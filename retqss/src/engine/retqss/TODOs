@@ -1,0 +1,7 @@
+* Model variables for 3D position --> x, y, z? 
+* Decide boundary crossing considering direction of the particle
+* Face neighborhood: use distance from straight line (direction of particle) to trajectory to bound maximum depth search.
+ * Add dQ to improve this bound 
+ 
+ * Better parallel tests
+ * Segfault when partition has different name than model binary

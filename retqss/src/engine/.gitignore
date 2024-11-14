@@ -1,0 +1,12 @@
+# Generated libs.
+usr/*
+
+# Local Changelog
+ChangeLog
+
+# Tmp VIM files.
+/**/*.swp
+
+# Vim config files.
+tags
+compile_commands.json
