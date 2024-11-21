@@ -39,70 +39,40 @@ algorithm
 	z := zCoord;
 end randomRoute;
 
-function acceleration
-	input Integer particleID;
-	input Real pX[1];
-	input Real pY[1];
-	input Real pZ[1];
-	input Real vX[1];
-	input Real vY[1];
-	input Real vZ[1];
+function repulsivePedestrianEffect
+	input Real pX1;
+	input Real pY1;
+	input Real pZ1;
+	input Real pX2;
+	input Real pY2;
+	input Real pZ2;
+	input Real vX2;
+	input Real vY2;
+	input Real vZ2;
+	output Real x;
+	output Real y;
+	output Real z;
+external "C" social_force_model_repulsivePedestrianEffect(pX1, pY1, pZ1, pX2, pY2, pZ2, vX2, vY2, vZ2, x, y, z) annotation(
+	Library="social_force_model",
+	Include="#include \"retqss_social_force_model.h\"");
+end repulsivePedestrianEffect;
+
+function pedestrianAcceleration
+	input Real pX;
+	input Real pY;
+	input Real pZ;
+	input Real vX;
+	input Real vY;
+	input Real vZ;
 	input Real targetX;
 	input Real targetY;
 	input Real targetZ;
 	output Real x;
 	output Real y;
 	output Real z;
-external "C" social_force_model_acceleration(particleID, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ, x, y, z) annotation(		
+external "C" social_force_model_pedestrianAcceleration(pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ, x, y, z) annotation(
 	Library="social_force_model",
 	Include="#include \"retqss_social_force_model.h\"");
-end acceleration;
-
-function totalRepulsivePedestrianEffect
-	input Integer particleID;
-	input Real pX[1];
-	input Real pY[1];
-	input Real pZ[1];
-	input Real vX[1];
-	input Real vY[1];
-	input Real vZ[1];
-	output Real x;
-	output Real y;
-	output Real z;
-external "C" social_force_model_totalRepulsivePedestrianEffect(particleID, pX, pY, pZ, vX, vY, vZ, x, y, z) annotation(
-	Library="social_force_model",
-	Include="#include \"retqss_social_force_model.h\"");
-end totalRepulsivePedestrianEffect;
-
-function pedestrianTotalMotivation
-	input Integer particleID;
-	input Real pX[1];
-	input Real pY[1];
-	input Real pZ[1];
-	input Real vX[1];
-	input Real vY[1];
-	input Real vZ[1];
-	input Real targetX;
-	input Real targetY;
-	input Real targetZ;
-	output Real x;
-	output Real y;
-	output Real z;
-protected
-	Real repulsiveX;
-	Real repulsiveY;
-	Real repulsiveZ;
-	Real accelerationX;
-	Real accelerationY;
-	Real accelerationZ;
-algorithm
-	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, pX, pY, pZ, vX, vY, vZ);
-	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
-	// + totalRepulsiveBorderEffect(x, y, z)  + totalAttractivePedestrianEffect(x, y, z);
-	x := accelerationX + repulsiveX;
-	y := accelerationY + repulsiveY;
-	z := accelerationZ + repulsiveZ;
-end pedestrianTotalMotivation;
-
+end pedestrianAcceleration;
 
 end retQSS_social_force_model;

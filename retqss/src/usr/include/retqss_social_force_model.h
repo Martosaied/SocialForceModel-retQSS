@@ -13,32 +13,6 @@ extern "C"
 {
 #endif
 
-void social_force_model_totalRepulsivePedestrianEffect(
-	int particleID,
-	double *pX,
-	double *pY,
-	double *pZ,
-	double *pVX,
-	double *pVY,
-	double *pVZ,
-	double *x,
-	double *y,
-	double *z);
-
-void social_force_model_acceleration(
-	int particleID,
-	double* px,
-	double* py,
-	double* pz,
-	double* vx,
-	double* vy,
-	double* vz,
-	double targetX,
-	double targetY,
-	double targetZ,
-	double *x,
-	double *y,
-	double *z);
 
 void social_force_model_desiredDirection(
 	double currentX,
@@ -50,6 +24,28 @@ void social_force_model_desiredDirection(
 	double *desiredX,
 	double *desiredY,
 	double *desiredZ);
+
+void social_force_model_pedestrianAcceleration(
+	double pX,
+	double pY,
+	double pZ,
+	double vX,
+	double vY,
+	double vz,
+	double targetX,
+	double targetY,
+	double targetZ,
+	double *x,
+	double *y,
+	double *z
+);
+
+void social_force_model_repulsivePedestrianEffect(
+	double pX1, double pY1, double pZ1,
+	double pX2, double pY2, double pZ2,
+	double vX2, double vY2, double vZ2,
+	double *x, double *y, double *z
+);
 
 #ifdef __cplusplus
 }

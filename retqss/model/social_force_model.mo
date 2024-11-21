@@ -74,6 +74,10 @@ discrete Real nextProgressTick;
 
 // local variables
 discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID;
+discrete Real currentVX, currentVY, currentVZ;
+discrete Real desiredVX, desiredVY, desiredVZ;
+discrete Real currentX, currentY, currentZ;
+discrete Integer inn, out;
 discrete Boolean isolate;
 
 
@@ -112,16 +116,11 @@ initial algorithm
 	// setup the particles initial state
 	for i in 1:N loop
 		// set the particles velocity according to their type, left to right or right to left
-		//TODO: no se puede mandar x[i], y[i], z[i] como parametro, preguntar
-		hx := dx[i];
-		hy := dy[i];
-		hz := dz[i];
 		if x[i] == 0.0 then
 			_ := particle_setProperty(i, "status", EXPOSED());
 		else
 			_ := particle_setProperty(i, "status", SUSCEPTIBLE());
 		end if;
-		(vx[i], vy[i], vz[i]) := pedestrianTotalMotivation(i, x, y, z, vx, vy, vz, hx, hy, hz);
 		_ := particle_setProperty(i, "initialX", x[i]);
 		_ := particle_setProperty(i, "initialY", y[i]);
 		_ := particle_setProperty(i, "trackingStatus", UNKNOWN());
@@ -149,9 +148,6 @@ equation
         der(vx[i]) = 0.;
         der(vy[i]) = 0.;
         der(vz[i]) = 0.;
-		// der(dx[i]) = dx[i];
-		// der(dy[i]) = dy[i];
-		// der(dz[i]) = dz[i];
     end for;
 
 	for i in 1:VOLUMES_COUNT loop
@@ -163,19 +159,6 @@ equation
 */
 algorithm
 
-	_ := debug(INFO(), time, "Starting time events",_,_,_,_);
-
-	_ := debug(INFO(), time, "Reinitializing velocities",_,_,_,_);
-	for i in 1:N loop
-		hx := dx[i];
-		hy := dy[i];
-		hz := dz[i];
-		(hx, hy, hz) := pedestrianTotalMotivation(i, x, y, z, vx, vy, vz, hx, hy, hz);
-		reinit(vx[i], hx);
-		reinit(vy[i], hy);
-		reinit(vz[i], hz);	
-	end for;
-	
 	for i in 1:N loop
 		//EVENT: particle enters a volume (it may bounce or triggers disease/tracing logics implemented in the library) 
 		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
@@ -201,9 +184,29 @@ algorithm
 
 	//EVENT: Next progress output time: prints a new line in stdout and computes the next output time incrementing the variable
   	when time > nextProgressTick then
+		for i in 1:N loop
+			inn := modulus(i, N);
+			out := floor(i / N);
+			_ := debug(INFO(), time, "Particle %d interacting with particle %d", inn, out, _,_);
+			hx := dx[i];
+			hy := dy[i];
+			hz := dz[i];
+			(hx, hy, hz) := pedestrianAcceleration(x[i], y[i], z[i], vx[i], vy[i], vz[i], hx, hy, hz);
+			// if inn <> out then
+			// 	(ux, uy, uz) := repulsivePedestrianEffect(x[inn], y[inn], z[inn], x[out], y[out], z[out], vx[out], vy[out], vz[out]);
+			// 	hx := hx + ux;
+			// 	hy := hy + uy;
+			// 	hz := hz + uz;
+			// end if;
+			_ := debug(INFO(), time, "Reinitializing velocities for particle %d. hx = %f, hy = %f, hz = %f", i, hx, hy, hz);
+			reinit(vx[i], hx);
+			reinit(vy[i], hy);
+			reinit(vz[i], hz);	
+		end for;
 		_ := debug(INFO(), time, "Progress checkpoint",_,_,_,_);
         nextProgressTick := time + PROGRESS_UPDATE_DT;
 	end when;
+
 	
 
 annotation(
