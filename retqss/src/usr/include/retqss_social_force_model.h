@@ -27,6 +27,7 @@ void social_force_model_totalRepulsivePedestrianEffect(
 
 void social_force_model_acceleration(
 	int particleID,
+	double* desiredSpeed,
 	double* px,
 	double* py,
 	double* pz,

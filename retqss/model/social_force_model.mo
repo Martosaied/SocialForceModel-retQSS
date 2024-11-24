@@ -11,7 +11,7 @@ import retQSS_covid19_fsm;
 */
 
 constant Integer // size
-	N = 40,
+	N = 100,
 	GRID_DIVISIONS = 7,
 	LEFT_COUNT = N / 2;
 
@@ -24,7 +24,9 @@ parameter Integer
 // Output delta time parameter
 parameter Real
 	DEFAULT_SPEED = getRealModelParameter("DEFAULT_SPEED", 1.34),
-	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 0.01);
+	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 0.01),
+	SPEED_MU = getRealModelParameter("SPEED_MU", 1.34),
+	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 0.26);
 
 
 // Grid constant
@@ -37,7 +39,7 @@ parameter Real
 	INF = 1e20,
 	EPS = 1e-5,
 	PI = 3.1415926,
-	PROGRESS_UPDATE_DT = 10.0,
+	PROGRESS_UPDATE_DT = 0.01,
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 1.0),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;
@@ -55,6 +57,9 @@ Real vx[N], vy[N], vz[N];
 // Particles desired destination variables
 discrete Real dx[N], dy[N], dz[N];
 
+// Particles desired speed
+discrete Real desiredSpeed[N];
+
 Real volumeConcentration[VOLUMES_COUNT];
 
 /*
@@ -71,6 +76,9 @@ discrete Real nextOutputTick;
 
 // Variable used to control and trigger progress output in the terminal
 discrete Real nextProgressTick;
+
+// Variable used to control and trigger motivation update
+discrete Real nextMotivationTick;
 
 // local variables
 discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID;
@@ -101,6 +109,8 @@ initial algorithm
 	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
         (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD);
+		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
+		_ := debug(INFO(), time, "For particle %d %d, desired speed is %f", i, i, desiredSpeed[i], _);
     end for;
 
 	// setup the particles in RETQSS
@@ -112,16 +122,11 @@ initial algorithm
 	// setup the particles initial state
 	for i in 1:N loop
 		// set the particles velocity according to their type, left to right or right to left
-		//TODO: no se puede mandar x[i], y[i], z[i] como parametro, preguntar
-		hx := dx[i];
-		hy := dy[i];
-		hz := dz[i];
 		if x[i] == 0.0 then
 			_ := particle_setProperty(i, "status", EXPOSED());
 		else
 			_ := particle_setProperty(i, "status", SUSCEPTIBLE());
 		end if;
-		(vx[i], vy[i], vz[i]) := pedestrianTotalMotivation(i, x, y, z, vx, vy, vz, hx, hy, hz);
 		_ := particle_setProperty(i, "initialX", x[i]);
 		_ := particle_setProperty(i, "initialY", y[i]);
 		_ := particle_setProperty(i, "trackingStatus", UNKNOWN());
@@ -134,6 +139,7 @@ initial algorithm
 
     terminateTime := FORCE_TERMINATION_AT;
     nextProgressTick := EPS;
+	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
     
@@ -149,9 +155,6 @@ equation
         der(vx[i]) = 0.;
         der(vy[i]) = 0.;
         der(vz[i]) = 0.;
-		// der(dx[i]) = dx[i];
-		// der(dy[i]) = dy[i];
-		// der(dz[i]) = dz[i];
     end for;
 
 	for i in 1:VOLUMES_COUNT loop
@@ -161,21 +164,7 @@ equation
 /*
   Model's time events
 */
-algorithm
-
-	_ := debug(INFO(), time, "Starting time events",_,_,_,_);
-
-	_ := debug(INFO(), time, "Reinitializing velocities",_,_,_,_);
-	for i in 1:N loop
-		hx := dx[i];
-		hy := dy[i];
-		hz := dz[i];
-		(hx, hy, hz) := pedestrianTotalMotivation(i, x, y, z, vx, vy, vz, hx, hy, hz);
-		reinit(vx[i], hx);
-		reinit(vy[i], hy);
-		reinit(vz[i], hz);	
-	end for;
-	
+algorithm	
 	for i in 1:N loop
 		//EVENT: particle enters a volume (it may bounce or triggers disease/tracing logics implemented in the library) 
 		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
@@ -199,9 +188,24 @@ algorithm
 		terminate();
 	end when;
 
+	
+	when time > nextMotivationTick then
+		nextMotivationTick := time + PROGRESS_UPDATE_DT;
+		// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
+		for i in 1:N loop
+			hx := dx[i];
+			hy := dy[i];
+			hz := dz[i];
+			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, x, y, z, vx, vy, vz, hx, hy, hz);
+			reinit(vx[i], hx);
+			reinit(vy[i], hy);
+			reinit(vz[i], hz);	
+		end for;
+	end when;
+
 	//EVENT: Next progress output time: prints a new line in stdout and computes the next output time incrementing the variable
-  	when time > nextProgressTick then
-		_ := debug(INFO(), time, "Progress checkpoint",_,_,_,_);
+	when time > nextProgressTick then
+		// _ := debug(INFO(), time, "Progress checkpoint",_,_,_,_);
         nextProgressTick := time + PROGRESS_UPDATE_DT;
 	end when;
 	

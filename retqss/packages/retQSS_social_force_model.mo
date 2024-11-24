@@ -41,6 +41,7 @@ end randomRoute;
 
 function acceleration
 	input Integer particleID;
+	input Real desiredSpeed[1];
 	input Real pX[1];
 	input Real pY[1];
 	input Real pZ[1];
@@ -53,7 +54,7 @@ function acceleration
 	output Real x;
 	output Real y;
 	output Real z;
-external "C" social_force_model_acceleration(particleID, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ, x, y, z) annotation(		
+external "C" social_force_model_acceleration(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ, x, y, z) annotation(		
 	Library="social_force_model",
 	Include="#include \"retqss_social_force_model.h\"");
 end acceleration;
@@ -76,6 +77,7 @@ end totalRepulsivePedestrianEffect;
 
 function pedestrianTotalMotivation
 	input Integer particleID;
+	input Real desiredSpeed[1];
 	input Real pX[1];
 	input Real pY[1];
 	input Real pZ[1];
@@ -89,6 +91,7 @@ function pedestrianTotalMotivation
 	output Real y;
 	output Real z;
 protected
+	Integer index;
 	Real repulsiveX;
 	Real repulsiveY;
 	Real repulsiveZ;
@@ -96,12 +99,17 @@ protected
 	Real accelerationY;
 	Real accelerationZ;
 algorithm
-	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, pX, pY, pZ, vX, vY, vZ);
-	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
+	// (repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, pX, pY, pZ, vX, vY, vZ);
+	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
 	// + totalRepulsiveBorderEffect(x, y, z)  + totalAttractivePedestrianEffect(x, y, z);
-	x := accelerationX + repulsiveX;
-	y := accelerationY + repulsiveY;
-	z := accelerationZ + repulsiveZ;
+
+	// if sqrt(accelerationX * accelerationX + accelerationY * accelerationY) > 1.3 * desiredSpeed then
+	// 	accelerationX := accelerationX * desiredSpeed * 1.3 / sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
+	// 	accelerationY := accelerationY * desiredSpeed * 1.3/ sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
+	// end if;
+	x := accelerationX;
+	y := accelerationY;
+	z := accelerationZ;
 end pedestrianTotalMotivation;
 
 

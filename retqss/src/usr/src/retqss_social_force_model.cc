@@ -7,7 +7,7 @@
 extern "C"
 {
 
-double norm(double aX, double aY, double aZ)
+double vector_norm(double aX, double aY, double aZ)
 {
 	return sqrt(aX*aX + aY*aY + aZ*aZ);
 }
@@ -20,6 +20,34 @@ void repulsive_pedestrian_effect(
 	double *x, double *y, double *z
 )
 {
+	// double deltaT = 0.01; // NI idea porque
+	// double deltaT2 = deltaT;
+	// double deltaX = 0.001;
+	// double rabmod = sqrt(aX*aX + aY*aY);
+	// double rabmodx = sqrt((aX+deltaX)*(aX+deltaX) + aY*aY);
+	// double rabmody = sqrt(aX*aX + (aY+deltaX)*(aY+deltaX));
+
+	// double rabx = bX - aX;
+	// double raby = bY - aY;
+
+	// double theta = atan2(raby, rabx);
+	// double thetax = atan2(raby, rabx+deltaX)
+	// double thetay = atan2(raby+deltaX, rabx)
+
+
+	// double vb = bSpeed;
+	// root = sqrt(rabmod**2.0-2.0*vb*deltaT2*rabmod*cos(theta)+vb**2.0*deltaT2**2.0)
+	// rootx = sqrt(rabmodx**2.0-2.0*vb*deltaT2*rabmodx*cos(thetax)+vb**2.0*deltaT2**2.0)
+	// rooty = sqrt(rabmody**2.0-2.0*vb*deltaT2*rabmody*cos(thetay)+vb**2.0*deltaT2**2.0)
+	// b = sqrt(rabmod**2.0+2.0*rabmod*root+root**2.0-vb**2.0*deltaT2**2.0)/2.0
+	// bx = sqrt(rabmodx**2.0+2.0*rabmodx*rootx+rootx**2.0-vb**2.0*deltaT2**2.0)/2.0
+	// by = sqrt(rabmody**2.0+2.0*rabmody*rooty+rooty**2.0-vb**2.0*deltaT2**2.0)/2.0
+	// exp = e**(-b/sigma)
+	// expx = e**(-bx/sigma)
+	// expy = e**(-by/sigma)
+	// fx[j] = -v0*(expx-exp)/deltax
+	// fy[j] = -v0*(expy-exp)/deltax
+
 	double rX = aX - bX;
 	double rY = aY - bY;
 	double rZ = aZ - bZ;
@@ -30,10 +58,10 @@ void repulsive_pedestrian_effect(
 		bVZ = 0;
 	}
 
-	double rNorm = norm(rX, rY, rZ);
+	double rNorm = vector_norm(rX, rY, rZ);
 
 	int deltaT = 2;
-	double bVNorm = norm(rX - deltaT * bVX, rY - deltaT * bVY, rZ - deltaT * bVZ);
+	double bVNorm = vector_norm(rX - deltaT * bVX, rY - deltaT * bVY, rZ - deltaT * bVZ);
 
 	double b = sqrt(
 		pow(rNorm + bVNorm, 2) 
@@ -44,11 +72,6 @@ void repulsive_pedestrian_effect(
 	double repulsivePotential = pow(initialRepulsivePotential, (-b/0.26));
 
 	double w = 1; // TODO: esto es una funcion que da 1 o un numero de 0 a 1 dependiendo de la distancia
-
-	printf("pow(rNorm + bVNorm, 2): %f\n", pow(rNorm + bVNorm, 2));
-	printf("pow(bSpeed * deltaT, 2): %f\n", pow(bSpeed * deltaT, 2));
-	printf("pow(rNorm + bVNorm, 2) - pow(bSpeed * deltaT, 2): %f\n", pow(rNorm + bVNorm, 2) - pow(bSpeed * deltaT, 2));
-	printf("b: %f\n", b);
 
 	*x = repulsivePotential * rX;
 	*y = repulsivePotential * rY;
@@ -85,8 +108,7 @@ void social_force_model_desiredDirection(
 	double *desiredY,
 	double *desiredZ)
 {
-	// TODO: Agregar z a la norma
-	double norm = sqrt((targetX - currentX) * (targetX - currentX) + (targetY - currentY) * (targetY - currentY));
+	double norm = vector_norm((targetX - currentX), (targetY - currentY), (targetZ - currentZ));
 	*desiredX = ((targetX - currentX) / norm);
 	*desiredY = ((targetY - currentY) / norm);
 	*desiredZ = currentZ;
@@ -94,6 +116,7 @@ void social_force_model_desiredDirection(
 
 void social_force_model_acceleration(
 	int particleID,
+	double* desiredSpeed,
 	double* px,
 	double* py,
 	double* pz,
@@ -114,7 +137,7 @@ void social_force_model_acceleration(
 	double currentZ = pz[index];
 
 	// The desired speed is gaussian distributed with mean 1.34 m/s and standard deviation 0.26 m/s
-	double desiredSpeed = retQSS::random_normal(1.34, 0.26); // TODO: make it a parameter
+	double desiredSpeedValue = desiredSpeed[particleID];
 
 	// The desired direction is given by the difference between the current position and the target position
 	double desiredX, desiredY, desiredZ;
@@ -125,9 +148,9 @@ void social_force_model_acceleration(
 	);
 
 	// // The desired acceleration is the difference between the desired speed and the current speed
-	desiredX = (desiredX*desiredSpeed);
-	desiredY = (desiredY*desiredSpeed);
-	desiredZ = (desiredZ*desiredSpeed);
+	desiredX = (desiredX*desiredSpeedValue);
+	desiredY = (desiredY*desiredSpeedValue);
+	desiredZ = (desiredZ*desiredSpeedValue);
 
 	// Current velocity
 	double currentVX = vx[index];
@@ -137,10 +160,20 @@ void social_force_model_acceleration(
 	// The acceleration is the difference between the desired acceleration and the current acceleration
 	// The acceleration has a relaxation time of 0.5 seconds
 	// TODO: Missing difference between desired and actual
-	double relaxationTime = 0.5; // TODO: make it a parameter
-	*x = (desiredX - currentVX) / relaxationTime;
-	*y = (desiredY - currentVY) / relaxationTime;
-	*z = (desiredZ - currentVZ) / relaxationTime;
+	double relaxationTime = 1/0.5; // TODO: make it a parameter
+	*x = (desiredX - currentVX) * relaxationTime;
+	*y = (desiredY - currentVY) * relaxationTime;
+	*z = 0;
+
+	if (sqrt(*x * *x + *y * *y) > 1.3 * desiredSpeedValue) {
+		*x = *x * desiredSpeedValue * 1.3 / sqrt(*x * *x + *y * *y);
+		*y = *y * desiredSpeedValue * 1.3/ sqrt(*x * *x + *y * *y);
+	}
+
+	printf("Desired speed is %f for particle %d\n", desiredSpeedValue, particleID);
+
+	*x = *x + currentVX;
+	*y = *y + currentVY;
 }
 
 
