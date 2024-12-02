@@ -54,6 +54,9 @@ Real x[N], y[N], z[N];
 // Particles velocity
 Real vx[N], vy[N], vz[N];
 
+// Particles acceleration
+Real ax[N], ay[N], az[N];
+
 // Particles desired destination variables
 discrete Real dx[N], dy[N], dz[N];
 
@@ -152,9 +155,12 @@ equation
         der(x[i])  = vx[i];
         der(y[i])  = vy[i];
         der(z[i])  = vz[i];
-        der(vx[i]) = 0.;
-        der(vy[i]) = 0.;
-        der(vz[i]) = 0.;
+        der(vx[i]) = ax[i];
+        der(vy[i]) = ay[i];
+        der(vz[i]) = az[i];
+		der(ax[i]) = 0.0;
+		der(ay[i]) = 0.0;
+		der(az[i]) = 0.0;
     end for;
 
 	for i in 1:VOLUMES_COUNT loop
@@ -165,17 +171,17 @@ equation
   Model's time events
 */
 algorithm	
-	for i in 1:N loop
-		//EVENT: particle enters a volume (it may bounce or triggers disease/tracing logics implemented in the library) 
-		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
-			(_, normalX, normalY) := onNextCross(time, i, 0.);
-			if normalX <> 0.0 or normalY <> 0.0 then
-				reinit(vx[i], 0.);
-				reinit(vy[i], 0.);
-			end if;
-		end when;
+	// for i in 1:N loop
+	// 	//EVENT: particle enters a volume (it may bounce or triggers disease/tracing logics implemented in the library) 
+	// 	when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
+	// 		(_, normalX, normalY) := onNextCross(time, i, 0.);
+	// 		if normalX <> 0.0 or normalY <> 0.0 then
+	// 			reinit(vx[i], 0.);
+	// 			reinit(vy[i], 0.);
+	// 		end if;
+	// 	end when;
 
-    end for;
+    // end for;
 
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
@@ -197,11 +203,34 @@ algorithm
 			hy := dy[i];
 			hz := dz[i];
 			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, x, y, z, vx, vy, vz, hx, hy, hz);
-			reinit(vx[i], hx);
-			reinit(vy[i], hy);
-			reinit(vz[i], hz);	
+			reinit(ax[i], hx);
+			reinit(ay[i], hy);
+			reinit(az[i], hz);	
+		end for;
+
+		_ := debug(INFO(), time, "Updating particles position",_,_,_,_);
+		for i in 1:N loop
+			hx := x[i];
+			hy := y[i];
+			hz := z[i];
+			if x[i] < 0.0 then
+				hx := 1.0;
+			end if;
+			if y[i] < 0.0 then
+				hy := 1.0;
+			end if;
+			if x[i] > 1.0 then
+				hx := 0.0;
+			end if;
+			if y[i] > 1.0 then
+				hy := 0.0;
+			end if;
+			reinit(x[i], hx);
+			reinit(y[i], hy);
+			reinit(z[i], hz);	
 		end for;
 	end when;
+
 
 	//EVENT: Next progress output time: prints a new line in stdout and computes the next output time incrementing the variable
 	when time > nextProgressTick then

@@ -15,12 +15,22 @@ extern "C"
 
 void social_force_model_totalRepulsivePedestrianEffect(
 	int particleID,
+	double *desiredSpeed,
 	double *pX,
 	double *pY,
 	double *pZ,
 	double *pVX,
 	double *pVY,
 	double *pVZ,
+	double *x,
+	double *y,
+	double *z);
+
+void social_force_model_totalRepulsiveBorderEffect(
+	int particleID,
+	double pX[1],
+	double pY[1],
+	double pZ[1],
 	double *x,
 	double *y,
 	double *z);

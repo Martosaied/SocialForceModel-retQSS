@@ -25,6 +25,8 @@ function randomRoute
 	output Real dx;
 	output Real dy;
 	output Real dz;
+protected
+	Real randomValue;
 algorithm
 	if randomBoolean(0.5) == 0.0 then
 		x := 0.0 * size;
@@ -61,6 +63,7 @@ end acceleration;
 
 function totalRepulsivePedestrianEffect
 	input Integer particleID;
+	input Real desiredSpeed[1];
 	input Real pX[1];
 	input Real pY[1];
 	input Real pZ[1];
@@ -70,10 +73,23 @@ function totalRepulsivePedestrianEffect
 	output Real x;
 	output Real y;
 	output Real z;
-external "C" social_force_model_totalRepulsivePedestrianEffect(particleID, pX, pY, pZ, vX, vY, vZ, x, y, z) annotation(
+external "C" social_force_model_totalRepulsivePedestrianEffect(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, x, y, z) annotation(
 	Library="social_force_model",
 	Include="#include \"retqss_social_force_model.h\"");
 end totalRepulsivePedestrianEffect;
+
+function totalRepulsiveBorderEffect
+	input Integer particleID;
+	input Real pX[1];
+	input Real pY[1];
+	input Real pZ[1];
+	output Real x;
+	output Real y;
+	output Real z;
+external "C" social_force_model_totalRepulsiveBorderEffect(particleID, pX, pY, pZ, x, y, z) annotation(
+	Library="social_force_model",
+	Include="#include \"retqss_social_force_model.h\"");
+end totalRepulsiveBorderEffect;
 
 function pedestrianTotalMotivation
 	input Integer particleID;
@@ -92,24 +108,40 @@ function pedestrianTotalMotivation
 	output Real z;
 protected
 	Integer index;
+	Real desiredSpeedValue;
+	Real currentVX;
+	Real currentVY;
+	Real currentVZ;
+	Real wallX;
+	Real wallY;
+	Real wallZ;
 	Real repulsiveX;
 	Real repulsiveY;
 	Real repulsiveZ;
 	Real accelerationX;
 	Real accelerationY;
 	Real accelerationZ;
+	Real resultX;
+	Real resultY;
+	Real resultZ;
 algorithm
-	// (repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, pX, pY, pZ, vX, vY, vZ);
 	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
-	// + totalRepulsiveBorderEffect(x, y, z)  + totalAttractivePedestrianEffect(x, y, z);
+	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ);
+	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(particleID, pX, pY, pZ);
 
-	// if sqrt(accelerationX * accelerationX + accelerationY * accelerationY) > 1.3 * desiredSpeed then
-	// 	accelerationX := accelerationX * desiredSpeed * 1.3 / sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
-	// 	accelerationY := accelerationY * desiredSpeed * 1.3/ sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
-	// end if;
-	x := accelerationX;
-	y := accelerationY;
-	z := accelerationZ;
+	resultX := repulsiveX + accelerationX + wallX;
+	resultY := repulsiveY + accelerationY + wallY;
+	resultZ := repulsiveZ + accelerationZ + wallZ;
+
+	desiredSpeedValue := arrayGet(desiredSpeed, particleID);
+	if sqrt(resultX * resultX + resultY * resultY) > 1.3 * desiredSpeedValue then
+		resultX := resultX * desiredSpeedValue * 1.3 / sqrt(resultX * resultX + resultY * resultY);
+		resultY := resultY * desiredSpeedValue * 1.3/ sqrt(resultX * resultX + resultY * resultY);
+	end if;
+
+	x := resultX;
+	y := resultY;
+	z := resultZ;
 end pedestrianTotalMotivation;
 
 

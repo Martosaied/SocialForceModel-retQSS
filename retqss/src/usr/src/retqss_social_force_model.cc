@@ -20,81 +20,143 @@ void repulsive_pedestrian_effect(
 	double *x, double *y, double *z
 )
 {
-	// double deltaT = 0.01; // NI idea porque
-	// double deltaT2 = deltaT;
-	// double deltaX = 0.001;
+	// double deltax = 0.001;
+	// double deltaT2 = 0.002;
 	// double rabmod = sqrt(aX*aX + aY*aY);
-	// double rabmodx = sqrt((aX+deltaX)*(aX+deltaX) + aY*aY);
-	// double rabmody = sqrt(aX*aX + (aY+deltaX)*(aY+deltaX));
+	// double rabmodx = sqrt((aX+deltax)*(aX+deltax) + aY*aY);
+	// double rabmody = sqrt(aX*aX + (aY+deltax)*(aY+deltax));
 
 	// double rabx = bX - aX;
 	// double raby = bY - aY;
 
 	// double theta = atan2(raby, rabx);
-	// double thetax = atan2(raby, rabx+deltaX)
-	// double thetay = atan2(raby+deltaX, rabx)
+	// double thetax = atan2(raby, rabx+deltax);
+	// double thetay = atan2(raby+deltax, rabx);
 
+	// double vb = sqrt(bVX*bVX + bVY*bVY);
 
-	// double vb = bSpeed;
-	// root = sqrt(rabmod**2.0-2.0*vb*deltaT2*rabmod*cos(theta)+vb**2.0*deltaT2**2.0)
-	// rootx = sqrt(rabmodx**2.0-2.0*vb*deltaT2*rabmodx*cos(thetax)+vb**2.0*deltaT2**2.0)
-	// rooty = sqrt(rabmody**2.0-2.0*vb*deltaT2*rabmody*cos(thetay)+vb**2.0*deltaT2**2.0)
-	// b = sqrt(rabmod**2.0+2.0*rabmod*root+root**2.0-vb**2.0*deltaT2**2.0)/2.0
-	// bx = sqrt(rabmodx**2.0+2.0*rabmodx*rootx+rootx**2.0-vb**2.0*deltaT2**2.0)/2.0
-	// by = sqrt(rabmody**2.0+2.0*rabmody*rooty+rooty**2.0-vb**2.0*deltaT2**2.0)/2.0
-	// exp = e**(-b/sigma)
-	// expx = e**(-bx/sigma)
-	// expy = e**(-by/sigma)
-	// fx[j] = -v0*(expx-exp)/deltax
-	// fy[j] = -v0*(expy-exp)/deltax
+	// double sigma = 0.3;
 
-	double rX = aX - bX;
-	double rY = aY - bY;
-	double rZ = aZ - bZ;
+	// double root = sqrt(rabmod*rabmod-2.0*vb*deltaT2*rabmod*cos(theta)+vb*vb*deltaT2*deltaT2);
+	// double rootx = sqrt(rabmodx*rabmodx-2.0*vb*deltaT2*rabmodx*cos(thetax)+vb*vb*deltaT2*deltaT2);
+	// double rooty = sqrt(rabmody*rabmody-2.0*vb*deltaT2*rabmody*cos(thetay)+vb*vb*deltaT2*deltaT2);
+	// double b = sqrt(rabmod*rabmod+2.0*rabmod*root+root*root-vb*vb*deltaT2*deltaT2)/2.0;
+	// double bx = sqrt(rabmodx*rabmodx+2.0*rabmodx*rootx+rootx*rootx-vb*vb*deltaT2*deltaT2)/2.0;
+	// double by = sqrt(rabmody*rabmody+2.0*rabmody*rooty+rooty*rooty-vb*vb*deltaT2*deltaT2)/2.0;
+	// double e = exp(-b/sigma);
+	// double expx = exp(-bx/sigma);
+	// double expy = exp(-by/sigma);
+	// double fx = -2.1*(expx-e)/deltax;
+	// double fy = -2.1*(expy-e)/deltax;
 
-	if (isnan(bVX) && isnan(bVY) && isnan(bVZ)) {
-		bVX = 0;
-		bVY = 0;
-		bVZ = 0;
-	}
+	// double phi = 100.0*2.0*3.1415926/360.0;
+	// double c = 0.5;
+	// if (-aX*fx >= sqrt(fx*fx+fy*fy)*cos(phi)) {
+	// 	fx = fx;
+	// 	fy = fy;
+	// } else {
+	// 	fx = fx*c;
+	// 	fy = fy*c;
+	// }
 
-	double rNorm = vector_norm(rX, rY, rZ);
+	double A = 4;
+	double B = 0.2;
 
-	int deltaT = 2;
-	double bVNorm = vector_norm(rX - deltaT * bVX, rY - deltaT * bVY, rZ - deltaT * bVZ);
+	double ra = 0.01;
+	double rb = 0.01;
+	double rab = ra + rb;
 
-	double b = sqrt(
-		pow(rNorm + bVNorm, 2) 
-		// - pow(bSpeed * deltaT, 2) TODO: revisar pq da negativo
-	);
+	double deltax = bX - aX;
+	double deltay = bY - aY;
+	double distanceab = sqrt(deltax*deltax + deltay*deltay);
 
-	double initialRepulsivePotential = 2.1; // TODO: make it a parameter
-	double repulsivePotential = pow(initialRepulsivePotential, (-b/0.26));
+	double normalizedX = deltax / distanceab;
+	double normalizedY = deltay / distanceab;
 
-	double w = 1; // TODO: esto es una funcion que da 1 o un numero de 0 a 1 dependiendo de la distancia
+	double fx = A*exp((rab-distanceab)/B)*normalizedX;
+	double fy = A*exp((rab-distanceab)/B)*normalizedY;
 
-	*x = repulsivePotential * rX;
-	*y = repulsivePotential * rY;
-	*z = repulsivePotential * rZ;
+	*x = fx;
+	*y = fy;
+	*z = 0;
 }
 
-void social_force_model_totalRepulsivePedestrianEffect(int particleID, double *pX, double *pY, double *pZ, double *pVX, double *pVY, double *pVZ, double *x, double *y, double *z)
+void social_force_model_totalRepulsivePedestrianEffect(
+	int particleID, 
+	double *desiredSpeed,
+	double *pX, 
+	double *pY, 
+	double *pZ, 
+	double *pVX, 
+	double *pVY, 
+	double *pVZ, 
+	double *x, 
+	double *y, 
+	double *z
+)
 {	
 	double totalRepulsiveX = 0;
 	double totalRepulsiveY = 0;
 	double totalRepulsiveZ = 0;
 
 	int index = (particleID-1)*3;
-	for (int i = 0; i < 39; i++) {
+	for (int i = 0; i < 99; i++) {
+		if (i == particleID-1) continue;
 		double repulsiveX, repulsiveY, repulsiveZ;
-		repulsive_pedestrian_effect(pX[index], pY[index], pZ[index], pX[i*3], pY[i*3], pZ[i*3], pVX[i*3], pVY[i*3], pVZ[i*3], 1.2, &repulsiveX, &repulsiveY, &repulsiveZ);
+		repulsive_pedestrian_effect(pX[index], pY[index], pZ[index], pX[i*3], pY[i*3], pZ[i*3], pVX[i*3], pVY[i*3], pVZ[i*3], desiredSpeed[i], &repulsiveX, &repulsiveY, &repulsiveZ);
 		totalRepulsiveX += repulsiveX;
 		totalRepulsiveY += repulsiveY;
 		totalRepulsiveZ += repulsiveZ;
 	}
 	*x = totalRepulsiveX;
 	*y = totalRepulsiveY;
-	*z = totalRepulsiveZ;
+	*z = totalRepulsiveZ;	
+}
+
+void social_force_model_totalRepulsiveBorderEffect(
+	int particleID,
+	double pX[1],
+	double pY[1],
+	double pZ[1],
+	double *x,
+	double *y,
+	double *z
+)
+{
+	int index = (particleID-1)*3;
+	double aX = pX[index];
+	double aY = pY[index];
+	double b_inf = 0;
+	double b_sup = 1;
+
+	double A = 4;
+	double B = 0.2;
+
+	double ra = 0.01;
+
+	double deltax = aX;
+	double deltay = b_inf - aY;
+	double distanceab = sqrt(deltax*deltax + deltay*deltay);
+
+	double normalizedX = deltax / distanceab;
+	double normalizedY = deltay / distanceab;
+
+	double fx_inf = A*exp((ra-distanceab)/B)*normalizedX;
+	double fy_inf = A*exp((ra-distanceab)/B)*normalizedY;
+
+	deltax = aX;
+	deltay = b_sup - aY;
+	distanceab = sqrt(deltax*deltax + deltay*deltay);
+
+	normalizedX = deltax / distanceab;
+	normalizedY = deltay / distanceab;
+
+	double fx_sup = A*exp((ra-distanceab)/B)*normalizedX;
+	double fy_sup = A*exp((ra-distanceab)/B)*normalizedY;
+
+	*x = fx_inf + fx_sup;
+	*y = fy_inf + fy_sup;
+	*z = 0;
 }
 
 void social_force_model_desiredDirection(
@@ -159,21 +221,11 @@ void social_force_model_acceleration(
 
 	// The acceleration is the difference between the desired acceleration and the current acceleration
 	// The acceleration has a relaxation time of 0.5 seconds
-	// TODO: Missing difference between desired and actual
 	double relaxationTime = 1/0.5; // TODO: make it a parameter
 	*x = (desiredX - currentVX) * relaxationTime;
 	*y = (desiredY - currentVY) * relaxationTime;
 	*z = 0;
 
-	if (sqrt(*x * *x + *y * *y) > 1.3 * desiredSpeedValue) {
-		*x = *x * desiredSpeedValue * 1.3 / sqrt(*x * *x + *y * *y);
-		*y = *y * desiredSpeedValue * 1.3/ sqrt(*x * *x + *y * *y);
-	}
-
-	printf("Desired speed is %f for particle %d\n", desiredSpeedValue, particleID);
-
-	*x = *x + currentVX;
-	*y = *y + currentVY;
 }
 
 
