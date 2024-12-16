@@ -27,16 +27,20 @@ function randomRoute
 	output Real dz;
 protected
 	Real randomValue;
+	Real randomValue2;
 algorithm
 	if randomBoolean(0.5) == 0.0 then
-		x := 0.0 * size;
-		dx := 0.99 * size;
+		randomValue2 := random(0.1, size/3);
+		x := randomValue2;
+		dx := 1.20 * size;
 	else
-		x := 0.99 * size;
-		dx := 0.0 * size;
+		randomValue2 := random(size/3 * 2, size);
+		x := randomValue2;
+		dx := -0.20;
 	end if;
-	dy := random(0.0, size);
-	y := random(0.0, size);
+	randomValue := random(size*0.2, size*0.8);
+	dy := randomValue;
+	y := randomValue;
 	dz := zCoord;
 	z := zCoord;
 end randomRoute;
@@ -70,10 +74,12 @@ function totalRepulsivePedestrianEffect
 	input Real vX[1];
 	input Real vY[1];
 	input Real vZ[1];
+	input Real targetX;
+	input Real targetY;
 	output Real x;
 	output Real y;
 	output Real z;
-external "C" social_force_model_totalRepulsivePedestrianEffect(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, x, y, z) annotation(
+external "C" social_force_model_totalRepulsivePedestrianEffect(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, x, y, z) annotation(
 	Library="social_force_model",
 	Include="#include \"retqss_social_force_model.h\"");
 end totalRepulsivePedestrianEffect;
@@ -126,18 +132,12 @@ protected
 	Real resultZ;
 algorithm
 	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
-	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ);
+	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY);
 	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(particleID, pX, pY, pZ);
 
 	resultX := repulsiveX + accelerationX + wallX;
 	resultY := repulsiveY + accelerationY + wallY;
 	resultZ := repulsiveZ + accelerationZ + wallZ;
-
-	desiredSpeedValue := arrayGet(desiredSpeed, particleID);
-	if sqrt(resultX * resultX + resultY * resultY) > 1.3 * desiredSpeedValue then
-		resultX := resultX * desiredSpeedValue * 1.3 / sqrt(resultX * resultX + resultY * resultY);
-		resultY := resultY * desiredSpeedValue * 1.3/ sqrt(resultX * resultX + resultY * resultY);
-	end if;
 
 	x := resultX;
 	y := resultY;

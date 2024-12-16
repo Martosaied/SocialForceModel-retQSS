@@ -17,67 +17,40 @@ void repulsive_pedestrian_effect(
 	double bX, double bY, double bZ,
 	double bVX, double bVY, double bVZ,
 	double bSpeed,
+	double targetX,
+	double targetY,
 	double *x, double *y, double *z
 )
 {
-	// double deltax = 0.001;
-	// double deltaT2 = 0.002;
-	// double rabmod = sqrt(aX*aX + aY*aY);
-	// double rabmodx = sqrt((aX+deltax)*(aX+deltax) + aY*aY);
-	// double rabmody = sqrt(aX*aX + (aY+deltax)*(aY+deltax));
+	double A = 2.1;
+	double B = 0.3;
 
-	// double rabx = bX - aX;
-	// double raby = bY - aY;
-
-	// double theta = atan2(raby, rabx);
-	// double thetax = atan2(raby, rabx+deltax);
-	// double thetay = atan2(raby+deltax, rabx);
-
-	// double vb = sqrt(bVX*bVX + bVY*bVY);
-
-	// double sigma = 0.3;
-
-	// double root = sqrt(rabmod*rabmod-2.0*vb*deltaT2*rabmod*cos(theta)+vb*vb*deltaT2*deltaT2);
-	// double rootx = sqrt(rabmodx*rabmodx-2.0*vb*deltaT2*rabmodx*cos(thetax)+vb*vb*deltaT2*deltaT2);
-	// double rooty = sqrt(rabmody*rabmody-2.0*vb*deltaT2*rabmody*cos(thetay)+vb*vb*deltaT2*deltaT2);
-	// double b = sqrt(rabmod*rabmod+2.0*rabmod*root+root*root-vb*vb*deltaT2*deltaT2)/2.0;
-	// double bx = sqrt(rabmodx*rabmodx+2.0*rabmodx*rootx+rootx*rootx-vb*vb*deltaT2*deltaT2)/2.0;
-	// double by = sqrt(rabmody*rabmody+2.0*rabmody*rooty+rooty*rooty-vb*vb*deltaT2*deltaT2)/2.0;
-	// double e = exp(-b/sigma);
-	// double expx = exp(-bx/sigma);
-	// double expy = exp(-by/sigma);
-	// double fx = -2.1*(expx-e)/deltax;
-	// double fy = -2.1*(expy-e)/deltax;
-
-	// double phi = 100.0*2.0*3.1415926/360.0;
-	// double c = 0.5;
-	// if (-aX*fx >= sqrt(fx*fx+fy*fy)*cos(phi)) {
-	// 	fx = fx;
-	// 	fy = fy;
-	// } else {
-	// 	fx = fx*c;
-	// 	fy = fy*c;
-	// }
-
-	double A = 4;
-	double B = 0.2;
-
-	double ra = 0.01;
-	double rb = 0.01;
+	double ra = 0.1;
+	double rb = 0.1;
 	double rab = ra + rb;
 
 	double deltax = bX - aX;
 	double deltay = bY - aY;
 	double distanceab = sqrt(deltax*deltax + deltay*deltay);
 
-	double normalizedX = deltax / distanceab;
-	double normalizedY = deltay / distanceab;
+	double normalizedX = (aX - bX) / distanceab;
+	double normalizedY = (aY - bY) / distanceab;
 
 	double fx = A*exp((rab-distanceab)/B)*normalizedX;
 	double fy = A*exp((rab-distanceab)/B)*normalizedY;
 
-	*x = fx;
-	*y = fy;
+	double lambda = 0.3;
+	double desiredX, desiredY, desiredZ;
+	social_force_model_desiredDirection(
+		aX, aY, aZ,
+		targetX, targetY, 0,
+		&desiredX, &desiredY, &desiredZ
+	);
+	double cos_phi = -normalizedX*desiredX - normalizedY*desiredY;
+	double area = lambda + (1-lambda)*((1+cos_phi)/2);
+
+	*x = fx*area;
+	*y = fy*area;
 	*z = 0;
 }
 
@@ -90,6 +63,8 @@ void social_force_model_totalRepulsivePedestrianEffect(
 	double *pVX, 
 	double *pVY, 
 	double *pVZ, 
+	double targetX,
+	double targetY,
 	double *x, 
 	double *y, 
 	double *z
@@ -100,10 +75,10 @@ void social_force_model_totalRepulsivePedestrianEffect(
 	double totalRepulsiveZ = 0;
 
 	int index = (particleID-1)*3;
-	for (int i = 0; i < 99; i++) {
+	for (int i = 0; i < 299; i++) {
 		if (i == particleID-1) continue;
 		double repulsiveX, repulsiveY, repulsiveZ;
-		repulsive_pedestrian_effect(pX[index], pY[index], pZ[index], pX[i*3], pY[i*3], pZ[i*3], pVX[i*3], pVY[i*3], pVZ[i*3], desiredSpeed[i], &repulsiveX, &repulsiveY, &repulsiveZ);
+		repulsive_pedestrian_effect(pX[index], pY[index], pZ[index], pX[i*3], pY[i*3], pZ[i*3], pVX[i*3], pVY[i*3], pVZ[i*3], desiredSpeed[i], targetX, targetY, &repulsiveX, &repulsiveY, &repulsiveZ);
 		totalRepulsiveX += repulsiveX;
 		totalRepulsiveY += repulsiveY;
 		totalRepulsiveZ += repulsiveZ;
@@ -123,40 +98,38 @@ void social_force_model_totalRepulsiveBorderEffect(
 	double *z
 )
 {
-	int index = (particleID-1)*3;
-	double aX = pX[index];
-	double aY = pY[index];
-	double b_inf = 0;
-	double b_sup = 1;
+	int nextVolumeId = retQSS_particle_nextVolumeID(particleID);
+	if (nextVolumeId != 0 && retQSS_volume_getProperty(nextVolumeId, "isObstacle")) {
+		int index = (particleID-1)*3;
+		double aY = pY[index];
+		double aX = pX[index];
 
-	double A = 4;
-	double B = 0.2;
+		double borderX, borderY, borderZ;
+		retQSS_volume_centroid(nextVolumeId, &borderX, &borderY, &borderZ);
 
-	double ra = 0.01;
+		double A = 10;
+		double B = 0.2;
 
-	double deltax = aX;
-	double deltay = b_inf - aY;
-	double distanceab = sqrt(deltax*deltax + deltay*deltay);
+		double ra = 0.01;
 
-	double normalizedX = deltax / distanceab;
-	double normalizedY = deltay / distanceab;
+		double deltay = borderY - aY;
+		double distanceab = sqrt(deltay*deltay);
+		double normalizedY = deltay / distanceab;
+		double fy = A*exp((ra-distanceab)/B)*normalizedY;
+	
+		double deltax = borderX - aX;
+		distanceab = sqrt(deltax*deltax);
+		double normalizedX = deltax / distanceab;
+		double fx = A*exp((ra-distanceab)/B)*normalizedX;
 
-	double fx_inf = A*exp((ra-distanceab)/B)*normalizedX;
-	double fy_inf = A*exp((ra-distanceab)/B)*normalizedY;
-
-	deltax = aX;
-	deltay = b_sup - aY;
-	distanceab = sqrt(deltax*deltax + deltay*deltay);
-
-	normalizedX = deltax / distanceab;
-	normalizedY = deltay / distanceab;
-
-	double fx_sup = A*exp((ra-distanceab)/B)*normalizedX;
-	double fy_sup = A*exp((ra-distanceab)/B)*normalizedY;
-
-	*x = fx_inf + fx_sup;
-	*y = fy_inf + fy_sup;
-	*z = 0;
+		*x = fx;
+		*y = fy;
+		*z = 0;
+	} else {
+		*x = 0;
+		*y = 0;
+		*z = 0;
+	}
 }
 
 void social_force_model_desiredDirection(

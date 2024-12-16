@@ -22,6 +22,8 @@ void social_force_model_totalRepulsivePedestrianEffect(
 	double *pVX,
 	double *pVY,
 	double *pVZ,
+	double targetX,
+	double targetY,
 	double *x,
 	double *y,
 	double *z);

@@ -11,15 +11,15 @@ import retQSS_covid19_fsm;
 */
 
 constant Integer // size
-	N = 100,
-	GRID_DIVISIONS = 7,
+	N = 300,
+	GRID_DIVISIONS = 10,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
 parameter Integer
 	RANDOM_SEED = getIntegerModelParameter("RANDOM_SEED", 0),
 	GRID_SCENARIO = getIntegerModelParameter("GRID_SCENARIO", 0), //0=hallway (homogeneous)
-	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 5);
+	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 20);
 
 // Output delta time parameter
 parameter Real
@@ -40,7 +40,7 @@ parameter Real
 	EPS = 1e-5,
 	PI = 3.1415926,
 	PROGRESS_UPDATE_DT = 0.01,
-	GRID_SIZE = getRealModelParameter("GRID_SIZE", 1.0),
+	GRID_SIZE = getRealModelParameter("GRID_SIZE", 10.0),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;
 
@@ -103,6 +103,11 @@ initial algorithm
     _ := geometry_gridSetUp(GRID_DIVISIONS, GRID_DIVISIONS, 1, CELL_EDGE_LENGTH);
 
 	for i in 1:VOLUMES_COUNT loop
+		if i < 11 or i > 90 then
+			_ := volume_setProperty(i, "isObstacle", 1);
+		else
+			_ := volume_setProperty(i, "isObstacle", 0);
+		end if;
 		_ := volume_setProperty(i, "particleSpeed", DEFAULT_SPEED);
 		_ := volume_setProperty(i, "isClosedSpace", 0);
 		_ := volume_setProperty(i, "isBlock", 0);
@@ -125,7 +130,7 @@ initial algorithm
 	// setup the particles initial state
 	for i in 1:N loop
 		// set the particles velocity according to their type, left to right or right to left
-		if x[i] == 0.0 then
+		if x[i] < GRID_SIZE / 2 then
 			_ := particle_setProperty(i, "status", EXPOSED());
 		else
 			_ := particle_setProperty(i, "status", SUSCEPTIBLE());
@@ -212,22 +217,19 @@ algorithm
 		for i in 1:N loop
 			hx := x[i];
 			hy := y[i];
-			hz := z[i];
-			if x[i] < 0.0 then
-				hx := 1.0;
-			end if;
 			if y[i] < 0.0 then
-				hy := 1.0;
+				hy := 10.0;
 			end if;
-			if x[i] > 1.0 then
-				hx := 0.0;
-			end if;
-			if y[i] > 1.0 then
+			if y[i] > 10.0 then
 				hy := 0.0;
 			end if;
+			if x[i] < 0.0 then
+				hx := 10.0;
+			end if;
+			if x[i] > 10.0 then
+				hx := 0.0;
+			end if;
 			reinit(x[i], hx);
-			reinit(y[i], hy);
-			reinit(z[i], hz);	
 		end for;
 	end when;
 
