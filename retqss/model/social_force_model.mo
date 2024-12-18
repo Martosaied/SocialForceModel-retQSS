@@ -12,7 +12,7 @@ import retQSS_covid19_fsm;
 
 constant Integer // size
 	N = 300,
-	GRID_DIVISIONS = 10,
+	GRID_DIVISIONS = 20,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -34,7 +34,6 @@ constant Integer
     VOLUMES_COUNT = GRID_DIVISIONS * GRID_DIVISIONS;
 
 
-// School scenario paremeters (non homogenous scenario)
 parameter Real
 	INF = 1e20,
 	EPS = 1e-5,
@@ -103,7 +102,7 @@ initial algorithm
     _ := geometry_gridSetUp(GRID_DIVISIONS, GRID_DIVISIONS, 1, CELL_EDGE_LENGTH);
 
 	for i in 1:VOLUMES_COUNT loop
-		if i < 11 or i > 90 then
+		if modulus(i,GRID_DIVISIONS) == 1 or modulus(i,GRID_DIVISIONS) == 0 then
 			_ := volume_setProperty(i, "isObstacle", 1);
 		else
 			_ := volume_setProperty(i, "isObstacle", 0);

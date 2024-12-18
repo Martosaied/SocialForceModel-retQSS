@@ -98,37 +98,41 @@ void social_force_model_totalRepulsiveBorderEffect(
 	double *z
 )
 {
-	int nextVolumeId = retQSS_particle_nextVolumeID(particleID);
-	if (nextVolumeId != 0 && retQSS_volume_getProperty(nextVolumeId, "isObstacle")) {
-		int index = (particleID-1)*3;
-		double aY = pY[index];
-		double aX = pX[index];
+	*x = 0;
+	*y = 0;
+	*z = 0;
+	for (int i = 1; i < 400; i++) {
+		if (retQSS_volume_getProperty(i, "isObstacle")) {
+			int index = (particleID-1)*3;
+			double aY = pY[index];
+			double aX = pX[index];
 
-		double borderX, borderY, borderZ;
-		retQSS_volume_centroid(nextVolumeId, &borderX, &borderY, &borderZ);
+			double borderX, borderY, borderZ;
 
-		double A = 10;
-		double B = 0.2;
+			// Calculate the forces from the centroid to be even from all sides
+			retQSS_volume_centroid(i, &borderX, &borderY, &borderZ);
 
-		double ra = 0.01;
+			double A = 10;
+			double B = 0.2;
 
-		double deltay = borderY - aY;
-		double distanceab = sqrt(deltay*deltay);
-		double normalizedY = deltay / distanceab;
-		double fy = A*exp((ra-distanceab)/B)*normalizedY;
-	
-		double deltax = borderX - aX;
-		distanceab = sqrt(deltax*deltax);
-		double normalizedX = deltax / distanceab;
-		double fx = A*exp((ra-distanceab)/B)*normalizedX;
+			double ra = 0.01;
 
-		*x = fx;
-		*y = fy;
-		*z = 0;
-	} else {
-		*x = 0;
-		*y = 0;
-		*z = 0;
+
+			double deltay = borderY - aY;
+			double deltax = borderX - aX;
+
+			double distanceab = sqrt(deltax*deltax + deltay*deltay);
+
+			double normalizedY = (aY - borderY) / distanceab;
+			double fy = A*exp((ra-distanceab)/B)*normalizedY;
+		
+			double normalizedX = (aX - borderX) / distanceab;
+			double fx = A*exp((ra-distanceab)/B)*normalizedX;
+
+			*x += fx;
+			*y += fy;
+			*z = 0;
+		}
 	}
 }
 

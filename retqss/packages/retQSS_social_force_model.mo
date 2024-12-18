@@ -30,11 +30,11 @@ protected
 	Real randomValue2;
 algorithm
 	if randomBoolean(0.5) == 0.0 then
-		randomValue2 := random(0.1, size/3);
+		randomValue2 := 0.1; // random(0.1, size/3);
 		x := randomValue2;
 		dx := 1.20 * size;
 	else
-		randomValue2 := random(size/3 * 2, size);
+		randomValue2 := 0.9 * size; // random(size/3 * 2, size);
 		x := randomValue2;
 		dx := -0.20;
 	end if;
