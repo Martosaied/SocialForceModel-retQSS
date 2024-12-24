@@ -19,12 +19,12 @@ constant Integer // size
 parameter Integer
 	RANDOM_SEED = getIntegerModelParameter("RANDOM_SEED", 0),
 	GRID_SCENARIO = getIntegerModelParameter("GRID_SCENARIO", 0), //0=hallway (homogeneous)
-	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 20);
+	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 40);
 
 // Output delta time parameter
 parameter Real
 	DEFAULT_SPEED = getRealModelParameter("DEFAULT_SPEED", 1.34),
-	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 0.01),
+	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 0.1),
 	SPEED_MU = getRealModelParameter("SPEED_MU", 1.34),
 	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 0.26);
 
@@ -39,7 +39,7 @@ parameter Real
 	EPS = 1e-5,
 	PI = 3.1415926,
 	PROGRESS_UPDATE_DT = 0.01,
-	GRID_SIZE = getRealModelParameter("GRID_SIZE", 10.0),
+	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;
 
@@ -102,7 +102,8 @@ initial algorithm
     _ := geometry_gridSetUp(GRID_DIVISIONS, GRID_DIVISIONS, 1, CELL_EDGE_LENGTH);
 
 	for i in 1:VOLUMES_COUNT loop
-		if modulus(i,GRID_DIVISIONS) == 1 or modulus(i,GRID_DIVISIONS) == 0 then
+		// if modulus(i,GRID_DIVISIONS) < 10 or modulus(i,GRID_DIVISIONS) > 11 then
+		if (i > 200 and i < 210) or (i > 211 and i < 221) then
 			_ := volume_setProperty(i, "isObstacle", 1);
 		else
 			_ := volume_setProperty(i, "isObstacle", 0);
@@ -217,15 +218,15 @@ algorithm
 			hx := x[i];
 			hy := y[i];
 			if y[i] < 0.0 then
-				hy := 10.0;
+				hy := GRID_SIZE;
 			end if;
-			if y[i] > 10.0 then
+			if y[i] > GRID_SIZE then
 				hy := 0.0;
 			end if;
 			if x[i] < 0.0 then
-				hx := 10.0;
+				hx := GRID_SIZE;
 			end if;
-			if x[i] > 10.0 then
+			if x[i] > GRID_SIZE then
 				hx := 0.0;
 			end if;
 			reinit(x[i], hx);

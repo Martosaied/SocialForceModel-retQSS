@@ -112,7 +112,7 @@ void social_force_model_totalRepulsiveBorderEffect(
 			// Calculate the forces from the centroid to be even from all sides
 			retQSS_volume_centroid(i, &borderX, &borderY, &borderZ);
 
-			double A = 10;
+			double A = 100;
 			double B = 0.2;
 
 			double ra = 0.01;

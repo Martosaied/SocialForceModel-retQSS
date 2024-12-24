@@ -1,0 +1,26 @@
+{
+    "iterations": 3,
+    "parameters": [
+        {
+            "name": "PEDESTRIAN_A",
+            "type": "range",
+            "min": 0,
+            "max": 100,
+            "step": 1
+        },
+        {
+            "name": "PEDESTRIAN_B",
+            "type": "range",
+            "min": 0,
+            "max": 100,
+            "step": 1
+        },
+        {
+            "name": "PEDESTRIAN_R",
+            "type": "range",
+            "min": 0,
+            "max": 0.1,
+            "step": 0.01
+        }
+    ]
+}

@@ -16,6 +16,7 @@ int debugLevel;
 ContagionConstants contagionConstants;
 std::map<int, TracingConstants> tracingConstants;
 std::unordered_map<ParticleID, ContactDataList> contactsHistory;
+std::unordered_map<std::string, std::string> parameters;
 
 std::ofstream outputCSV("solution.csv");
 bool started = false;
@@ -80,12 +81,24 @@ std::string covid19_getParameter(const char *name) {
 	return std::string("");
 }
 int covid19_getIntegerModelParameter(const char *name, int defaultValue) {
-	std::string value = covid19_getParameter(name);
+	std::string value = "";
+	if (parameters.find(name) == parameters.end()) {
+		value = covid19_getParameter(name);
+		parameters[name] = value;
+	} else {
+		value = parameters[name];
+	}
 	return value == "" ? defaultValue : std::stoi(value);
 }
 
 double covid19_getRealModelParameter(const char *name, double defaultValue) {
-	std::string value = covid19_getParameter(name);
+	std::string value = "";
+	if (parameters.find(name) == parameters.end()) {
+		value = covid19_getParameter(name);
+		parameters[name] = value;
+	} else {
+		value = parameters[name];
+	}
 	return value == "" ? defaultValue : std::stof(value);
 }
 
