@@ -1,33 +1,151 @@
-#include "retqss_social_force_model.h"
+#include "retqss_social_force_model.hh"
 
 #include "retqss/retqss_model_api.h"
 #include "retqss/retqss_interface.hh"
 #include "retqss/retqss_utilities.hh"
 
+#include <cmath>
+#include <fstream>
+#include <set>
+#include <chrono>
+#include <ctime>
+#include <cstddef>
+
+int debugLevel;
+std::unordered_map<std::string, std::string> parameters;
+
+std::ofstream outputCSV("solution.csv");
+bool started = false;
+
+#define IC_FILE "initial_conditions.ic"
+#define PARAMS_FILE "parameters.config"
+#define DEBUG 1
+
 extern "C"
 {
+
+int social_force_model_setDebugLevel(int level)
+{
+	debugLevel = level;
+	return level;
+}
+
+Bool social_force_model_isDebugLevelEnabled(int level)
+{
+	return level <= debugLevel;
+}
+
+int social_force_model_debug(int level, double time, const char *format, int int1, int int2, double double1, double double2)
+{
+	if (social_force_model_isDebugLevelEnabled(level)) {
+	    std::time_t current_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	    char * ct = std::ctime(&current_time);
+	    ct[strcspn(ct, "\n")] = '\0';
+	    printf("[%s] (t=%.2f) ", ct, time);
+	    printf(format, (int) int1, (int) int2, double1, double2);
+	    printf("\n");
+	}
+	return level;
+}
+
+double social_force_model_arrayGet(double *array, int index)
+{
+	return array[index-1];
+}
+
+Bool social_force_model_arraySet(double *array, int index, double value)
+{
+	array[index-1] = value;
+	return true;
+}
+
+
+std::string social_force_model_getParameter(const char *name) {
+	if (parameters.find(name) != parameters.end()) {
+		return parameters[name];
+	}
+
+	std::ifstream is_file(PARAMS_FILE);
+	std::string line;
+	while( std::getline(is_file, line) )
+	{
+	  std::istringstream is_line(line);
+	  std::string key;
+	  if( std::getline(is_line, key, '=') && key == name)
+	  {
+	    std::string value;
+	    if( std::getline(is_line, value) ){
+			parameters[name] = value;
+			return value;
+		}
+	  }
+	}
+
+	parameters[name] = std::string("");
+	return std::string("");
+}
+
+Bool social_force_model_isInArrayParameter(const char *name, int value) {
+	std::string parameter = social_force_model_getParameter(name);
+	// Convert the string to an array of integers
+	std::vector<int> array;
+	std::stringstream ss(parameter);
+	std::string item;
+	while (std::getline(ss, item, ',')) {
+		array.push_back(std::stoi(item));
+	}
+
+	if (array.empty()) {
+		return false;
+	} else {
+		return std::find(array.begin(), array.end(), value) != array.end();
+	}
+}
+
+int social_force_model_getIntegerModelParameter(const char *name, int defaultValue) {
+	std::string value = social_force_model_getParameter(name);
+	return value == "" ? defaultValue : std::stoi(value);
+}
+
+double social_force_model_getRealModelParameter(const char *name, double defaultValue) {
+	std::string value = social_force_model_getParameter(name);
+	return value == "" ? defaultValue : std::stof(value);
+}
+
 
 double vector_norm(double aX, double aY, double aZ)
 {
 	return sqrt(aX*aX + aY*aY + aZ*aZ);
 }
 
-void repulsive_pedestrian_effect(
-	double aX, double aY, double aZ,
-	double bX, double bY, double bZ,
-	double bVX, double bVY, double bVZ,
-	double bSpeed,
-	double targetX,
-	double targetY,
-	double *x, double *y, double *z
-)
+bool repulsive_pedestrian_effect(
+    retQSS::ParticleNeighbor *neighbor,
+    const std::vector<double> &args,
+    Vector_3 &result)
 {
+	retQSS::Particle *p = neighbor->source_particle();
+	retQSS::Particle *q = neighbor->neighbor_particle();
+
+	if (p->get_ID() == 0 || q->get_ID() == 0) {
+		return false; // Skip the source particle
+	}
+
 	double A = 2.1;
 	double B = 0.3;
 
 	double ra = 0.1;
 	double rb = 0.1;
 	double rab = ra + rb;
+
+	double aX, aY, aZ, bX, bY, bZ, bVX, bVY, bVZ;
+
+    retQSS_particle_currentPosition(p->get_ID(), &aX, &aY, &aZ);
+    retQSS_particle_currentPosition(q->get_ID(), &bX, &bY, &bZ);
+    retQSS_particle_currentVelocity(q->get_ID(), &bVX, &bVY, &bVZ);
+
+	double targetX = args[0];
+	double targetY = args[1];
+
 
 	double deltax = bX - aX;
 	double deltay = bY - aY;
@@ -48,10 +166,10 @@ void repulsive_pedestrian_effect(
 	);
 	double cos_phi = -normalizedX*desiredX - normalizedY*desiredY;
 	double area = lambda + (1-lambda)*((1+cos_phi)/2);
-
-	*x = fx*area;
-	*y = fy*area;
-	*z = 0;
+	
+	Vector_3 force = Vector_3(fx*area, fy*area, 0);
+	result += force;
+	return true;
 }
 
 void social_force_model_totalRepulsivePedestrianEffect(
@@ -78,7 +196,7 @@ void social_force_model_totalRepulsivePedestrianEffect(
 	for (int i = 0; i < 299; i++) {
 		if (i == particleID-1) continue;
 		double repulsiveX, repulsiveY, repulsiveZ;
-		repulsive_pedestrian_effect(pX[index], pY[index], pZ[index], pX[i*3], pY[i*3], pZ[i*3], pVX[i*3], pVY[i*3], pVZ[i*3], desiredSpeed[i], targetX, targetY, &repulsiveX, &repulsiveY, &repulsiveZ);
+		// repulsive_pedestrian_effect(pX[index], pY[index], pZ[index], pX[i*3], pY[i*3], pZ[i*3], pVX[i*3], pVY[i*3], pVZ[i*3], desiredSpeed[i], targetX, targetY, &repulsiveX, &repulsiveY, &repulsiveZ);
 		totalRepulsiveX += repulsiveX;
 		totalRepulsiveY += repulsiveY;
 		totalRepulsiveZ += repulsiveZ;
@@ -205,5 +323,48 @@ void social_force_model_acceleration(
 
 }
 
+Bool social_force_model_outputCSV(double time,
+	int N,
+	double *x)
+{
+	if(!started) {
+		outputCSV << "time";
+		for(int i=1; i<=N; i++) {
+			outputCSV << ",PX[" << i << "],PY[" << i << "],PS[" << i << "]";
+		}
+		outputCSV << std::endl;
+		started = true;
+	} 
+	outputCSV << std::fixed << std::setprecision(4) << time;
+	for(int i=0; i < N; i++){
+	    int pType = (int) RETQSS()->particle_get_property(i, "type");
+		outputCSV << "," << x[i*3] << "," << x[(i+N)*3] << "," << pType;
+	}
+	outputCSV << std::endl;
+	outputCSV.flush();
+	return true;
+}
+
+Bool social_force_model_setUpParticles(
+    int N,
+    double cellEdgeLength,
+    int gridDivisions,
+    double *x)
+{
+	std::ofstream output(IC_FILE);
+	for(int p = 0; p < N; p++)
+	{
+		for(int c=0;c<6;c++){
+			output << x[(p+c*N)*3] << " ";
+		}
+		double px = x[p*3] / cellEdgeLength;
+		double py = x[(p+N)*3] / cellEdgeLength;
+		int volumeID = ((int) px) * gridDivisions + ((int) py) + 1;
+	    output << " " << volumeID << std::endl;
+	}
+	output.close();
+	retQSS_particle_setUpFromFile(N, IC_FILE, "indirect_infection");
+    return true;
+}
 
 }

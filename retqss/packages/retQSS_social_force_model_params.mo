@@ -1,6 +1,6 @@
 package retQSS_social_force_model_params
 
-import retQSS_covid19_utils;
+import retQSS_social_force_model_utils;
 
 function PEDESTRIAN_A
 	output Real pedestrianA;
@@ -35,19 +35,19 @@ end RELAXATION_TIME;
 function BORDER_A
 	output Real borderA;
 algorithm
-	borderA := getRealModelParameter("BORDER_A", 100.0);
+	borderA := getRealModelParameter("BORDER_A", 10.0);
 end BORDER_A;
 
 function BORDER_B
 	output Real borderB;
 algorithm
-	borderB := getRealModelParameter("BORDER_B", 0.2);
+	borderB := getRealModelParameter("BORDER_B", 0.7);
 end BORDER_B;
 
 function BORDER_R
 	output Real borderR;
 algorithm
-	borderR := getRealModelParameter("BORDER_R", 0.01);
+	borderR := getRealModelParameter("BORDER_R", 0.1);
 end BORDER_R;
 
 end retQSS_social_force_model_params;

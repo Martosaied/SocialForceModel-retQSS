@@ -2,17 +2,17 @@ model social_force_model
 
 import retQSS;
 import retQSS_social_force_model;
-import retQSS_covid19;
-import retQSS_covid19_utils;
-import retQSS_covid19_fsm;
+import retQSS_social_force_model_utils;
+import retQSS_social_force_model_params;
+import retQSS_social_force_model_types;
 
 /*
   This section loads parameters and constants from the parameters.config file
 */
 
 constant Integer // size
-	N = 300,
-	GRID_DIVISIONS = 20,
+	N = 240,
+	GRID_DIVISIONS = 3,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -102,15 +102,7 @@ initial algorithm
     _ := geometry_gridSetUp(GRID_DIVISIONS, GRID_DIVISIONS, 1, CELL_EDGE_LENGTH);
 
 	for i in 1:VOLUMES_COUNT loop
-		// if modulus(i,GRID_DIVISIONS) < 10 or modulus(i,GRID_DIVISIONS) > 11 then
-		if (i > 200 and i < 210) or (i > 211 and i < 221) then
-			_ := volume_setProperty(i, "isObstacle", 1);
-		else
-			_ := volume_setProperty(i, "isObstacle", 0);
-		end if;
-		_ := volume_setProperty(i, "particleSpeed", DEFAULT_SPEED);
-		_ := volume_setProperty(i, "isClosedSpace", 0);
-		_ := volume_setProperty(i, "isBlock", 0);
+		_ := volume_setProperty(i, "isObstacle", isInArrayParameter("OBSTACLES", i));
 		volumeConcentration[i] := 0.0;
     end for;
 
@@ -118,7 +110,6 @@ initial algorithm
 	for i in 1:N loop
         (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD);
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
-		_ := debug(INFO(), time, "For particle %d %d, desired speed is %f", i, i, desiredSpeed[i], _);
     end for;
 
 	// setup the particles in RETQSS
@@ -131,15 +122,12 @@ initial algorithm
 	for i in 1:N loop
 		// set the particles velocity according to their type, left to right or right to left
 		if x[i] < GRID_SIZE / 2 then
-			_ := particle_setProperty(i, "status", EXPOSED());
+			_ := particle_setProperty(i, "type", LEFT());
 		else
-			_ := particle_setProperty(i, "status", SUSCEPTIBLE());
+			_ := particle_setProperty(i, "type", RIGHT());
 		end if;
 		_ := particle_setProperty(i, "initialX", x[i]);
 		_ := particle_setProperty(i, "initialY", y[i]);
-		_ := particle_setProperty(i, "trackingStatus", UNKNOWN());
-		_ := particle_setProperty(i, "enteredVolumesCount", 0.0);
-		_ := particle_setProperty(i, "bouncesCount", 0.0);
 		_ := particle_setProperty(i, "initialVX", vx[i]);
 		_ := particle_setProperty(i, "initialVY", vy[i]);
 
@@ -176,21 +164,10 @@ equation
   Model's time events
 */
 algorithm	
-	// for i in 1:N loop
-	// 	//EVENT: particle enters a volume (it may bounce or triggers disease/tracing logics implemented in the library) 
-	// 	when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
-	// 		(_, normalX, normalY) := onNextCross(time, i, 0.);
-	// 		if normalX <> 0.0 or normalY <> 0.0 then
-	// 			reinit(vx[i], 0.);
-	// 			reinit(vy[i], 0.);
-	// 		end if;
-	// 	end when;
-
-    // end for;
 
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
-		_ := outputCSV(time, N, x, y, VOLUMES_COUNT, volumeConcentration, N, N);
+		_ := outputCSV(time, N, x, y);
 		nextOutputTick := time + OUTPUT_UPDATE_DT;
 	end when;
 
@@ -207,7 +184,7 @@ algorithm
 			hx := dx[i];
 			hy := dy[i];
 			hz := dz[i];
-			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, x, y, z, vx, vy, vz, hx, hy, hz);
+			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, x, y, z, vx, vy, vz, hx, hy, hz, CELL_EDGE_LENGTH);
 			reinit(ax[i], hx);
 			reinit(ay[i], hy);
 			reinit(az[i], hz);	

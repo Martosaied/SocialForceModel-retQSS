@@ -60,6 +60,10 @@ Bool covid19_arraySet(
 	int index,
 	double value);
 
+Bool covid19_isInArrayParameter(
+	const char *name,
+	int value);
+
 int covid19_getIntegerModelParameter(
 	const char *name,
 	int defaultValue);

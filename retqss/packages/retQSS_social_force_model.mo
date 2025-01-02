@@ -1,10 +1,21 @@
 package retQSS_social_force_model
 
 import retQSS;
-import retQSS_covid19;
-import retQSS_covid19_utils;
-import retQSS_covid19_fsm;
 import retQSS_social_force_model_params;
+import retQSS_social_force_model_utils;
+import retQSS_social_force_model_types;
+
+function setUpParticles
+	input Integer N;
+	input Real cellEdgeLength;
+	input Integer gridDivisions;
+	input Real x[1];
+	output Boolean _;
+	external "C" _=social_force_model_setUpParticles(N, cellEdgeLength, gridDivisions, x) annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.hh\"");
+end setUpParticles;
+
 
 function randomBoolean
 	input Real trueProbability;
@@ -41,7 +52,7 @@ algorithm
 		x := randomValue2;
 		dx := -0.20;
 	end if;
-	randomValue := random(size*0.2, size*0.8);
+	randomValue := random(size*0.25, size*0.75);
 	dy := randomValue;
 	y := randomValue;
 	dz := zCoord;
@@ -217,6 +228,7 @@ protected
 	Real totalRepulsiveX;
 	Real totalRepulsiveY;
 	Real totalRepulsiveZ;
+	Integer num_neighbors;
 	Real repulsiveX;
 	Real repulsiveY;
 	Real repulsiveZ;
@@ -226,19 +238,26 @@ algorithm
 	totalRepulsiveY := 0;
 	totalRepulsiveZ := 0;
 
-	for i0 in 1:300 loop
-		if i0 <> particleID then
-			(repulsiveX, repulsiveY, repulsiveZ) := repulsivePedestrianEffect(
-				equationArrayGet(pX, particleID), equationArrayGet(pY, particleID), equationArrayGet(pZ, particleID), 
-				equationArrayGet(pX, i0), equationArrayGet(pY, i0), equationArrayGet(pZ, i0), 
-				equationArrayGet(vX, i0), equationArrayGet(vY, i0), equationArrayGet(vZ, i0), 
-				equationArrayGet(desiredSpeed, i0), targetX, targetY
-			);
-			totalRepulsiveX := totalRepulsiveX + repulsiveX;
-			totalRepulsiveY := totalRepulsiveY + repulsiveY;
-			totalRepulsiveZ := totalRepulsiveZ + repulsiveZ;
-		end if;
-	end for;
+    (num_neighbors, totalRepulsiveX, totalRepulsiveY, totalRepulsiveZ) := 
+		particleNeighborhood_forEachParticle_2(
+			particleID, "repulsive_pedestrian_effect", 
+			targetX, targetY
+		);
+
+
+	// for i0 in 1:300 loop
+	// 	if i0 <> particleID then
+	// 		(repulsiveX, repulsiveY, repulsiveZ) := repulsivePedestrianEffect(
+	// 			equationArrayGet(pX, particleID), equationArrayGet(pY, particleID), equationArrayGet(pZ, particleID), 
+	// 			equationArrayGet(pX, i0), equationArrayGet(pY, i0), equationArrayGet(pZ, i0), 
+	// 			equationArrayGet(vX, i0), equationArrayGet(vY, i0), equationArrayGet(vZ, i0), 
+	// 			equationArrayGet(desiredSpeed, i0), targetX, targetY
+	// 		);
+	// 		totalRepulsiveX := totalRepulsiveX + repulsiveX;
+	// 		totalRepulsiveY := totalRepulsiveY + repulsiveY;
+	// 		totalRepulsiveZ := totalRepulsiveZ + repulsiveZ;
+	// 	end if;
+	// end for;
 	x := totalRepulsiveX;
 	y := totalRepulsiveY;
 	z := totalRepulsiveZ;	
@@ -246,6 +265,7 @@ end totalRepulsivePedestrianEffect;
 
 function totalRepulsiveBorderEffect
 	input Integer particleID;
+	input Real cellEdgeLength;
 	input Real pX[1];
 	input Real pY[1];
 	input Real pZ[1];
@@ -272,6 +292,7 @@ protected
 	Real fy;
 	Real totalX;
 	Real totalY;
+	Integer nextObstacle;
 algorithm
 	totalX := 0;
 	totalY := 0;
@@ -279,7 +300,10 @@ algorithm
 	B := BORDER_B();
 	R := BORDER_R();
 
-	for i0 in 1:400 loop
+	// nextObstacle := particle_nextVolumeID(particleID);
+
+	for i0 in 1:9 loop
+	// if nextObstacle <> 0 then
 		isObstacle := volume_getProperty(i0, "isObstacle");
 		if isObstacle then
 			aX := equationArrayGet(pX, particleID);
@@ -288,21 +312,22 @@ algorithm
 			// Calculate the forces from the centroid to be even from all sides
 			(borderX, borderY, borderZ) := volume_centroid(i0);
 
-			deltay := borderY - aY;
-			deltax := borderX - aX;
+			deltay := (borderY + cellEdgeLength/2) - aY;
+			deltax := (borderX + cellEdgeLength/2) - aX;
 
 			distanceab := sqrt(deltax*deltax + deltay*deltay);
 
-			normalizedY := (aY - borderY) / distanceab;
+			normalizedY := (aY - borderY - cellEdgeLength/2) / distanceab;
 			fy := A*exp((R-distanceab)/B)*normalizedY;
-		
-			normalizedX := (aX - borderX) / distanceab;
+
+			normalizedX := (aX - borderX - cellEdgeLength/2) / distanceab;
 			fx := A*exp((R-distanceab)/B)*normalizedX;
 
 			totalX := totalX + fx;
 			totalY := totalY + fy;
 			z := 0;
 		end if;
+	// end if;
 	end for;
 	x := totalX;
 	y := totalY;
@@ -321,6 +346,7 @@ function pedestrianTotalMotivation
 	input Real targetX;
 	input Real targetY;
 	input Real targetZ;
+	input Real cellEdgeLength;
 	output Real x;
 	output Real y;
 	output Real z;
@@ -345,7 +371,7 @@ protected
 algorithm
 	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
 	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY);
-	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(particleID, pX, pY, pZ);
+	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(particleID, cellEdgeLength, pX, pY, pZ);
 
 	resultX := accelerationX + repulsiveX + wallX;
 	resultY := accelerationY + repulsiveY + wallY;

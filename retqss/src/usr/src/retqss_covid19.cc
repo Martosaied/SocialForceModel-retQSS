@@ -65,6 +65,10 @@ Bool covid19_arraySet(double *array, int index, double value)
 
 
 std::string covid19_getParameter(const char *name) {
+	if (parameters.find(name) != parameters.end()) {
+		return parameters[name];
+	}
+
 	std::ifstream is_file(PARAMS_FILE);
 	std::string line;
 	while( std::getline(is_file, line) )
@@ -74,31 +78,41 @@ std::string covid19_getParameter(const char *name) {
 	  if( std::getline(is_line, key, '=') && key == name)
 	  {
 	    std::string value;
-	    if( std::getline(is_line, value) )
-	      return value;
+	    if( std::getline(is_line, value) ){
+			parameters[name] = value;
+			return value;
+		}
 	  }
 	}
+
+	parameters[name] = std::string("");
 	return std::string("");
 }
-int covid19_getIntegerModelParameter(const char *name, int defaultValue) {
-	std::string value = "";
-	if (parameters.find(name) == parameters.end()) {
-		value = covid19_getParameter(name);
-		parameters[name] = value;
-	} else {
-		value = parameters[name];
+
+Bool covid19_isInArrayParameter(const char *name, int value) {
+	std::string parameter = covid19_getParameter(name);
+	// Convert the string to an array of integers
+	std::vector<int> array;
+	std::stringstream ss(parameter);
+	std::string item;
+	while (std::getline(ss, item, ',')) {
+		array.push_back(std::stoi(item));
 	}
+
+	if (array.empty()) {
+		return false;
+	} else {
+		return std::find(array.begin(), array.end(), value) != array.end();
+	}
+}
+
+int covid19_getIntegerModelParameter(const char *name, int defaultValue) {
+	std::string value = covid19_getParameter(name);
 	return value == "" ? defaultValue : std::stoi(value);
 }
 
 double covid19_getRealModelParameter(const char *name, double defaultValue) {
-	std::string value = "";
-	if (parameters.find(name) == parameters.end()) {
-		value = covid19_getParameter(name);
-		parameters[name] = value;
-	} else {
-		value = parameters[name];
-	}
+	std::string value = covid19_getParameter(name);
 	return value == "" ? defaultValue : std::stof(value);
 }
 

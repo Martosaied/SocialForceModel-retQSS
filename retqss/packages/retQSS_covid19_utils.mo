@@ -227,6 +227,18 @@ algorithm
 end getClassroomDoor;
 
 /*
+  Util function for retrieving an array of integers from parameters.config file
+*/
+function isInArrayParameter
+	input String name;
+	input Integer value;
+	output Boolean result;
+external "C" result=covid19_isInArrayParameter(name, value) annotation(
+	    Library="covid19",
+	    Include="#include \"retqss_covid19.h\"");
+end isInArrayParameter;
+
+/*
   Util function for retrieving an integer value from parameters.config file
 */
 function getIntegerModelParameter
