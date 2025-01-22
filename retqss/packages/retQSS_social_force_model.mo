@@ -31,6 +31,8 @@ end randomBoolean;
 function randomRoute
 	input Real size;
 	input Real zCoord;
+	input Real fromY;
+	input Real toY;
 	output Real x;
 	output Real y;
 	output Real z;
@@ -52,7 +54,7 @@ algorithm
 		x := randomValue2;
 		dx := -0.20;
 	end if;
-	randomValue := random(size*0.25, size*0.75);
+	randomValue := random(fromY, toY);
 	dy := randomValue;
 	y := randomValue;
 	dz := zCoord;
@@ -155,9 +157,6 @@ function repulsivePedestrianEffect
 	input Real bX;
 	input Real bY;
 	input Real bZ;
-	input Real bVX;
-	input Real bVY;
-	input Real bVZ;
 	input Real bSpeed;
 	input Real targetX;
 	input Real targetY;
@@ -210,6 +209,7 @@ algorithm
 end repulsivePedestrianEffect;
 
 function totalRepulsivePedestrianEffect
+	input Integer totalNumberOfParticles;
 	input Integer particleID;
 	input Real desiredSpeed[1];
 	input Real pX[1];
@@ -238,32 +238,36 @@ algorithm
 	totalRepulsiveY := 0;
 	totalRepulsiveZ := 0;
 
-    (num_neighbors, totalRepulsiveX, totalRepulsiveY, totalRepulsiveZ) := 
-		particleNeighborhood_forEachParticle_2(
-			particleID, "repulsive_pedestrian_effect", 
-			targetX, targetY
-		);
+    // (num_neighbors, totalRepulsiveX, totalRepulsiveY, totalRepulsiveZ) := 
+	// 	particleNeighborhood_forEachParticle_2(
+	// 		particleID, "repulsive_pedestrian_effect", 
+	// 		targetX, targetY
+	// 	);
+
+	// totalRepulsiveX := 0;
+	// totalRepulsiveY := 0;
+	// totalRepulsiveZ := 0;
 
 
-	// for i0 in 1:300 loop
-	// 	if i0 <> particleID then
-	// 		(repulsiveX, repulsiveY, repulsiveZ) := repulsivePedestrianEffect(
-	// 			equationArrayGet(pX, particleID), equationArrayGet(pY, particleID), equationArrayGet(pZ, particleID), 
-	// 			equationArrayGet(pX, i0), equationArrayGet(pY, i0), equationArrayGet(pZ, i0), 
-	// 			equationArrayGet(vX, i0), equationArrayGet(vY, i0), equationArrayGet(vZ, i0), 
-	// 			equationArrayGet(desiredSpeed, i0), targetX, targetY
-	// 		);
-	// 		totalRepulsiveX := totalRepulsiveX + repulsiveX;
-	// 		totalRepulsiveY := totalRepulsiveY + repulsiveY;
-	// 		totalRepulsiveZ := totalRepulsiveZ + repulsiveZ;
-	// 	end if;
-	// end for;
+	for i0 in 1:10000 loop
+		if i0 < totalNumberOfParticles and i0 <> particleID then
+			(repulsiveX, repulsiveY, repulsiveZ) := repulsivePedestrianEffect(
+				equationArrayGet(pX, particleID), equationArrayGet(pY, particleID), equationArrayGet(pZ, particleID), 
+				equationArrayGet(pX, i0), equationArrayGet(pY, i0), equationArrayGet(pZ, i0), 
+				equationArrayGet(desiredSpeed, i0), targetX, targetY
+			);
+			totalRepulsiveX := totalRepulsiveX + repulsiveX;
+			totalRepulsiveY := totalRepulsiveY + repulsiveY;
+			totalRepulsiveZ := totalRepulsiveZ + repulsiveZ;
+		end if;
+	end for;
 	x := totalRepulsiveX;
 	y := totalRepulsiveY;
 	z := totalRepulsiveZ;	
 end totalRepulsivePedestrianEffect;
 
 function totalRepulsiveBorderEffect
+	input Integer totalNumberOfVolumes;
 	input Integer particleID;
 	input Real cellEdgeLength;
 	input Real pX[1];
@@ -300,35 +304,38 @@ algorithm
 	B := BORDER_B();
 	R := BORDER_R();
 
-	// nextObstacle := particle_nextVolumeID(particleID);
+	// TODO: This is not working
+	nextObstacle := particle_nextVolumeID(particleID);
+	if nextObstacle <> 0 then
 
-	for i0 in 1:9 loop
-	// if nextObstacle <> 0 then
-		isObstacle := volume_getProperty(i0, "isObstacle");
-		if isObstacle then
-			aX := equationArrayGet(pX, particleID);
-			aY := equationArrayGet(pY, particleID);
+	// for i0 in 1:10000 loop
+	// 	if i0 < totalNumberOfVolumes then
+			isObstacle := volume_getProperty(nextObstacle, "isObstacle");
+			if isObstacle then
+				aX := equationArrayGet(pX, particleID);
+				aY := equationArrayGet(pY, particleID);
 
-			// Calculate the forces from the centroid to be even from all sides
-			(borderX, borderY, borderZ) := volume_centroid(i0);
+				// Calculate the forces from the centroid to be even from all sides
+				(borderX, borderY, borderZ) := volume_centroid(i0);
 
-			deltay := (borderY + cellEdgeLength/2) - aY;
-			deltax := (borderX + cellEdgeLength/2) - aX;
+				deltay := (borderY + cellEdgeLength/2) - aY;
+				deltax := (borderX + cellEdgeLength/2) - aX;
 
-			distanceab := sqrt(deltax*deltax + deltay*deltay);
+				distanceab := sqrt(deltax*deltax + deltay*deltay);
 
-			normalizedY := (aY - borderY - cellEdgeLength/2) / distanceab;
-			fy := A*exp((R-distanceab)/B)*normalizedY;
+				normalizedY := (aY - borderY - cellEdgeLength/2) / distanceab;
+				fy := A*exp((R-distanceab)/B)*normalizedY;
 
-			normalizedX := (aX - borderX - cellEdgeLength/2) / distanceab;
-			fx := A*exp((R-distanceab)/B)*normalizedX;
+				normalizedX := (aX - borderX - cellEdgeLength/2) / distanceab;
+				fx := A*exp((R-distanceab)/B)*normalizedX;
 
-			totalX := totalX + fx;
-			totalY := totalY + fy;
-			z := 0;
+				totalX := totalX + fx;
+				totalY := totalY + fy;
+				z := 0;
+			end if;
 		end if;
-	// end if;
-	end for;
+	// end for;
+
 	x := totalX;
 	y := totalY;
 	z := 0;
@@ -347,6 +354,8 @@ function pedestrianTotalMotivation
 	input Real targetY;
 	input Real targetZ;
 	input Real cellEdgeLength;
+	input Integer totalNumberOfVolumes;
+	input Integer totalNumberOfParticles;
 	output Real x;
 	output Real y;
 	output Real z;
@@ -370,8 +379,8 @@ protected
 	Real resultZ;
 algorithm
 	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
-	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY);
-	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(particleID, cellEdgeLength, pX, pY, pZ);
+	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(totalNumberOfParticles, particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY);
+	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(totalNumberOfVolumes, particleID, cellEdgeLength, pX, pY, pZ);
 
 	resultX := accelerationX + repulsiveX + wallX;
 	resultY := accelerationY + repulsiveY + wallY;

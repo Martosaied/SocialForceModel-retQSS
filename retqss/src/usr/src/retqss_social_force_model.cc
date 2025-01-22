@@ -126,9 +126,13 @@ bool repulsive_pedestrian_effect(
 	retQSS::Particle *p = neighbor->source_particle();
 	retQSS::Particle *q = neighbor->neighbor_particle();
 
-	if (p->get_ID() == 0 || q->get_ID() == 0) {
+	int pID = p->get_ID() + 1;
+	int qID = q->get_ID() + 1;
+
+	if (pID == qID) {
 		return false; // Skip the source particle
 	}
+
 
 	double A = 2.1;
 	double B = 0.3;
@@ -137,11 +141,12 @@ bool repulsive_pedestrian_effect(
 	double rb = 0.1;
 	double rab = ra + rb;
 
-	double aX, aY, aZ, bX, bY, bZ, bVX, bVY, bVZ;
+	double aX, aY, aZ, bX, bY, bZ;
 
-    retQSS_particle_currentPosition(p->get_ID(), &aX, &aY, &aZ);
-    retQSS_particle_currentPosition(q->get_ID(), &bX, &bY, &bZ);
-    retQSS_particle_currentVelocity(q->get_ID(), &bVX, &bVY, &bVZ);
+    retQSS_particle_currentPosition(pID, &aX, &aY, &aZ);
+    retQSS_particle_currentPosition(qID, &bX, &bY, &bZ);
+
+	// printf("%d, %d, Current position: %f, %f\n", pID, qID, aX, aY);
 
 	double targetX = args[0];
 	double targetY = args[1];
@@ -164,11 +169,11 @@ bool repulsive_pedestrian_effect(
 		targetX, targetY, 0,
 		&desiredX, &desiredY, &desiredZ
 	);
-	double cos_phi = -normalizedX*desiredX - normalizedY*desiredY;
+	double cos_phi = -(normalizedX*desiredX) - (normalizedY*desiredY);
 	double area = lambda + (1-lambda)*((1+cos_phi)/2);
 	
-	Vector_3 force = Vector_3(fx*area, fy*area, 0);
-	result += force;
+	result = Vector_3(fx, fy, 0);
+
 	return true;
 }
 

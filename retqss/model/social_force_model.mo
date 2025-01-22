@@ -11,8 +11,8 @@ import retQSS_social_force_model_types;
 */
 
 constant Integer // size
-	N = 240,
-	GRID_DIVISIONS = 3,
+	N = 300,
+	GRID_DIVISIONS = 1,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -26,7 +26,9 @@ parameter Real
 	DEFAULT_SPEED = getRealModelParameter("DEFAULT_SPEED", 1.34),
 	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 0.1),
 	SPEED_MU = getRealModelParameter("SPEED_MU", 1.34),
-	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 0.26);
+	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 0.26),
+	FROM_Y = getRealModelParameter("FROM_Y", 0.0),
+	TO_Y = getRealModelParameter("TO_Y", 20.0);
 
 
 // Grid constant
@@ -108,7 +110,7 @@ initial algorithm
 
 	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
-        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD);
+        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
     end for;
 
@@ -184,7 +186,7 @@ algorithm
 			hx := dx[i];
 			hy := dy[i];
 			hz := dz[i];
-			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, x, y, z, vx, vy, vz, hx, hy, hz, CELL_EDGE_LENGTH);
+			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, x, y, z, vx, vy, vz, hx, hy, hz, CELL_EDGE_LENGTH, VOLUMES_COUNT, N);
 			reinit(ax[i], hx);
 			reinit(ay[i], hy);
 			reinit(az[i], hz);	

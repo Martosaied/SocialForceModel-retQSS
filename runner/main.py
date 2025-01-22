@@ -1,3 +1,4 @@
+import time
 import argparse
 import json
 import os
@@ -8,7 +9,9 @@ from pathlib import Path
 import subprocess
 import shutil
 import random
+import multiprocessing
 
+from plotter import generate_gif
 from utils import load_config, create_output_dir, process_parameters, get_parameter_combinations
 
 def run_model(model_name: str):
@@ -27,7 +30,8 @@ def run_model(model_name: str):
             cmd,
             shell=True,
             check=True,
-            text=True
+            text=True,
+            # capture_output=True
         )
         
         # Check if solution.csv was created
@@ -41,42 +45,54 @@ def run_model(model_name: str):
         print(f"Error output: {e.stderr}")
         raise
 
-def setup_parameters(model_name: str, parameters: dict):
+def setup_parameters(model_name: str, parameters: dict, iteration: int):
     """Setup parameters for the model."""
-    # Create a parameters.config file
-    with open(f"../retqss/build/{model_name}/parameters.config", "w") as f:
-        for param, value in parameters.items():
-            f.write(f"{param}={value}\n")
-
-def setup_random_seed(model_name: str, iteration: int):
-    """Setup random seed for the model."""
 
     random.seed(iteration)
     seed = random.randint(0, 1000000)
-    with open(f"../retqss/build/{model_name}/parameters.config", "w") as f:
-        f.write(f"RANDOM_SEED={seed}\n")
+
+    # Create a parameters.config file
+    f = open(f"../retqss/build/{model_name}/parameters.config", "w")
+    for param, value in parameters.items():
+        f.write(f"{param}={value}\n")
+
+    f.write(f"RANDOM_SEED={seed}\n")
+    f.close()
 
 def run_iterations(num_iterations: int, model_name: str, output_dir: str, parameters: dict):
     """Run experiment iterations using the specified model."""
-    print("Setting up parameters...")
-    setup_parameters(model_name, parameters)
+
+    time_file = os.path.join(output_dir, f'benchmark.txt')
+    time_file = open(time_file, 'w')
 
     for iteration in range(num_iterations):
         print(f"\nStarting iteration {iteration + 1}/{num_iterations}")
-        
+
         try:
-            # Set random seed for this iteration
-            setup_random_seed(model_name, iteration)
+            print("Setting up parameters...")
+            setup_parameters(model_name, parameters, iteration)
+
+            # Measure time
+            start_time = time.time()
 
             # Run the model and get path to solution file
             solution_path = run_model(model_name)
-            
+
+            # Measure time
+            end_time = time.time()
+            time_file.write(f"{end_time - start_time}\n")
+
             # Define the destination path for this iteration
             result_file = os.path.join(output_dir, f'result_{iteration}.csv')
             
             # Move and rename the solution file
             shutil.move(solution_path, result_file)
             print(f"Saved results for iteration {iteration} to {result_file}")
+
+            # Generate GIF
+            if iteration == 0:
+                generate_gif(result_file, output_dir)
+                print(f"Generated GIF for first iteration only")
             
         except Exception as e:
             print(f"Error in iteration {iteration}: {str(e)}")
@@ -85,6 +101,8 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str, parame
             with open(error_file, 'w') as f:
                 f.write(f"Error during iteration {iteration}:\n{str(e)}")
             raise
+
+    time_file.close()
 
 
 def run_experiment(config: dict, output_dir: str, model_name: str):
