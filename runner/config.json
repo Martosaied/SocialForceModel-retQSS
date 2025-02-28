@@ -1,74 +1,101 @@
 {
-    "iterations": 1,
-    "parameters": [
-        {
-            "name": "FORCE_TERMINATION_AT",
-            "type": "value",
-            "value": 30.0
-        },
-        {
-            "name": "GRID_SIZE",
-            "type": "value",
-            "value": 20.0
-        },
-        {
-            "name": "FROM_Y",
-            "type": "value",
-            "value": 5
-        },
-        {
-            "name": "TO_Y",
-            "type": "value",
-            "value": 15
-        },
-        {
-            "name": "OBSTACLES",
-            "type": "map",
-            "map": [
-                [
-                    0
-                ]
-            ]
-        },
-        {
-            "name": "PEDESTRIAN_A",
-            "type": "value",
-            "value": 2.1
-        },
-        {
-            "name": "PEDESTRIAN_B",
-            "type": "value",
-            "value": 0.3
-        },
-        {
-            "name": "PEDESTRIAN_R",
-            "type": "value",
-            "value": 0.1
-        },
-        {
-            "name": "BORDER_A",
-            "type": "value",
-            "value": 10.0
-        },
-        {
-            "name": "BORDER_B",
-            "type": "value",
-            "value": 0.7
-        },
-        {
-            "name": "BORDER_R",
-            "type": "value",
-            "value": 0.1
-        },
-        {
-            "name": "SPEED_MU",
-            "type": "value",
-            "value": 1.34
-        },
-        {
-            "name": "SPEED_SIGMA",
-            "type": "value",
-            "value": 0.26
-        }
-    ]
+  "iterations": 1,
+  "parameters": [
+    {
+      "name": "PEDESTRIAN_IMPLEMENTATION",
+      "type": "value",
+      "value": 1
+    },
+    {
+      "name": "BORDER_IMPLEMENTATION",
+      "type": "value",
+      "value": 2
+    },
+    {
+      "name": "FORCE_TERMINATION_AT",
+      "type": "value",
+      "value": 30.0
+    },
+    {
+      "name": "GRID_SIZE",
+      "type": "value",
+      "value": 20.0
+    },
+    {
+      "name": "FROM_Y",
+      "type": "value",
+      "value": 5
+    },
+    {
+      "name": "TO_Y",
+      "type": "value",
+      "value": 15
+    },
+    {
+      "name": "OBSTACLES",
+      "type": "map",
+      "map": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "WALLS",
+      "type": "custom",
+      "value": []
+    },
+    {
+      "name": "PEDESTRIAN_A",
+      "type": "value",
+      "value": 2.1
+    },
+    {
+      "name": "PEDESTRIAN_B",
+      "type": "value",
+      "value": 0.3
+    },
+    {
+      "name": "PEDESTRIAN_R",
+      "type": "value",
+      "value": 0.1
+    },
+    {
+      "name": "BORDER_A",
+      "type": "value",
+      "value": 10.0
+    },
+    {
+      "name": "BORDER_B",
+      "type": "value",
+      "value": 0.7
+    },
+    {
+      "name": "BORDER_R",
+      "type": "value",
+      "value": 0.1
+    },
+    {
+      "name": "SPEED_MU",
+      "type": "value",
+      "value": 1.34
+    },
+    {
+      "name": "SPEED_SIGMA",
+      "type": "value",
+      "value": 0.26
+    }
+  ]
 }

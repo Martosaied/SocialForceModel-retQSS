@@ -2,6 +2,19 @@ package retQSS_social_force_model_params
 
 import retQSS_social_force_model_utils;
 
+
+function PEDESTRIAN_IMPLEMENTATION
+	output Integer implementation;
+algorithm
+	implementation := getIntegerModelParameter("PEDESTRIAN_IMPLEMENTATION", 0);
+end PEDESTRIAN_IMPLEMENTATION;
+
+function BORDER_IMPLEMENTATION
+	output Integer implementation;
+algorithm
+	implementation := getIntegerModelParameter("BORDER_IMPLEMENTATION", 0);
+end BORDER_IMPLEMENTATION;
+
 function PEDESTRIAN_A
 	output Real pedestrianA;
 algorithm

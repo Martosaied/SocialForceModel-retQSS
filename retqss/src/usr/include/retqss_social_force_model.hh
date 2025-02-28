@@ -17,11 +17,21 @@ extern "C"
 {
 #endif
 
+struct Wall
+{
+	double from_x;
+	double from_y;
+	double to_x;
+	double to_y;
+};
+
 Bool social_force_model_setUpParticles(
     int N,
     double cellEdgeLength,
     int gridDivisions,
     double *x);
+
+Bool social_force_model_setUpWalls();
 
 int social_force_model_setDebugLevel(int level);
 
@@ -47,6 +57,15 @@ Bool social_force_model_outputCSV(double time,
 // 	retQSS::ParticleNeighbor *neighbors,
 // 	const std::vector<double> &args,
 // 	Vector_3 &result);
+
+void social_force_model_repulsiveBorderEffect(
+	double A,
+	double B,
+	double ra,
+	int particleID,
+	double *x,
+	double *y,
+	double *z);
 
 void social_force_model_totalRepulsivePedestrianEffect(
 	int particleID,

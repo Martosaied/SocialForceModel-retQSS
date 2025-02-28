@@ -10,9 +10,11 @@
 #include <chrono>
 #include <ctime>
 #include <cstddef>
+#include <json.hpp>
 
 int debugLevel;
 std::unordered_map<std::string, std::string> parameters;
+std::list<Wall> walls;
 
 std::ofstream outputCSV("solution.csv");
 bool started = false;
@@ -112,10 +114,85 @@ double social_force_model_getRealModelParameter(const char *name, double default
 	return value == "" ? defaultValue : std::stof(value);
 }
 
+// Function to compute the dot product of two vectors
+double dot_product(double aX, double aY, double bX, double bY) {
+    return aX * bX + aY * bY;
+}
+
+// Function to compute the squared magnitude of a vector
+double squared_magnitude(double aX, double aY) {
+    return aX * aX + aY * aY;
+}
+
+void closest_point_on_segment(double pX, double pY, double aX, double aY, double bX, double bY, double *x, double *y) {
+    double APx = pX - aX;
+    double APy = pY - aY;
+    double ABx = bX - aX;
+    double ABy = bY - aY;
+    
+    double AB_squared = squared_magnitude(ABx, ABy);
+    if (AB_squared == 0.0) {
+        *x = aX;
+        *y = aY;
+        return; // A and B are the same point
+    }
+    
+    double projection_scalar = dot_product(APx, APy, ABx, ABy) / AB_squared;
+    
+    if (projection_scalar < 0.0) {
+        *x = aX;
+        *y = aY;
+    } else if (projection_scalar > 1.0) {
+        *x = bX;
+        *y = bY;
+    } else {
+        *x = aX + projection_scalar * ABx;
+        *y = aY + projection_scalar * ABy;
+    }
+}
 
 double vector_norm(double aX, double aY, double aZ)
 {
 	return sqrt(aX*aX + aY*aY + aZ*aZ);
+}
+
+void social_force_model_repulsiveBorderEffect(
+	double A,
+	double B,
+	double ra,
+	int particleID,
+	double *x,
+	double *y,
+	double *z
+) {
+	double pX, pY, pZ;
+	retQSS_particle_currentPosition(particleID, &pX, &pY, &pZ);
+
+	for (Wall wall : walls) {
+		double from_x = wall.from_x;
+		double from_y = wall.from_y;
+		double to_x = wall.to_x;
+		double to_y = wall.to_y;
+
+		double closest_x, closest_y;
+		closest_point_on_segment(pX, pY, from_x, from_y, to_x, to_y, &closest_x, &closest_y);
+
+		double deltay = closest_y - pY;
+		double deltax = closest_x - pX;
+
+		double distanceab = sqrt(deltax*deltax + deltay*deltay);
+
+		double normalizedY = (pY - closest_y) / distanceab;
+		double fy = A*exp((ra-distanceab)/B)*normalizedY;
+	
+		double normalizedX = (pX - closest_x) / distanceab;
+		double fx = A*exp((ra-distanceab)/B)*normalizedX;
+
+		*x += fx;
+		*y += fy;
+		*z = 0;
+	}
+	
 }
 
 bool repulsive_pedestrian_effect(
@@ -130,7 +207,7 @@ bool repulsive_pedestrian_effect(
 	int qID = q->get_ID() + 1;
 
 	if (pID == qID) {
-		return false; // Skip the source particle
+		return false; // Skip if the source and neighbor particle are the same
 	}
 
 
@@ -145,8 +222,6 @@ bool repulsive_pedestrian_effect(
 
     retQSS_particle_currentPosition(pID, &aX, &aY, &aZ);
     retQSS_particle_currentPosition(qID, &bX, &bY, &bZ);
-
-	// printf("%d, %d, Current position: %f, %f\n", pID, qID, aX, aY);
 
 	double targetX = args[0];
 	double targetY = args[1];
@@ -210,6 +285,7 @@ void social_force_model_totalRepulsivePedestrianEffect(
 	*y = totalRepulsiveY;
 	*z = totalRepulsiveZ;	
 }
+
 
 void social_force_model_totalRepulsiveBorderEffect(
 	int particleID,
@@ -371,5 +447,30 @@ Bool social_force_model_setUpParticles(
 	retQSS_particle_setUpFromFile(N, IC_FILE, "indirect_infection");
     return true;
 }
+
+Bool social_force_model_setUpWalls() {
+	std::string walls_str = social_force_model_getParameter("WALLS");
+	
+	std::string item;
+	std::stringstream ss(walls_str);
+	while (std::getline(ss, item, ',')) {
+		std::stringstream iss(item);
+		std::string s;
+		Wall wall;
+		std::getline(iss, s, '/');
+		wall.from_x = std::stod(s);
+		std::getline(iss, s, '/');
+		wall.from_y = std::stod(s);
+		std::getline(iss, s, '/');
+		wall.to_x = std::stod(s);
+		std::getline(iss, s, '/');
+		wall.to_y = std::stod(s);
+
+		walls.push_back(wall);
+	}
+
+	return true;
+}
+
 
 }

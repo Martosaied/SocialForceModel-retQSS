@@ -16,6 +16,13 @@ def load_config(config_path: str) -> dict:
     with open(config_path, 'r') as f:
         return json.load(f)
 
+def copy_results_to_latest(output_dir: str) -> str:
+    """Copy results from output directory to latest directory."""
+    latest_dir = os.path.join(output_dir, '../latest')
+    os.makedirs(latest_dir, exist_ok=True)
+    shutil.copytree(output_dir, latest_dir, dirs_exist_ok=True)
+    return latest_dir
+
 def create_output_dir(base_dir: str = "experiments", experiment_name: str = None) -> str:
     """Create and return path to timestamped directory within experiment folder.
     
@@ -41,14 +48,27 @@ def create_output_dir(base_dir: str = "experiments", experiment_name: str = None
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
-def process_map(map):
+def process_map(mapping: List[List[int]]) -> List[int]:
     obstacle_indices = []
-    for i in range(len(map)):
-        for j in range(len(map[i])):
-            if map[i][j] == 1:
-                obstacle_indices.append(i % len(map) + len(map[i]) * j + 1)
+    for i in range(len(mapping)):
+        for j in range(len(mapping[i])):
+            if mapping[i][j] == 1:
+                obstacle_indices.append(i % len(mapping) + len(mapping[i]) * j + 1)
     
     return obstacle_indices
+
+def process_walls(walls: List[List[Dict[str, int]]]) -> List[str]:
+    processed_walls = []
+    for wall in walls:
+        processed_walls.append(f'{wall["from_x"]}/{wall["from_y"]}/{wall["to_x"]}/{wall["to_y"]}')
+
+    return [f'{",".join(processed_walls)}']
+
+def custom_process_by_name(name: str, value: Any) -> Any:
+    if name == 'WALLS':
+        return process_walls(value)
+    else:
+        raise ValueError(f"Invalid parameter name: {name}")
 
 def process_parameter(param: dict) -> dict:
     """Process parameter configuration and return a dictionary."""
@@ -61,6 +81,8 @@ def process_parameter(param: dict) -> dict:
         return [param['value']]
     elif param['type'] == 'map':
         return [f'{process_map(param['map'])}'.replace(' ', '').replace('[', '').replace(']', '')]
+    elif param['type'] == 'custom':
+        return custom_process_by_name(param['name'], param['value'])
     else:
         raise ValueError(f"Invalid parameter type: {param['type']}")
 

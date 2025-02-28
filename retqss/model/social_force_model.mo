@@ -12,14 +12,16 @@ import retQSS_social_force_model_types;
 
 constant Integer // size
 	N = 300,
-	GRID_DIVISIONS = 1,
+	GRID_DIVISIONS = 3,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
 parameter Integer
 	RANDOM_SEED = getIntegerModelParameter("RANDOM_SEED", 0),
 	GRID_SCENARIO = getIntegerModelParameter("GRID_SCENARIO", 0), //0=hallway (homogeneous)
-	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 40);
+	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 40),
+	PEDESTRIAN_IMPLEMENTATION = getIntegerModelParameter("PEDESTRIAN_IMPLEMENTATION", 0),
+	BORDER_IMPLEMENTATION = getIntegerModelParameter("BORDER_IMPLEMENTATION", 0);
 
 // Output delta time parameter
 parameter Real
@@ -119,6 +121,9 @@ initial algorithm
 	_ := setUpParticles(N, CELL_EDGE_LENGTH, GRID_DIVISIONS, x);
     _ := debug(INFO(), time, "Particles setup ended. N = %d", N,_,_,_);
 
+	// setup the walls in RETQSS
+	_ := setUpWalls();
+
 
 	// setup the particles initial state
 	for i in 1:N loop
@@ -209,6 +214,7 @@ algorithm
 				hx := 0.0;
 			end if;
 			reinit(x[i], hx);
+			_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
 		end for;
 	end when;
 

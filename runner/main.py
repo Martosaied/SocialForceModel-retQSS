@@ -12,7 +12,7 @@ import random
 import multiprocessing
 
 from plotter import generate_gif
-from utils import load_config, create_output_dir, process_parameters, get_parameter_combinations
+from utils import load_config, create_output_dir, process_parameters, get_parameter_combinations, copy_results_to_latest
 
 def run_model(model_name: str):
     """Run the specified model command and handle the solution file."""
@@ -165,6 +165,9 @@ def main():
     
     # Run experiment
     run_experiment(config, output_dir, args.model)
+
+    # Copy results from output directory to latest directory
+    copy_results_to_latest(output_dir)
     print(f"\nExperiment completed. Results saved in {output_dir}")
 
 if __name__ == '__main__':

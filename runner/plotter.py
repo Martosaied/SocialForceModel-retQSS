@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import numpy as np
 import imageio
 import os
@@ -13,6 +14,7 @@ def generate_gif(solution_file, output_dir):
     os.makedirs(frames_dir, exist_ok=True)
 
     # Create frames
+    prev_row = None
     for index, row in df.iterrows():
         # Create a new figure for each frame
         plt.figure(figsize=(20, 20))
@@ -30,32 +32,78 @@ def generate_gif(solution_file, output_dir):
         frame_positions_x = []
         frame_positions_y = []
         frame_positions_color = []
+        frame_velocities_x = []
+        frame_velocities_y = []
+        
+        # For legend
+        left_scatter = None
+        right_scatter = None
+        
         for i in range(1, 300):  # 300 particles
+            if row.get(f'PX[{i}]') is None:
+                continue
 
             x = row[f'PX[{i}]']
             y = row[f'PY[{i}]']
             state = row[f'PS[{i}]']
 
-            # Different colors based on particle state
-            if state == 4:  # Infected
-                color = 'red'
-            elif state == 1:  # Recovered
+            # Calculate velocities from position changes if we have a previous frame
+            vx = 0
+            vy = 0
+            if prev_row is not None:
+                dt = row['time'] - prev_row['time']
+                if dt > 0:  # Avoid division by zero
+                    prev_x = prev_row[f'PX[{i}]']
+                    prev_y = prev_row[f'PY[{i}]']
+                    vx = (x - prev_x) / dt
+                    vy = (y - prev_y) / dt
+
+            if state == 1:  # Right
                 color = 'green'
-            else:  # Susceptible
+            else:  # Left
                 color = 'blue'
 
             frame_positions_x.append(x)
             frame_positions_y.append(y)
             frame_positions_color.append(color)
+            frame_velocities_x.append(vx)
+            frame_velocities_y.append(vy)
 
-        plt.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=300)
-        # Add title with time
+        # Plot scatter points
+        scatter = plt.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=300)
+        
+        # Create legend elements
+        legend_elements = [
+            plt.scatter([], [], c='blue', s=300, label='Left'),
+            plt.scatter([], [], c='green', s=300, label='Right')
+        ]
+        
+        # Add legend
+        plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5),
+                  title='Particles', fontsize=12, title_fontsize=14)
+        
+        # Add velocity vectors with quiver only if we have velocity data
+        if prev_row is not None:
+            # Scale factor for velocity vectors (adjust this value to make arrows more visible)
+            scale = 0.5  # Reduced scale since velocities might be larger with position differences
+            plt.quiver(frame_positions_x, frame_positions_y, 
+                      np.array(frame_velocities_x) * scale, 
+                      np.array(frame_velocities_y) * scale,
+                      color='black', alpha=0.5, width=0.003)
 
-        plt.title(f'Time: {row["time"]:.2f}')
+        # Add main title and timestamp
+        plt.suptitle('Pedestrian Movement Simulation', fontsize=16, y=0.95)
+        plt.title(f'Time: {row["time"]:.2f}', pad=20)
+        
+        # Adjust layout to prevent legend from being cut off
+        plt.tight_layout()
 
         # Save the frame
-        plt.savefig(os.path.join(frames_dir, f'frame_{index:04d}.png'))
+        plt.savefig(os.path.join(frames_dir, f'frame_{index:04d}.png'), bbox_inches='tight')
         plt.close()
+        
+        # Update previous row for next iteration
+        prev_row = row.copy()
 
     # Create GIF from frames
     frames = []
