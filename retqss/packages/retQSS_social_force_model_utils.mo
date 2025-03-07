@@ -145,6 +145,8 @@ function outputCSV
 	input Integer N;
 	input Real x[1];
 	input Real y[1];
+	input Real vx[1];
+	input Real vy[1];
 	output Boolean status;
 	external "C" status=social_force_model_outputCSV(time, N, x) annotation(
 	    Library="social_force_model",

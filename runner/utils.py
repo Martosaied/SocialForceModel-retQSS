@@ -64,6 +64,22 @@ def process_walls(walls: List[List[Dict[str, int]]]) -> List[str]:
 
     return [f'{",".join(processed_walls)}']
 
+def parse_walls(walls: str) -> List[Dict[str, int]]:
+    if walls is '' or walls is None:
+        return []
+
+    walls = walls.split(',')
+    processed_walls = []
+    for wall in walls:
+        coordinates = wall.split('/')
+        processed_walls.append({
+            'from_x': int(coordinates[0]),
+            'from_y': int(coordinates[1]),
+            'to_x': int(coordinates[2]),
+            'to_y': int(coordinates[3])
+        })
+    return processed_walls
+
 def custom_process_by_name(name: str, value: Any) -> Any:
     if name == 'WALLS':
         return process_walls(value)

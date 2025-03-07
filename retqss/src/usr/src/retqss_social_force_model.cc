@@ -10,7 +10,6 @@
 #include <chrono>
 #include <ctime>
 #include <cstddef>
-#include <json.hpp>
 
 int debugLevel;
 std::unordered_map<std::string, std::string> parameters;
@@ -411,7 +410,7 @@ Bool social_force_model_outputCSV(double time,
 	if(!started) {
 		outputCSV << "time";
 		for(int i=1; i<=N; i++) {
-			outputCSV << ",PX[" << i << "],PY[" << i << "],PS[" << i << "]";
+			outputCSV << ",PX[" << i << "],PY[" << i << "],VX[" << i << "],VY[" << i << "],PS[" << i << "]";
 		}
 		outputCSV << std::endl;
 		started = true;
@@ -419,7 +418,10 @@ Bool social_force_model_outputCSV(double time,
 	outputCSV << std::fixed << std::setprecision(4) << time;
 	for(int i=0; i < N; i++){
 	    int pType = (int) RETQSS()->particle_get_property(i, "type");
-		outputCSV << "," << x[i*3] << "," << x[(i+N)*3] << "," << pType;
+		double y = x[(i+N)*3];
+		double vx = x[(i+2*N)];
+		double vy = x[(i+3*N)];
+		outputCSV << "," << x[i*3] << "," << y << "," << vx << "," << vy << "," << pType;
 	}
 	outputCSV << std::endl;
 	outputCSV.flush();

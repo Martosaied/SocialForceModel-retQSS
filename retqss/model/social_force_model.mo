@@ -174,7 +174,7 @@ algorithm
 
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
-		_ := outputCSV(time, N, x, y);
+		_ := outputCSV(time, N, x, y, vx, vy);
 		nextOutputTick := time + OUTPUT_UPDATE_DT;
 	end when;
 

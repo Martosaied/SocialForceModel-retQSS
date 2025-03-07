@@ -91,7 +91,7 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str, parame
 
             # Generate GIF
             if iteration == 0:
-                generate_gif(result_file, output_dir)
+                generate_gif(result_file, output_dir, parameters)
                 print(f"Generated GIF for first iteration only")
             
         except Exception as e:

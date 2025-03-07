@@ -4,8 +4,12 @@ import matplotlib.animation as animation
 import numpy as np
 import imageio
 import os
+from utils import parse_walls
 
-def generate_gif(solution_file, output_dir):
+def generate_gif(solution_file, output_dir, parameters):
+    walls = parameters['WALLS']
+    walls = parse_walls(walls)
+
     frames_dir = os.path.join(output_dir, 'frames')
     # Read the CSV file
     df = pd.read_csv(solution_file)
@@ -27,6 +31,14 @@ def generate_gif(solution_file, output_dir):
         for i in range(21):  # 21 lines to create 20 divisions
             plt.axhline(y=i, color='gray', linestyle='-', alpha=0.3)
             plt.axvline(x=i, color='gray', linestyle='-', alpha=0.3)
+
+        # Plot wall segments
+        for wall in walls:
+            plt.plot(
+                [wall['from_x'], wall['to_x']], 
+                [wall['from_y'], wall['to_y']], 
+                'k-', linewidth=3, label='_nolegend_'
+            )  # 'k-' means black solid line
 
         # Plot each particle
         frame_positions_x = []
@@ -92,14 +104,11 @@ def generate_gif(solution_file, output_dir):
                       color='black', alpha=0.5, width=0.003)
 
         # Add main title and timestamp
-        plt.suptitle('Pedestrian Movement Simulation', fontsize=16, y=0.95)
-        plt.title(f'Time: {row["time"]:.2f}', pad=20)
+        plt.title('Pedestrian Movement Simulation', fontsize=16)
+        plt.subtitle(f'Time: {row["time"]:.2f}')
         
-        # Adjust layout to prevent legend from being cut off
-        plt.tight_layout()
-
         # Save the frame
-        plt.savefig(os.path.join(frames_dir, f'frame_{index:04d}.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(frames_dir, f'frame_{index:04d}.png'))
         plt.close()
         
         # Update previous row for next iteration
