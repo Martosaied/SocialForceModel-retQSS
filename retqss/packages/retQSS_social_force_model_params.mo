@@ -15,17 +15,29 @@ algorithm
 	implementation := getIntegerModelParameter("BORDER_IMPLEMENTATION", 0);
 end BORDER_IMPLEMENTATION;
 
-function PEDESTRIAN_A
-	output Real pedestrianA;
+function PEDESTRIAN_A_1
+	output Real pedestrianA_1;
 algorithm
-	pedestrianA := getRealModelParameter("PEDESTRIAN_A", 2.1);
-end PEDESTRIAN_A;
+	pedestrianA_1 := getRealModelParameter("PEDESTRIAN_A_1", 2.1);
+end PEDESTRIAN_A_1;
 
-function PEDESTRIAN_B
-	output Real pedestrianB;
+function PEDESTRIAN_B_1
+	output Real pedestrianB_1;
 algorithm
-	pedestrianB := getRealModelParameter("PEDESTRIAN_B", 0.3);
-end PEDESTRIAN_B;
+	pedestrianB_1 := getRealModelParameter("PEDESTRIAN_B_1", 0.3);
+end PEDESTRIAN_B_1;
+
+function PEDESTRIAN_A_2
+	output Real pedestrianA_2;
+algorithm
+	pedestrianA_2 := getRealModelParameter("PEDESTRIAN_A_2", 2.1);
+end PEDESTRIAN_A_2;
+
+function PEDESTRIAN_B_2
+	output Real pedestrianB_2;
+algorithm
+	pedestrianB_2 := getRealModelParameter("PEDESTRIAN_B_2", 0.3);
+end PEDESTRIAN_B_2;
 
 function PEDESTRIAN_R
 	output Real pedestrianR;

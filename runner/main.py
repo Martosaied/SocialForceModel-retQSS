@@ -11,7 +11,7 @@ import shutil
 import random
 import multiprocessing
 
-from plotter import generate_gif
+from plotter import generate_gif, generate_grouped_directioned_graph
 from utils import load_config, create_output_dir, process_parameters, get_parameter_combinations, copy_results_to_latest
 
 def run_model(model_name: str):
@@ -92,7 +92,11 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str, parame
             # Generate GIF
             if iteration == 0:
                 generate_gif(result_file, output_dir, parameters)
-                print(f"Generated GIF for first iteration only")
+                # Create a directory for the grouped directioned graph
+                grouped_directioned_graph_dir = f'{output_dir}/grouped_directioned_graph'
+                os.makedirs(grouped_directioned_graph_dir, exist_ok=True)
+                generate_grouped_directioned_graph(result_file, grouped_directioned_graph_dir)
+                print(f"Generated visual representations for first iteration only")
             
         except Exception as e:
             print(f"Error in iteration {iteration}: {str(e)}")

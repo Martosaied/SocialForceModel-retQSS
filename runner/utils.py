@@ -73,10 +73,10 @@ def parse_walls(walls: str) -> List[Dict[str, int]]:
     for wall in walls:
         coordinates = wall.split('/')
         processed_walls.append({
-            'from_x': int(coordinates[0]),
-            'from_y': int(coordinates[1]),
-            'to_x': int(coordinates[2]),
-            'to_y': int(coordinates[3])
+            'from_x': float(coordinates[0]),
+            'from_y': float(coordinates[1]),
+            'to_x': float(coordinates[2]),
+            'to_y': float(coordinates[3])
         })
     return processed_walls
 

@@ -12,8 +12,10 @@
 #include <cstddef>
 
 int debugLevel;
-std::unordered_map<std::string, std::string> parameters;
+std::map<std::string, std::string> parameters;
 std::list<Wall> walls;
+
+ModelParameters model_parameters;
 
 std::ofstream outputCSV("solution.csv");
 bool started = false;
@@ -24,6 +26,23 @@ bool started = false;
 
 extern "C"
 {
+
+Bool social_force_model_setParameters() {
+	model_parameters.PEDESTRIAN_A_1 = social_force_model_getRealModelParameter("PEDESTRIAN_A_1", 2.1);
+	model_parameters.PEDESTRIAN_B_1 = social_force_model_getRealModelParameter("PEDESTRIAN_B_1", 0.3);
+	model_parameters.PEDESTRIAN_A_2 = social_force_model_getRealModelParameter("PEDESTRIAN_A_2", 2.1);
+	model_parameters.PEDESTRIAN_B_2 = social_force_model_getRealModelParameter("PEDESTRIAN_B_2", 0.3);
+	model_parameters.PEDESTRIAN_R = social_force_model_getRealModelParameter("PEDESTRIAN_R", 0.1);
+	model_parameters.PEDESTRIAN_LAMBDA = social_force_model_getRealModelParameter("PEDESTRIAN_LAMBDA", 0.3);
+	model_parameters.PEDESTRIAN_IMPLEMENTATION = social_force_model_getRealModelParameter("PEDESTRIAN_IMPLEMENTATION", 0);
+
+	model_parameters.BORDER_IMPLEMENTATION = social_force_model_getRealModelParameter("BORDER_IMPLEMENTATION", 0);
+	model_parameters.BORDER_A = social_force_model_getRealModelParameter("BORDER_A", 10);
+	model_parameters.BORDER_B = social_force_model_getRealModelParameter("BORDER_B", 0.7);
+	model_parameters.BORDER_R = social_force_model_getRealModelParameter("BORDER_R", 0.1);
+
+	return true;
+}
 
 int social_force_model_setDebugLevel(int level)
 {
@@ -209,12 +228,14 @@ bool repulsive_pedestrian_effect(
 		return false; // Skip if the source and neighbor particle are the same
 	}
 
+	double A_1 = model_parameters.PEDESTRIAN_A_1;
+	double B_1 = model_parameters.PEDESTRIAN_B_1;
 
-	double A = 2.1;
-	double B = 0.3;
+	double A_2 = model_parameters.PEDESTRIAN_A_2;
+	double B_2 = model_parameters.PEDESTRIAN_B_2;
 
-	double ra = 0.1;
-	double rb = 0.1;
+	double ra = model_parameters.PEDESTRIAN_R;
+	double rb = model_parameters.PEDESTRIAN_R;
 	double rab = ra + rb;
 
 	double aX, aY, aZ, bX, bY, bZ;
@@ -225,7 +246,6 @@ bool repulsive_pedestrian_effect(
 	double targetX = args[0];
 	double targetY = args[1];
 
-
 	double deltax = bX - aX;
 	double deltay = bY - aY;
 	double distanceab = sqrt(deltax*deltax + deltay*deltay);
@@ -233,10 +253,13 @@ bool repulsive_pedestrian_effect(
 	double normalizedX = (aX - bX) / distanceab;
 	double normalizedY = (aY - bY) / distanceab;
 
-	double fx = A*exp((rab-distanceab)/B)*normalizedX;
-	double fy = A*exp((rab-distanceab)/B)*normalizedY;
+	double fx_1 = A_1*exp((rab-distanceab)/B_1)*normalizedX;
+	double fy_1 = A_1*exp((rab-distanceab)/B_1)*normalizedY;
 
-	double lambda = 0.3;
+	double fx_2 = A_2*exp((rab-distanceab)/B_2)*normalizedX;
+	double fy_2 = A_2*exp((rab-distanceab)/B_2)*normalizedY;
+
+	double lambda = model_parameters.PEDESTRIAN_LAMBDA;
 	double desiredX, desiredY, desiredZ;
 	social_force_model_desiredDirection(
 		aX, aY, aZ,
@@ -246,45 +269,10 @@ bool repulsive_pedestrian_effect(
 	double cos_phi = -(normalizedX*desiredX) - (normalizedY*desiredY);
 	double area = lambda + (1-lambda)*((1+cos_phi)/2);
 	
-	result = Vector_3(fx, fy, 0);
+	result = Vector_3((fx_1 * area) + fx_2, (fy_1 * area) + fy_2, 0);
 
 	return true;
 }
-
-void social_force_model_totalRepulsivePedestrianEffect(
-	int particleID, 
-	double *desiredSpeed,
-	double *pX, 
-	double *pY, 
-	double *pZ, 
-	double *pVX, 
-	double *pVY, 
-	double *pVZ, 
-	double targetX,
-	double targetY,
-	double *x, 
-	double *y, 
-	double *z
-)
-{	
-	double totalRepulsiveX = 0;
-	double totalRepulsiveY = 0;
-	double totalRepulsiveZ = 0;
-
-	int index = (particleID-1)*3;
-	for (int i = 0; i < 299; i++) {
-		if (i == particleID-1) continue;
-		double repulsiveX, repulsiveY, repulsiveZ;
-		// repulsive_pedestrian_effect(pX[index], pY[index], pZ[index], pX[i*3], pY[i*3], pZ[i*3], pVX[i*3], pVY[i*3], pVZ[i*3], desiredSpeed[i], targetX, targetY, &repulsiveX, &repulsiveY, &repulsiveZ);
-		totalRepulsiveX += repulsiveX;
-		totalRepulsiveY += repulsiveY;
-		totalRepulsiveZ += repulsiveZ;
-	}
-	*x = totalRepulsiveX;
-	*y = totalRepulsiveY;
-	*z = totalRepulsiveZ;	
-}
-
 
 void social_force_model_totalRepulsiveBorderEffect(
 	int particleID,

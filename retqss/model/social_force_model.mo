@@ -10,9 +10,9 @@ import retQSS_social_force_model_types;
   This section loads parameters and constants from the parameters.config file
 */
 
-constant Integer // size
-	N = 300,
-	GRID_DIVISIONS = 3,
+constant Integer
+	N = 600,
+	GRID_DIVISIONS = 30,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -99,6 +99,9 @@ initial algorithm
 
 	// sets the random seed from the config file
 	_ := random_reseed(RANDOM_SEED);
+
+	// sets the parameters from the config file
+	_ := setParameters();
 
     _ := debug(INFO(), time, "Grid setup. Divisions = %d", GRID_DIVISIONS, _, _, _);
 

@@ -23,6 +23,13 @@ function setUpWalls
 	    Include="#include \"retqss_social_force_model.hh\"");
 end setUpWalls;
 
+function setParameters
+	output Boolean _;
+	external "C" _=social_force_model_setParameters() annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.hh\"");
+end setParameters;
+
 function internalRepulsiveBorderEffect
 	input Real A;
 	input Real B;
@@ -171,6 +178,12 @@ algorithm
 end acceleration;
 
 function repulsivePedestrianEffect
+	input Real pedestrianA1;
+	input Real pedestrianB1;
+	input Real pedestrianA2;
+	input Real pedestrianB2;
+	input Real pedestrianR;
+	input Real pedestrianLambda;
 	input Real aX;
 	input Real aY;
 	input Real aZ;
@@ -198,13 +211,13 @@ protected
 	Real desiredY;
 	Real desiredZ;
 	Real area;
-	Real fx;
-	Real fy;
+	Real fx_1;
+	Real fy_1;
+	Real fx_2;
+	Real fy_2;
 algorithm
-	rab := PEDESTRIAN_R() * 2;
-	A := PEDESTRIAN_A();
-	B := PEDESTRIAN_B();
-	lambda := PEDESTRIAN_LAMBDA();
+	rab := pedestrianR * 2;
+	lambda := pedestrianLambda;
 	
 	deltax := bX - aX;
 	deltay := bY - aY;
@@ -213,8 +226,10 @@ algorithm
 	normalizedX := (aX - bX) / distanceab;
 	normalizedY := (aY - bY) / distanceab;
 
-	fx := A*exp((rab-distanceab)/B)*normalizedX;
-	fy := A*exp((rab-distanceab)/B)*normalizedY;
+	fx_1 := pedestrianA1*exp((rab-distanceab)/pedestrianB1)*normalizedX;
+	fy_1 := pedestrianA1*exp((rab-distanceab)/pedestrianB1)*normalizedY;
+	fx_2 := pedestrianA2*exp((rab-distanceab)/pedestrianB2)*normalizedX;
+	fy_2 := pedestrianA2*exp((rab-distanceab)/pedestrianB2)*normalizedY;
 
 	(desiredX, desiredY, desiredZ) := desiredDirection(
 		aX, aY, aZ,
@@ -223,8 +238,8 @@ algorithm
 	cos_phi := -(normalizedX*desiredX) - (normalizedY*desiredY);
 	area := lambda + (1-lambda)*((1+cos_phi)/2);
 
-	x := fx*area;
-	y := fy*area;
+	x := fx_1*area + fx_2;
+	y := fy_1*area + fy_2;
 	z := 0;
 end repulsivePedestrianEffect;
 
@@ -244,6 +259,12 @@ function totalRepulsivePedestrianEffect
 	output Real y;
 	output Real z;
 protected
+	Real pedestrianA1;
+	Real pedestrianB1;
+	Real pedestrianA2;
+	Real pedestrianB2;
+	Real pedestrianR;
+	Real pedestrianLambda;
 	Integer index;
 	Real totalRepulsiveX;
 	Real totalRepulsiveY;
@@ -270,10 +291,17 @@ algorithm
 		totalRepulsiveX := 0;
 		totalRepulsiveY := 0;
 		totalRepulsiveZ := 0;
+		pedestrianA1 := PEDESTRIAN_A_1();
+		pedestrianB1 := PEDESTRIAN_B_1();
+		pedestrianA2 := PEDESTRIAN_A_2();
+		pedestrianB2 := PEDESTRIAN_B_2();
+		pedestrianR := PEDESTRIAN_R();
+		pedestrianLambda := PEDESTRIAN_LAMBDA();
 
 		for i0 in 1:10000 loop
 			if i0 < totalNumberOfParticles and i0 <> particleID then
 				(repulsiveX, repulsiveY, repulsiveZ) := repulsivePedestrianEffect(
+					pedestrianA1, pedestrianB1, pedestrianA2, pedestrianB2, pedestrianR, pedestrianLambda,
 					equationArrayGet(pX, particleID), equationArrayGet(pY, particleID), equationArrayGet(pZ, particleID), 
 					equationArrayGet(pX, i0), equationArrayGet(pY, i0), equationArrayGet(pZ, i0), 
 					equationArrayGet(desiredSpeed, i0), targetX, targetY

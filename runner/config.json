@@ -4,7 +4,7 @@
     {
       "name": "PEDESTRIAN_IMPLEMENTATION",
       "type": "value",
-      "value": 1
+      "value": 0
     },
     {
       "name": "BORDER_IMPLEMENTATION",
@@ -24,12 +24,12 @@
     {
       "name": "FROM_Y",
       "type": "value",
-      "value": 5
+      "value": 5.0
     },
     {
       "name": "TO_Y",
       "type": "value",
-      "value": 15
+      "value": 15.0
     },
     {
       "name": "OBSTACLES",
@@ -37,17 +37,17 @@
       "map": [
         [
           0,
-          1,
+          0,
           0
         ],
         [
           0,
-          1,
+          0,
           0
         ],
         [
           0,
-          1,
+          0,
           0
         ]
       ]
@@ -58,12 +58,22 @@
       "value": []
     },
     {
-      "name": "PEDESTRIAN_A",
+      "name": "PEDESTRIAN_A_1",
+      "type": "value",
+      "value": 0.0
+    },
+    {
+      "name": "PEDESTRIAN_B_1",
+      "type": "value",
+      "value": 0.3
+    },
+    {
+      "name": "PEDESTRIAN_A_2",
       "type": "value",
       "value": 2.1
     },
     {
-      "name": "PEDESTRIAN_B",
+      "name": "PEDESTRIAN_B_2",
       "type": "value",
       "value": 0.3
     },
@@ -71,6 +81,11 @@
       "name": "PEDESTRIAN_R",
       "type": "value",
       "value": 0.1
+    },
+    {
+      "name": "PEDESTRIAN_LAMBDA",
+      "type": "value",
+      "value": 0.3
     },
     {
       "name": "BORDER_A",

@@ -25,6 +25,24 @@ struct Wall
 	double to_y;
 };
 
+struct ModelParameters {
+	double PEDESTRIAN_A_1;
+	double PEDESTRIAN_B_1;
+	double PEDESTRIAN_A_2;
+	double PEDESTRIAN_B_2;
+	double PEDESTRIAN_R;
+	double PEDESTRIAN_LAMBDA;
+	double PEDESTRIAN_IMPLEMENTATION;
+	double BORDER_IMPLEMENTATION;
+	double BORDER_A;
+	double BORDER_B;
+	double BORDER_R;
+	double FORCE_TERMINATION_AT;
+	double GRID_SIZE;
+	double FROM_Y;
+	double TO_Y;
+};
+
 Bool social_force_model_setUpParticles(
     int N,
     double cellEdgeLength,
@@ -32,6 +50,8 @@ Bool social_force_model_setUpParticles(
     double *x);
 
 Bool social_force_model_setUpWalls();
+
+Bool social_force_model_setParameters();
 
 int social_force_model_setDebugLevel(int level);
 
