@@ -71,18 +71,16 @@ protected
 	Real randomValue2;
 algorithm
 	if randomBoolean(0.5) == 0.0 then
-		randomValue2 := 0.1; 
-		// randomValue2 := random(0.1, size/3);
+		randomValue2 := random(0.1, size/3);
 		x := randomValue2;
-		dx := 1.20 * size;
+		dx := 2 * size;
 	else
-		randomValue2 := 0.9 * size;
-		// randomValue2 := random(size/3 * 2, size);
+		randomValue2 := random(size/3 * 2, size);
 		x := randomValue2;
-		dx := -0.20;
+		dx := -2 * size;
 	end if;
 	randomValue := random(fromY, toY);
-	dy := randomValue;
+	dy := size - randomValue;
 	y := randomValue;
 	dz := zCoord;
 	z := zCoord;
@@ -171,6 +169,7 @@ algorithm
 
 	// The acceleration is the difference between the desired acceleration and the current acceleration
 	// The acceleration has a relaxation time of 0.5 seconds
+
 	relaxationTime := 1/0.5;
 	x := (desiredX - currentVX) * relaxationTime;
 	y := (desiredY - currentVY) * relaxationTime;

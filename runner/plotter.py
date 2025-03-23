@@ -10,7 +10,7 @@ from itertools import groupby, product
 from utils import parse_walls
 
 def generate_gif(solution_file, output_dir, parameters):
-    walls = parameters['WALLS']
+    walls = parameters.get('WALLS', '')
     walls = parse_walls(walls)
 
     frames_dir = os.path.join(output_dir, 'frames')
@@ -23,12 +23,15 @@ def generate_gif(solution_file, output_dir, parameters):
     # Create frames
     prev_row = None
     for index, row in df.iterrows():
+        # if index % 5 != 0:
+        #     continue
+
         # Create a new figure for each frame
         plt.figure(figsize=(20, 20))
 
         # Set up the plot area
-        plt.xlim(0, parameters['GRID_SIZE'])
-        plt.ylim(0, parameters['GRID_SIZE'])
+        plt.xlim(0, parameters.get('GRID_SIZE', 20))
+        plt.ylim(0, parameters.get('GRID_SIZE', 20))
 
         # Add grid lines
         for i in range(21):  # 21 lines to create 20 divisions
@@ -54,7 +57,7 @@ def generate_gif(solution_file, output_dir, parameters):
         left_scatter = None
         right_scatter = None
         
-        for i in range(1, 1000):  # 300 particles
+        for i in range(1, parameters.get('N', 300)):  # 300 particles
             if row.get(f'PX[{i}]') is None:
                 continue
 
@@ -74,7 +77,7 @@ def generate_gif(solution_file, output_dir, parameters):
                     vy = (y - prev_y) / dt
 
             if state == 1:  # Right
-                color = 'green'
+                color = 'red'
             else:  # Left
                 color = 'blue'
 
@@ -100,10 +103,18 @@ def generate_gif(solution_file, output_dir, parameters):
         # Add velocity vectors with quiver only if we have velocity data
         if prev_row is not None:
             # Scale factor for velocity vectors (adjust this value to make arrows more visible)
-            scale = 0.5  # Reduced scale since velocities might be larger with position differences
+            length_velocities = [
+                sqrt(frame_velocities_x[i] ** 2 + frame_velocities_y[i] ** 2) for i in range(len(frame_velocities_x))
+            ]
+            normalize_velocities_x = [
+                frame_velocities_x[i] / length_velocities[i] for i in range(len(frame_velocities_x))
+            ]
+            normalize_velocities_y = [
+                frame_velocities_y[i] / length_velocities[i] for i in range(len(frame_velocities_y))
+            ]
             plt.quiver(frame_positions_x, frame_positions_y, 
-                      np.array(frame_velocities_x) * scale, 
-                      np.array(frame_velocities_y) * scale,
+                      np.array(normalize_velocities_x), 
+                      np.array(normalize_velocities_y),
                       color='black', alpha=0.5, width=0.003)
 
         # Add main title and timestamp
@@ -166,7 +177,7 @@ def calculate_groups(row, particles):
     for group in particles_groups:
         if group not in unique_groups:
             unique_groups.append(group)
-    
+
     return unique_groups
 
 
@@ -236,7 +247,12 @@ def generate_grouped_directioned_graph(solution_file, output_dir):
                           np.array(velocities_y) * scale,
                           color='black', alpha=0.5, width=0.003)
         
-        plt.title(f'Time: {row["time"]:.2f}')
+        plt.suptitle('Grouped Lanes', fontsize=20)
+        plt.title(f'Time: {row["time"]:.2f}', fontsize=16)
+        plt.legend()
+        plt.xlabel('X', fontsize=16)
+        plt.ylabel('Y', fontsize=16)
+
         plt.savefig(f'{output_dir}/group_{index}.png')
         plt.close()
 
@@ -249,3 +265,27 @@ def generate_grouped_directioned_graph(solution_file, output_dir):
     plt.savefig(f'{output_dir}/linear_graph.png')
     plt.close()
 
+def benchmark_graph():
+    results = {
+        'N': [100, 200, 400, 800, 1600],
+        'mmoc': [7.09, 17.46, 48.89, 156.24, 551.06],
+        'retqss': [2.77, 5.06, 10.98, 25.70, 67.70]
+    }
+
+    description = """
+    The simulations were made using the same parameters for both models. 
+    Same ones used by Helbing and Molnar 1995. No obstacles were used.
+    The number of volumes for the retqss implementation was 100.
+    """
+
+    plt.figure(figsize=(10, 10))
+    plt.plot(results['N'], results['mmoc'], label='mmoc only')
+    plt.plot(results['N'], results['retqss'], label='mmoc+retqss')
+    plt.title('Comparacion de tiempos de ejecucion*')
+    plt.xlabel('Numero de peatones en la simulacion')
+    plt.ylabel('Tiempo(s)')
+    plt.legend()
+    plt.savefig(f'benchmark_graph.png')
+    plt.close()
+
+benchmark_graph()

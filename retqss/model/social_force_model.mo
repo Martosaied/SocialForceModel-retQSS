@@ -11,17 +11,17 @@ import retQSS_social_force_model_types;
 */
 
 constant Integer
-	N = 600,
-	GRID_DIVISIONS = 30,
+	N = 300,
+	GRID_DIVISIONS = 1,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
 parameter Integer
 	RANDOM_SEED = getIntegerModelParameter("RANDOM_SEED", 0),
-	GRID_SCENARIO = getIntegerModelParameter("GRID_SCENARIO", 0), //0=hallway (homogeneous)
 	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 40),
 	PEDESTRIAN_IMPLEMENTATION = getIntegerModelParameter("PEDESTRIAN_IMPLEMENTATION", 0),
-	BORDER_IMPLEMENTATION = getIntegerModelParameter("BORDER_IMPLEMENTATION", 0);
+	BORDER_IMPLEMENTATION = getIntegerModelParameter("BORDER_IMPLEMENTATION", 0),
+	CONVEYOR_BELT_EFFECT = getIntegerModelParameter("CONVEYOR_BELT_EFFECT", 0);
 
 // Output delta time parameter
 parameter Real
@@ -204,17 +204,19 @@ algorithm
 		for i in 1:N loop
 			hx := x[i];
 			hy := y[i];
-			if y[i] < 0.0 then
-				hy := GRID_SIZE;
-			end if;
-			if y[i] > GRID_SIZE then
-				hy := 0.0;
-			end if;
-			if x[i] < 0.0 then
-				hx := GRID_SIZE;
-			end if;
-			if x[i] > GRID_SIZE then
-				hx := 0.0;
+			if CONVEYOR_BELT_EFFECT == 1 then
+				if y[i] < 0.0 then
+					hy := GRID_SIZE;
+				end if;
+				if y[i] > GRID_SIZE then
+					hy := 0.0;
+				end if;
+				if x[i] < 0.0 then
+					hx := GRID_SIZE;
+				end if;
+				if x[i] > GRID_SIZE then
+					hx := 0.0;
+				end if;
 			end if;
 			reinit(x[i], hx);
 			_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);

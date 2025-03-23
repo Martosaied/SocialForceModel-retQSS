@@ -434,7 +434,7 @@ Bool social_force_model_setUpParticles(
 	    output << " " << volumeID << std::endl;
 	}
 	output.close();
-	retQSS_particle_setUpFromFile(N, IC_FILE, "indirect_infection");
+	retQSS_particle_setUpFromFile(N, IC_FILE, "social_force_model");
     return true;
 }
 

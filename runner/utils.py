@@ -9,7 +9,11 @@ import shutil
 import numpy as np
 import itertools
 from typing import Dict, List, Any, Iterator
+import psutil
+import time
 
+def elapsed_since(start: float) -> float:
+    return time.time() - start
 
 def load_config(config_path: str) -> dict:
     """Load experiment configuration from JSON file."""
@@ -131,3 +135,24 @@ def get_parameter_combinations(params_dict: Dict[str, List[Any]]) -> Iterator[Di
     for combination in itertools.product(*param_values):
         # Create a dictionary for this combination
         yield dict(zip(param_names, combination))
+
+def get_process_memory(pid: int) -> int:
+    process = psutil.Process(pid)
+    return process.memory_info().rss
+
+
+def track_and_run(cmd: str):
+   # Start the subprocess
+    process = subprocess.Popen(
+        cmd, 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE, 
+        stdin=subprocess.PIPE,
+        shell=True
+    )
+
+
+    while process.poll() is None:
+        time.sleep(1)
+
+    return process.communicate()
