@@ -1,3 +1,7 @@
+runner/experiments/*/run_*
+runner/experiments/*/latest/*
+runner/experiments/*
+
 retqss/bin/
 retqss/build/
 retqss/lib/
@@ -5,8 +9,3 @@ retqss/models/
 retqss/output/
 retqss/packages/pkg_*
 retqss/.project
-
-retqss/src/engine/3rd-party/cgal/CGAL-4.14-beta2.tar.gz
-
-
-*.DS_Store

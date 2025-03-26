@@ -30,7 +30,7 @@ def run_model(model_name: str):
     try:
         # Run the command
         result = subprocess.run(
-            f'/usr/bin/time -f "%E %M" {cmd}',
+            cmd,
             shell=True,
             check=True,
             text=True,
