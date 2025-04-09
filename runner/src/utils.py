@@ -27,7 +27,7 @@ def copy_results_to_latest(output_dir: str) -> str:
     shutil.copytree(output_dir, latest_dir, dirs_exist_ok=True)
     return latest_dir
 
-def create_output_dir(base_dir: str = "experiments", experiment_name: str = None) -> str:
+def create_output_dir(base_dir: str = "results", experiment_name: str = None) -> str:
     """Create and return path to timestamped directory within experiment folder.
     
     Args:

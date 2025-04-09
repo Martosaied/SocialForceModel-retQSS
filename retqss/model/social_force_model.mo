@@ -12,7 +12,7 @@ import retQSS_social_force_model_types;
 
 constant Integer
 	N = 300,
-	GRID_DIVISIONS = 1,
+	GRID_DIVISIONS = 20,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters

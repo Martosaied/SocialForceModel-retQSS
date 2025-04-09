@@ -5,8 +5,8 @@ import time
 import os
 import subprocess
 
-from plotter import generate_gif, generate_grouped_directioned_graph
-from utils import process_parameters, get_parameter_combinations
+from src.plotter import generate_gif, generate_grouped_directioned_graph
+from src.utils import process_parameters, get_parameter_combinations
 
 
 def run_model(model_name: str):
@@ -22,11 +22,11 @@ def run_model(model_name: str):
     try:
         # Run the command
         result = subprocess.run(
-            f'/usr/bin/time -f "%E %M" {cmd}',
+            cmd,
             shell=True,
             check=True,
             text=True,
-            # capture_output=True
+            capture_output=True
         )
 
         # Check if solution.csv was created
@@ -56,12 +56,12 @@ def setup_parameters(model_name: str, parameters: dict, iteration: int):
     f.close()
 
 
-def run_iterations(num_iterations: int, model_name: str, output_dir: str, parameters: dict):
+def run_iterations(num_iterations: int, model_name: str, output_dir: str = "output", parameters: dict = {}, plot: bool = True, copy_results: bool = True):
     """Run experiment iterations using the specified model."""
 
     time_file = os.path.join(output_dir, f'benchmark.txt')
     time_file = open(time_file, 'w')
-
+    results = []
     for iteration in range(num_iterations):
         print(f"\nStarting iteration {iteration + 1}/{num_iterations}")
 
@@ -81,19 +81,16 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str, parame
 
             # Define the destination path for this iteration
             result_file = os.path.join(output_dir, f'result_{iteration}.csv')
-
-            # Move and rename the solution file
-            shutil.move(solution_path, result_file)
-            print(f"Saved results for iteration {iteration} to {result_file}")
+            results.append(result_file)
 
             # Generate GIF
-            if iteration == 0:
-                generate_gif(result_file, output_dir, parameters)
-                # Create a directory for the grouped directioned graph
-                grouped_directioned_graph_dir = f'{output_dir}/grouped_directioned_graph'
-                os.makedirs(grouped_directioned_graph_dir, exist_ok=True)
-                generate_grouped_directioned_graph(result_file, grouped_directioned_graph_dir)
-                print(f"Generated visual representations for first iteration only")
+            if iteration == 0 and plot:
+                generate_gif(solution_path, output_dir, parameters)
+
+            # Move and rename the solution file
+            if copy_results:
+                shutil.move(solution_path, result_file)
+                print(f"Saved results for iteration {iteration} to {result_file}")
 
         except Exception as e:
             print(f"Error in iteration {iteration}: {str(e)}")
@@ -103,10 +100,15 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str, parame
                 f.write(f"Error during iteration {iteration}:\n{str(e)}")
             raise
 
+    # if plot:
+    #     # Create a directory for the grouped directioned graph
+    #     generate_grouped_directioned_graph(results, output_dir)
+    #     print(f"Generated visual representations of lanes")
+
     time_file.close()
 
 
-def run_experiment(config: dict, output_dir: str, model_name: str):
+def run_experiment(config: dict, output_dir: str, model_name: str, plot: bool = True, copy_results: bool = True):
     """Run experiment iterations using the specified model."""
     num_iterations = config.get('iterations', 1)
     print(f"Running {num_iterations} iterations for {model_name}...")
@@ -116,16 +118,16 @@ def run_experiment(config: dict, output_dir: str, model_name: str):
     grouped_parameters = get_parameter_combinations(parameters)
     for params in grouped_parameters:
         print(f"Running with parameters: {params}")
-        run_iterations(num_iterations, model_name, output_dir, params)
+        run_iterations(num_iterations, model_name, output_dir, params, plot, copy_results)
 
 
 def compile_c_code():
     """Compile the C++ code for the specified model."""
     cmd = f"cd ../retqss/src && make"
-    subprocess.run(cmd, shell=True, check=True)
+    subprocess.run(cmd, shell=True, check=True, capture_output=True)
 
 
 def compile_model(model_name: str):
     """Compile the model for the specified model."""
     cmd = f"cd ../retqss/model/scripts && ./build.sh {model_name}"
-    subprocess.run(cmd, shell=True, check=True)
+    subprocess.run(cmd, shell=True, check=True, capture_output=True)

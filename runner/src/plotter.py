@@ -7,7 +7,7 @@ import os
 import pandas as pd
 from math import sqrt
 from itertools import groupby, product
-from utils import parse_walls
+from src.utils import parse_walls
 
 def generate_gif(solution_file, output_dir, parameters):
     walls = parameters.get('WALLS', '')
@@ -143,122 +143,147 @@ def generate_gif(solution_file, output_dir, parameters):
         os.remove(os.path.join(frames_dir, frame_file))
     os.rmdir(frames_dir)
 
-MIN_X_DISTANCE = 3
+MIN_X_DISTANCE = 2
 MIN_Y_DISTANCE = 0.5
 
-def get_related(pair, row):
-    return sqrt(
-        pow(row[f'PX[{pair[0]}]'] - row[f'PX[{pair[1]}]'], 2) + pow(row[f'PY[{pair[0]}]'] - row[f'PY[{pair[1]}]'], 2)
-    ) < MIN_DISTANCE
+def distance(tup1, tup2):
+    return abs(tup1[1] - tup2[1]) < MIN_X_DISTANCE and abs(tup1[2] - tup2[2]) < MIN_Y_DISTANCE
+
+def unify_groups(particles_groups):
+    # Remove duplicates
+    unique_groups = {}
+    for group in particles_groups:
+        sorted_group = tuple(sorted(group))
+        hash_id = str(hash(sorted_group))
+        unique_groups[hash_id] = set(sorted_group)
+
+    return list(unique_groups.values())
+
+def join_groups(particles_groups):
+    for group in particles_groups:
+        for other_group in particles_groups:
+            if len(set(group) & set(other_group)) > 0:
+                group.update(other_group)
+
+    return particles_groups
+
+def direct_group(particle, particles_list):
+    particle_group = set([particle[0]])
+    for other_particle in particles_list:
+        if distance(particle, other_particle) and particle[3] == other_particle[3]:
+            particle_group.add(other_particle[0])
+
+    return particle_group
 
 def calculate_groups(row, particles):    
-    def distance(tup1, tup2):
-        return abs(tup1[1] - tup2[1]) < MIN_X_DISTANCE and abs(tup1[2] - tup2[2]) < MIN_Y_DISTANCE
-    
     # initializing list
     particles_list = [(i, row[f'PX[{i}]'], row[f'PY[{i}]'], row[f'PS[{i}]']) for i in range(1, particles)]
-            
-    # Group Adjacent Coordinates
-    # Using product() + groupby() + list comprehension
-    man_tups = [sorted(sub) for sub in product(particles_list, repeat = 2) if distance(*sub) and sub[0][3] == sub[1][3]]
-    
-    res_dict = {ele: {ele} for ele in particles_list}
-    for tup1, tup2 in man_tups:
-        res_dict[tup1] |= res_dict[tup2]
-        res_dict[tup2] = res_dict[tup1]
-    
-    res = [[*next(val)] for key, val in groupby(
-            sorted(res_dict.values(), key = id), id)]
 
-    particles_groups = map(lambda x: set([y[0] for y in x]), res)
-
-    # Remove duplicates
-    unique_groups = []
-    for group in particles_groups:
-        if group not in unique_groups:
-            unique_groups.append(group)
-
-    return unique_groups
+    particles_groups = []
+    for particle in particles_list:
+        particle_group = direct_group(particle, particles_list)
+        particles_groups.append(particle_group)
 
 
-def generate_grouped_directioned_graph(solution_file, output_dir):
-    df = pd.read_csv(solution_file)
+    previous_group_quantity = 0
+    while len(particles_groups) != previous_group_quantity:
+        previous_group_quantity = len(particles_groups)
+        particles_groups = join_groups(particles_groups)
+        particles_groups = unify_groups(particles_groups)
 
-    particles = (len(df.columns) - 1) / 5
+    return particles_groups
+
+def generate_grouped_directioned_graph(results, output_dir):
     groups_per_time = {}
-    for index, row in df.iterrows():
-        if index % 20 != 0:
-            continue
+    for result_file in results:
+        df = pd.read_csv(result_file)
 
-        groups = calculate_groups(row, int(particles))
-        groups_per_time[row['time']] = len(groups)
+        particles = (len(df.columns) - 1) / 5
+        for index, row in df.iterrows():
+            if index % 5 != 0:
+                continue
 
-        # Graphic representation of the group position
-        # Create a new figure for each frame
-        plt.figure(figsize=(20, 20))
+            groups = calculate_groups(row, int(particles))
+            if row['time'] not in groups_per_time:
+                groups_per_time[row['time']] = [len(groups)]
+            else:
+                groups_per_time[row['time']].append(len(groups))
 
-        # Set up the plot area
-        plt.xlim(0, 20)
-        plt.ylim(0, 20)
+            # Graphic representation of the group position
+            # Create a new figure for each frame
+            plt.figure(figsize=(20, 20))
 
-        # Add grid lines
-        for i in range(21):  # 21 lines to create 20 divisions
-            plt.axhline(y=i, color='gray', linestyle='-', alpha=0.3)
-            plt.axvline(x=i, color='gray', linestyle='-', alpha=0.3)
+            # Set up the plot area
+            plt.xlim(0, 20)
+            plt.ylim(0, 20)
 
-        for group in groups:
-            # Create a random color for the group
-            color = np.random.rand(3,)
-            
-            # Arrays to store positions and velocities for quiver
-            positions_x = []
-            positions_y = []
-            velocities_x = []
-            velocities_y = []
-            
-            for particle in group:
-                x = row[f'PX[{particle}]']
-                y = row[f'PY[{particle}]']
+            # Add grid lines
+            for i in range(21):  # 21 lines to create 20 divisions
+                plt.axhline(y=i, color='gray', linestyle='-', alpha=0.3)
+                plt.axvline(x=i, color='gray', linestyle='-', alpha=0.3)
+
+            for group in groups:
+                # Create a random color for the group
+                color = np.random.rand(3,)
                 
-                # Calculate velocities if we have a previous frame
-                vx = 0
-                vy = 0
-                if df.iloc[index - 1] is not None:
-                    dt = row['time'] - df.iloc[index - 1]['time']
-                    if dt > 0:  # Avoid division by zero
-                        prev_x = df.iloc[index - 1][f'PX[{particle}]']
-                        prev_y = df.iloc[index - 1][f'PY[{particle}]']
-                        vx = (x - prev_x) / dt
-                        vy = (y - prev_y) / dt
+                # Arrays to store positions and velocities for quiver
+                positions_x = []
+                positions_y = []
+                velocities_x = []
+                velocities_y = []
                 
-                positions_x.append(x)
-                positions_y.append(y)
-                velocities_x.append(vx)
-                velocities_y.append(vy)
+                for particle in group:
+                    x = row[f'PX[{particle}]']
+                    y = row[f'PY[{particle}]']
+                    
+                    # Calculate velocities if we have a previous frame
+                    vx = 0
+                    vy = 0
+                    if df.iloc[index - 1] is not None:
+                        dt = row['time'] - df.iloc[index - 1]['time']
+                        if dt > 0:  # Avoid division by zero
+                            prev_x = df.iloc[index - 1][f'PX[{particle}]']
+                            prev_y = df.iloc[index - 1][f'PY[{particle}]']
+                            vx = (x - prev_x) / dt
+                            vy = (y - prev_y) / dt
+                    
+                    positions_x.append(x)
+                    positions_y.append(y)
+                    velocities_x.append(vx)
+                    velocities_y.append(vy)
+                    
+                    plt.scatter(x, y, color=color, s=300)
                 
-                plt.scatter(x, y, color=color, s=300)
+                # Add velocity vectors with quiver if we have velocity data
+                if df.iloc[index - 1] is not None and positions_x:
+                    # Scale factor for velocity vectors
+                    scale = 0.5
+                    plt.quiver(positions_x, positions_y, 
+                              np.array(velocities_x) * scale, 
+                              np.array(velocities_y) * scale,
+                              color='black', alpha=0.5, width=0.003)
             
-            # Add velocity vectors with quiver if we have velocity data
-            if df.iloc[index - 1] is not None and positions_x:
-                # Scale factor for velocity vectors
-                scale = 0.5
-                plt.quiver(positions_x, positions_y, 
-                          np.array(velocities_x) * scale, 
-                          np.array(velocities_y) * scale,
-                          color='black', alpha=0.5, width=0.003)
-        
-        plt.suptitle('Grouped Lanes', fontsize=20)
-        plt.title(f'Time: {row["time"]:.2f}', fontsize=16)
-        plt.legend()
-        plt.xlabel('X', fontsize=16)
-        plt.ylabel('Y', fontsize=16)
+            plt.suptitle('Grouped Lanes', fontsize=20)
+            plt.title(f'Time: {row["time"]:.2f}', fontsize=16)
+            plt.legend()
+            plt.xlabel('X', fontsize=16)
+            plt.ylabel('Y', fontsize=16)
 
-        plt.savefig(f'{output_dir}/group_{index}.png')
-        plt.close()
+            plt.savefig(f'{output_dir}/group_{index}.png')
+            plt.close()
 
     # Create a new figure for the linear graph with title and x and y labels
+    # Show the mean of the groups per time and its standard deviation
     plt.figure(figsize=(20, 20))
-    plt.plot(list(groups_per_time.keys()), list(groups_per_time.values()))
+    mean_groups_per_time = {k: np.mean(v) for k, v in groups_per_time.items()}
+    std_groups_per_time = {k: np.std(v) for k, v in groups_per_time.items()}
+    plt.plot(list(mean_groups_per_time.keys()), list(mean_groups_per_time.values()))
+    plt.fill_between(
+        list(mean_groups_per_time.keys()), 
+        (np.array(list(mean_groups_per_time.values())) - np.array(list(std_groups_per_time.values()))), 
+        (np.array(list(mean_groups_per_time.values())) + np.array(list(std_groups_per_time.values()))), 
+        alpha=0.2
+    )
     plt.title('Number of groups per time')
     plt.xlabel('Time')
     plt.ylabel('Number of groups')

@@ -2,6 +2,15 @@ package retQSS_social_force_model_params
 
 import retQSS_social_force_model_utils;
 
+// Pedestrian destination
+// 0 - same Y coordinate
+// 1 - opposite Y coordinate
+// 2 - random Y coordinate
+function PEDESTRIAN_DESTINATION
+	output Real destination;
+algorithm
+	destination := getRealModelParameter("PEDESTRIAN_DESTINATION", 0);
+end PEDESTRIAN_DESTINATION;
 
 function PEDESTRIAN_IMPLEMENTATION
 	output Integer implementation;

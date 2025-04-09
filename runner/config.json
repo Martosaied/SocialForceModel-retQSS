@@ -1,15 +1,30 @@
 {
-  "iterations": 1,
+  "iterations": 5,
   "parameters": [
+    {
+      "name": "N",
+      "type": "value",
+      "value": 300
+    },
     {
       "name": "PEDESTRIAN_IMPLEMENTATION",
       "type": "value",
-      "value": 0
+      "value": 1
     },
     {
       "name": "BORDER_IMPLEMENTATION",
       "type": "value",
-      "value": 2
+      "value": 0
+    },
+    {
+      "name": "PEDESTRIAN_DESTINATION",
+      "type": "value",
+      "value": 0
+    },
+    {
+      "name": "CONVEYOR_BELT_EFFECT",
+      "type": "value",
+      "value": 1
     },
     {
       "name": "FORCE_TERMINATION_AT",
@@ -36,6 +51,25 @@
       "type": "map",
       "map": [
         [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
           0,
           0,
           0
@@ -43,12 +77,86 @@
         [
           0,
           0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
           0
         ],
         [
           0,
           0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
           0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         ]
       ]
     },
@@ -100,7 +208,7 @@
     {
       "name": "BORDER_R",
       "type": "value",
-      "value": 0.1
+      "value": 0.2
     },
     {
       "name": "SPEED_MU",

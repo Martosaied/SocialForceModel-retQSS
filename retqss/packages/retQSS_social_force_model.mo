@@ -69,18 +69,31 @@ function randomRoute
 protected
 	Real randomValue;
 	Real randomValue2;
+	Real destination;
 algorithm
+	destination := PEDESTRIAN_DESTINATION();
+	
 	if randomBoolean(0.5) == 0.0 then
-		randomValue2 := random(0.1, size/3);
+		// randomValue2 := random(0.1, size/3);
+		randomValue2 := 0.1 * size;
 		x := randomValue2;
 		dx := 2 * size;
 	else
-		randomValue2 := random(size/3 * 2, size);
+		// randomValue2 := random(size/3 * 2, size);
+		randomValue2 := 0.9 * size;
 		x := randomValue2;
 		dx := -2 * size;
 	end if;
 	randomValue := random(fromY, toY);
-	dy := size - randomValue;
+	if destination == 0.0 then
+		dy := randomValue;
+	end if;
+	if destination == 1.0 then
+		dy := size - randomValue;
+	end if;
+	if destination == 2.0 then
+		dy := random(fromY, toY);
+	end if;
 	y := randomValue;
 	dz := zCoord;
 	z := zCoord;
