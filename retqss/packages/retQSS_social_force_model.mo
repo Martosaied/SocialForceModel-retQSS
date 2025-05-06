@@ -43,6 +43,28 @@ external "C" social_force_model_repulsiveBorderEffect(A, B, R, particleID, x, y,
 	    Include="#include \"retqss_social_force_model.hh\"");
 end internalRepulsiveBorderEffect;
 
+function neighborsRepulsiveBorderEffect
+	input Real A;
+	input Real B;
+	input Real R;
+	input Integer particleID;
+	input Real cellEdgeLength;
+	output Real x;
+	output Real y;
+	output Real z;
+external "C" social_force_model_neighborsRepulsiveBorderEffect(A, B, R, particleID, cellEdgeLength, x, y, z) annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.hh\"");
+end neighborsRepulsiveBorderEffect;
+
+function updateNeighboringVolumes
+	input Integer particleID;
+	input Integer gridDivisions;
+	output Boolean _;
+external "C" social_force_model_updateNeighboringVolumes(particleID, gridDivisions) annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.hh\"");
+end updateNeighboringVolumes;
 
 function randomBoolean
 	input Real trueProbability;
@@ -74,15 +96,15 @@ algorithm
 	destination := PEDESTRIAN_DESTINATION();
 	
 	if randomBoolean(0.5) == 0.0 then
-		// randomValue2 := random(0.1, size/3);
-		randomValue2 := 0.1 * size;
+		randomValue2 := random(0.1, size/3);
+		// randomValue2 := 0.1 * size;
 		x := randomValue2;
-		dx := 2 * size;
+		dx := 1.5 * size;
 	else
-		// randomValue2 := random(size/3 * 2, size);
-		randomValue2 := 0.9 * size;
+		randomValue2 := random(size/3 * 2, size);
+		// randomValue2 := 0.9 * size;
 		x := randomValue2;
-		dx := -2 * size;
+		dx := -0.5 * size;
 	end if;
 	randomValue := random(fromY, toY);
 	if destination == 0.0 then
@@ -374,15 +396,27 @@ algorithm
 			// Calculate the forces from the centroid to be even from all sides
 			(borderX, borderY, borderZ) := volume_centroid(nextObstacle);
 
-			deltay := (borderY + cellEdgeLength/2) - aY;
-			deltax := (borderX + cellEdgeLength/2) - aX;
+			deltay := borderY - aY;
+			deltax := borderX - aX;
+
+			if deltay < 0 then
+				deltay := abs(deltay + cellEdgeLength/2);
+			else
+				deltay := deltay - cellEdgeLength/2;
+			end if;
+
+			if deltax < 0 then
+				deltax := abs(deltax + cellEdgeLength/2);
+			else
+				deltax := deltax - cellEdgeLength/2;
+			end if;
 
 			distanceab := sqrt(deltax*deltax + deltay*deltay);
 
-			normalizedY := (aY - borderY - cellEdgeLength/2) / distanceab;
+			normalizedY := deltay / distanceab;
 			fy := A*exp((R-distanceab)/B)*normalizedY;
 
-			normalizedX := (aX - borderX - cellEdgeLength/2) / distanceab;
+			normalizedX := deltax / distanceab;
 			fx := A*exp((R-distanceab)/B)*normalizedX;
 
 			totalX := fx;
@@ -449,6 +483,13 @@ algorithm
 		B := BORDER_B();
 		R := BORDER_R();
 		(totalX, totalY, totalZ) := internalRepulsiveBorderEffect(A, B, R, particleID);
+	end if;
+
+	if BORDER_IMPLEMENTATION() == 3 then
+		A := BORDER_A();
+		B := BORDER_B();
+		R := BORDER_R();
+		(totalX, totalY, totalZ) := neighborsRepulsiveBorderEffect(A, B, R, particleID, cellEdgeLength);
 	end if;
 
 	x := totalX;

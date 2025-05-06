@@ -26,7 +26,7 @@ def run_model(model_name: str):
             shell=True,
             check=True,
             text=True,
-            capture_output=True
+            capture_output=False
         )
 
         # Check if solution.csv was created

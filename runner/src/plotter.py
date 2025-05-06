@@ -13,6 +13,9 @@ def generate_gif(solution_file, output_dir, parameters):
     walls = parameters.get('WALLS', '')
     walls = parse_walls(walls)
 
+    # obstacles = parameters.get('OBSTACLES', '')
+    # obstacles = parse_obstacles(obstacles)
+
     frames_dir = os.path.join(output_dir, 'frames')
     # Read the CSV file
     df = pd.read_csv(solution_file)
@@ -23,8 +26,8 @@ def generate_gif(solution_file, output_dir, parameters):
     # Create frames
     prev_row = None
     for index, row in df.iterrows():
-        # if index % 5 != 0:
-        #     continue
+        if index % 3 != 0:
+            continue
 
         # Create a new figure for each frame
         plt.figure(figsize=(20, 20))
@@ -143,7 +146,7 @@ def generate_gif(solution_file, output_dir, parameters):
         os.remove(os.path.join(frames_dir, frame_file))
     os.rmdir(frames_dir)
 
-MIN_X_DISTANCE = 2
+MIN_X_DISTANCE = 25
 MIN_Y_DISTANCE = 0.5
 
 def distance(tup1, tup2):
@@ -214,8 +217,8 @@ def generate_grouped_directioned_graph(results, output_dir):
             plt.figure(figsize=(20, 20))
 
             # Set up the plot area
-            plt.xlim(0, 20)
-            plt.ylim(0, 20)
+            plt.xlim(0, 50)
+            plt.ylim(0, 50)
 
             # Add grid lines
             for i in range(21):  # 21 lines to create 20 divisions

@@ -73,6 +73,17 @@ Bool social_force_model_outputCSV(double time,
 	int N,
 	double *x);
 
+void social_force_model_updateNeighboringVolumes(int particleID, int gridDivisions);
+
+void social_force_model_neighborsRepulsiveBorderEffect(
+	double A,
+	double B,
+	double r,
+	int particleID,
+	double cellEdgeLength,
+	double *x,
+	double *y, double *z);
+
 // void repulsive_pedestrian_effect(
 // 	retQSS::ParticleNeighbor *neighbors,
 // 	const std::vector<double> &args,

@@ -10,7 +10,11 @@ import numpy as np
 from src.plotter import calculate_groups
 
 
-WIDTHS = [16, 14, 12, 10, 8]
+WIDTHS = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+PEDESTRIAN_DENSITY = 0.3
+VOLUMES = 50
+GRID_SIZE = 50
+CELL_SIZE = GRID_SIZE / VOLUMES
 
 def generate_map(width):
     """
@@ -19,14 +23,14 @@ def generate_map(width):
     if width < 2:
         raise ValueError("Width must be at least 2 meters.")
 
-    matrix = [[0] * 20 for _ in range(20)]
+    matrix = [[0] * VOLUMES for _ in range(VOLUMES)]
     
     # Define how many top/bottom rows to set as obstacle
-    rows_as_obstacle = int((20 - width) / 2)
+    rows_as_obstacle = int((VOLUMES - width) / 2)
 
     for i in range(rows_as_obstacle):
-        matrix[i] = [1] * 20
-        matrix[20 - i - 1] = [1] * 20
+        matrix[i] = [1] * VOLUMES
+        matrix[VOLUMES - i - 1] = [1] * VOLUMES
 
     return matrix
 
@@ -50,7 +54,9 @@ def run(width):
     output_dir = create_output_dir(f'experiments/lanes_by_width/results/width_{width}')
     print(f"Created output directory: {output_dir}")
 
-    config['parameters'][0]['value'] = 300
+    pedestrians = int(PEDESTRIAN_DENSITY * width * VOLUMES)
+
+    config['parameters'][0]['value'] = pedestrians
     config['parameters'][1]['value'] = Constants.MMOC
 
 
@@ -66,12 +72,12 @@ def run(width):
     config['parameters'].append({
       "name": "FROM_Y",
       "type": "value",
-      "value": 10 - int(width / 2)
+      "value": (VOLUMES/ 2) - int(width / 2)
     })
     config['parameters'].append({
       "name": "TO_Y",
       "type": "value",
-      "value": 10 + int(width / 2)
+      "value": (VOLUMES/ 2) + int(width / 2)
     })
 
     # Save config copy in experiment directory
@@ -80,7 +86,9 @@ def run(width):
         json.dump(config, f, indent=2)
 
     # Replace the grid divisions in the model
-    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(20) + '/', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model.mo'])
+    # Replace the pedestrians in the model
+    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(pedestrians) + '/', '../retqss/model/social_force_model.mo'])
 
     # Compile the C++ code if requested
     compile_c_code()
@@ -93,7 +101,7 @@ def run(width):
         config, 
         output_dir, 
         'social_force_model', 
-        plot=False, 
+        plot=True, 
         copy_results=True
     )
 
@@ -116,23 +124,35 @@ def plot_results():
     plt.ylabel('Number of groups')
 
     # Read the results directories
-    groups_per_width = {}
+    groups_per_width = {
+        width: []
+        for width in WIDTHS
+    }
     for result_dir in results_dirs:
-        df = pd.read_csv(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest', 'result_0.csv'))
-        particles = (len(df.columns) - 1) / 5
-        groups = calculate_groups(df.iloc[150], int(particles))
-        groups_per_width[int(result_dir.split('_')[1])] = len(groups)
+        for result_file in os.listdir(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest')):
+            if result_file.endswith('.csv'):
+                df = pd.read_csv(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest', result_file))
+                particles = (len(df.columns) - 1) / 5
+                for index, row in df.iterrows():
+                    groups = calculate_groups(row, int(particles))
+                    groups_per_width[float(result_dir.split('_')[1])].append(len(groups))
+                        
+
+    # Mean the groups per width
+    for width in WIDTHS:
+        groups_per_width[width] = np.mean(groups_per_width[width])
 
     # Sort the groups per width_
     groups_per_width = dict(sorted(groups_per_width.items(), key=lambda item: item[0]))
     n_groups = np.array(list(groups_per_width.values()))
     widths = np.array(list(groups_per_width.keys()))
 
+
     plt.scatter(widths, n_groups, label='Data Points')
     # Fit line using numpy polyfit (degree 1 = linear)
     slope, intercept = np.polyfit(widths, n_groups, 1)
     line = slope * widths + intercept
-    plt.plot(widths, line, label='Fitted Line')
+    plt.plot(widths, line, label='Fitted Line', color='red')
 
     plt.legend()
     plt.xlabel('Width')

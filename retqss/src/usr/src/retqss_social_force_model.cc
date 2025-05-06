@@ -14,6 +14,7 @@
 int debugLevel;
 std::map<std::string, std::string> parameters;
 std::list<Wall> walls;
+std::map<int, std::vector<int>> neighboring_obstacles;
 
 ModelParameters model_parameters;
 
@@ -211,6 +212,82 @@ void social_force_model_repulsiveBorderEffect(
 		*z = 0;
 	}
 	
+}
+
+void social_force_model_neighborsRepulsiveBorderEffect(
+	double A,
+	double B,
+	double r,
+	int particleID,
+	double cellEdgeLength,
+	double *x,
+	double *y,
+	double *z
+) {
+	*x = 0;
+	*y = 0;
+	*z = 0;
+
+	double pX, pY, pZ;
+	retQSS_particle_currentPosition(particleID, &pX, &pY, &pZ);
+
+	std::vector<int> volumes = neighboring_obstacles[particleID];
+	for (int volume : volumes) {
+		double borderX, borderY, borderZ;
+
+		// Calculate the forces from the centroid to be even from all sides
+		retQSS_volume_centroid(volume, &borderX, &borderY, &borderZ);
+
+		double deltay = borderY - pY;
+		double deltax = borderX - pX;
+
+		// if (deltay < 0) {
+		// 	deltay = abs(deltay + cellEdgeLength/2);
+		// } else {
+		// 	deltay -= cellEdgeLength/2;
+		// }
+
+		// if (deltax < 0) {
+		// 	deltax = abs(deltax + cellEdgeLength/2);
+		// } else {
+		// 	deltax -= cellEdgeLength/2;
+		// }
+
+		double distanceab = sqrt(deltax*deltax + deltay*deltay);
+
+		double normalizedY = (deltay) / distanceab;
+		double fy = A*exp((r-distanceab)/B)*normalizedY;
+
+		double normalizedX = (deltax) / distanceab;
+		double fx = A*exp((r-distanceab)/B)*normalizedX;
+
+		*x += fx;
+		*y += fy;
+		*z = 0;
+	}
+}
+
+void social_force_model_updateNeighboringVolumes(int particleID, int gridDivisions) {
+	int volumeID = retQSS_particle_currentVolumeID(particleID);
+	int upperVolumeID = volumeID + gridDivisions;
+	int lowerVolumeID = volumeID - gridDivisions;
+	int rightVolumeID = volumeID + 1;
+	int leftVolumeID = volumeID - 1;
+	int upperRightVolumeID = upperVolumeID + 1;
+	int upperLeftVolumeID = upperVolumeID - 1;
+	int lowerRightVolumeID = lowerVolumeID + 1;
+	int lowerLeftVolumeID = lowerVolumeID - 1;
+
+	std::vector<int> volumes = {upperVolumeID, lowerVolumeID, rightVolumeID, leftVolumeID, upperRightVolumeID, upperLeftVolumeID, lowerRightVolumeID, lowerLeftVolumeID};
+
+	// Filter the ones that are not in the grid or not obstacles
+	neighboring_obstacles[particleID] = {};
+
+	for (int id : volumes) {
+		if (id >= 1 && id <= gridDivisions*gridDivisions && retQSS_volume_getProperty(id, "isObstacle")) {
+			neighboring_obstacles[particleID].push_back(id);
+		}
+	}
 }
 
 bool repulsive_pedestrian_effect(

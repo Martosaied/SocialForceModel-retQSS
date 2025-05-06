@@ -12,7 +12,7 @@ from experiments.average_velocity.average_velocity import average_velocity
 from experiments.lanes_by_volumes.lanes_by_volumes import lanes_by_volumes
 from experiments.lanes_by_iterations.lanes_by_iterations import lanes_by_iterations
 from experiments.lanes_by_width.lanes_by_width import lanes_by_width
-
+from experiments.deltaq.deltaq import deltaq
 def main():
     parser = argparse.ArgumentParser(description='Run experiments with JSON configuration')
     subparsers = parser.add_subparsers(dest='command', title='Tools', help='sub-command help')
@@ -96,6 +96,8 @@ def main():
             lanes_by_iterations()
         elif args.experiment == 'lanes_by_width':
             lanes_by_width()
+        elif args.experiment == 'deltaq':
+            deltaq()
         else:
             print(f"Experiment {args.experiment} not found")
     else:

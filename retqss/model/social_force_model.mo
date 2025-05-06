@@ -11,8 +11,8 @@ import retQSS_social_force_model_types;
 */
 
 constant Integer
-	N = 300,
-	GRID_DIVISIONS = 20,
+	N = 150,
+	GRID_DIVISIONS = 50,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -174,6 +174,15 @@ equation
   Model's time events
 */
 algorithm	
+
+	//EVENT: particle enters a volume and update neighboring volumes that are obstacles
+	for i in 1:N loop
+		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
+			if BORDER_IMPLEMENTATION == 3 then
+				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
+			end if;
+		end when;
+	end for;
 
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then

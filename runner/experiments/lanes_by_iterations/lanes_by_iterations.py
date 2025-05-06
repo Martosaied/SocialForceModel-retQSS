@@ -9,10 +9,11 @@ import pandas as pd
 import numpy as np
 from src.plotter import calculate_groups
 
+PEDESTRIAN_COUNT = 20 * 50 * 0.3
 
 def lanes_by_iterations():
-    print("Running iterations for 300 pedestrians and plotting lanes by iteration...\n")
-    # run()
+    print(f"Running iterations for {PEDESTRIAN_COUNT} pedestrians and plotting lanes by iteration...\n")
+    run()
 
     # Plot the results
     print("Plotting results...")
@@ -28,7 +29,7 @@ def run():
     output_dir = create_output_dir('experiments/lanes_by_iterations/results')
     print(f"Created output directory: {output_dir}")
 
-    config['parameters'][0]['value'] = 300
+    config['parameters'][0]['value'] = PEDESTRIAN_COUNT
     config['parameters'][1]['value'] = Constants.MMOC
 
     # Save config copy in experiment directory
@@ -37,6 +38,7 @@ def run():
         json.dump(config, f, indent=2)
 
     subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(1) + '/', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/social_force_model.mo'])
 
     # Compile the C++ code if requested
     compile_c_code()
@@ -107,7 +109,7 @@ def plot_results():
     )
 
     fig.savefig(f'experiments/lanes_by_iterations/groups_by_iterations.png')
-    fig.close()
+    plt.close()
 
 if __name__ == '__main__':
     lanes_by_iterations()
