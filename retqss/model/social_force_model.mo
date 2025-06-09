@@ -11,7 +11,7 @@ import retQSS_social_force_model_types;
 */
 
 constant Integer
-	N = 150,
+	N = 300,
 	GRID_DIVISIONS = 50,
 	LEFT_COUNT = N / 2;
 
@@ -87,7 +87,7 @@ discrete Real nextProgressTick;
 discrete Real nextMotivationTick;
 
 // local variables
-discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID;
+discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID, groupID;
 discrete Boolean isolate;
 
 
@@ -113,16 +113,17 @@ initial algorithm
 		volumeConcentration[i] := 0.0;
     end for;
 
-	// setup the particles half in the left side and half in the right side of the grid
-	for i in 1:N loop
-        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
-		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
-    end for;
-
 	// setup the particles in RETQSS
     _ := debug(INFO(), time, "Particles setup. N = %d", N,_,_,_);
 	_ := setUpParticles(N, CELL_EDGE_LENGTH, GRID_DIVISIONS, x);
     _ := debug(INFO(), time, "Particles setup ended. N = %d", N,_,_,_);
+
+		// setup the particles half in the left side and half in the right side of the grid
+	for i in 1:N loop
+        (groupID, x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
+		_ := particle_setProperty(i, "type", groupID);
+		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
+    end for;
 
 	// setup the walls in RETQSS
 	_ := setUpWalls();
@@ -130,18 +131,18 @@ initial algorithm
 
 	// setup the particles initial state
 	for i in 1:N loop
-		// set the particles velocity according to their type, left to right or right to left
-		if x[i] < GRID_SIZE / 2 then
-			_ := particle_setProperty(i, "type", LEFT());
-		else
-			_ := particle_setProperty(i, "type", RIGHT());
-		end if;
 		_ := particle_setProperty(i, "initialX", x[i]);
 		_ := particle_setProperty(i, "initialY", y[i]);
 		_ := particle_setProperty(i, "initialVX", vx[i]);
 		_ := particle_setProperty(i, "initialVY", vy[i]);
-
     end for;
+
+	if BORDER_IMPLEMENTATION == 3 then
+		// update the neighboring volumes for each particle
+		for i in 1:N loop
+			_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
+		end for;
+	end if;
 
     terminateTime := FORCE_TERMINATION_AT;
     nextProgressTick := EPS;

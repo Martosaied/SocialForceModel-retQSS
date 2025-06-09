@@ -2,26 +2,30 @@ import json
 import os
 import subprocess
 from src.runner import run_experiment, compile_c_code, compile_model
-from src.utils import load_config, create_output_dir, copy_results_to_latest
+from src.utils import load_config, create_output_dir, copy_results_to_latest, generate_map
 from src.constants import Constants
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from src.plotter import calculate_groups
+from src.math.Clustering import Clustering
 
 
 DELTAQ = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+PEDESTRIAN_COUNT = int(20 * 50 * 0.3)
+WIDTH = 20
+VOLUMES = 50
 
 
 def deltaq():
     print("Running iterations for 300 pedestrians reducing Tolerance and plotting lanes...\n")
     for deltaq in DELTAQ:
         print(f"Running experiment for deltaq: {deltaq}")
-        run(deltaq)
+        # run(deltaq)
 
     # Plot the results
     print("Plotting results...")
-    plot_results()
+    # plot_results()
+    plot_iterations_by_deltaq()
 
 def run(deltaq):
     """
@@ -33,8 +37,27 @@ def run(deltaq):
     output_dir = create_output_dir(f'experiments/deltaq/results/deltaq_{deltaq}')
     print(f"Created output directory: {output_dir}")
 
-    config['parameters'][0]['value'] = 300
+    config['parameters'][0]['value'] = PEDESTRIAN_COUNT
     config['parameters'][1]['value'] = Constants.MMOC
+
+    generated_map = generate_map(VOLUMES, WIDTH)
+    config['parameters'].append({
+      "name": "OBSTACLES",
+      "type": "map",
+      "map": generated_map
+    })
+
+    # Add from where to where pedestrians are generated
+    config['parameters'].append({
+      "name": "FROM_Y",
+      "type": "value",
+      "value": (VOLUMES/ 2) - int(WIDTH / 2)
+    })
+    config['parameters'].append({
+      "name": "TO_Y",
+      "type": "value",
+      "value": (VOLUMES/ 2) + int(WIDTH / 2)
+    })
 
     # Save config copy in experiment directory
     config_copy_path = os.path.join(output_dir, 'config.json')
@@ -42,7 +65,8 @@ def run(deltaq):
         json.dump(config, f, indent=2)
 
     # Replace the grid divisions in the model
-    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(10) + '/', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model.mo'])
     subprocess.run(['sed', '-i', r's/\Tolerance={1e-[0-9]\+}\+/Tolerance={1e-' + str(deltaq) + '}/', '../retqss/model/social_force_model.mo'])
     subprocess.run(['sed', '-i', r's/\AbsTolerance={1e-[0-9]\+}\+/AbsTolerance={1e-' + str(deltaq+3) + '}/', '../retqss/model/social_force_model.mo'])
 
@@ -65,6 +89,46 @@ def run(deltaq):
     copy_results_to_latest(output_dir)
 
     print(f"\nExperiment completed. Results saved in {output_dir}")
+
+def plot_iterations_by_deltaq():
+    # Get all the results directories
+    fig, ax = plt.subplots(figsize=(20, 10))
+    ax.set_title('Number of groups per time(averaged)')
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Number of groups')
+
+    for deltaq in DELTAQ:
+
+        # Get the results files
+        results_files = [f for f in os.listdir(os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest')) if f.endswith('.csv')]
+
+        # Read the results files
+        groups_per_time = {}
+        groups_per_time_averaged = {}
+        for result_file in results_files:
+            df = pd.read_csv(os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest', result_file))
+            particles = (len(df.columns) - 1) / 5
+            for index, row in df.iterrows():
+                groups = Clustering(row, int(particles)).calculate_groups()
+                groups_per_time[row['time']] = len(groups)
+
+                if row['time'] not in groups_per_time_averaged:
+                    groups_per_time_averaged[row['time']] = [len(groups)]
+                else:
+                    groups_per_time_averaged[row['time']].append(len(groups))
+        
+        mean_groups_per_time = {k: np.mean(v) for k, v in groups_per_time_averaged.items()}
+        std_groups_per_time = {k: np.std(v) for k, v in groups_per_time_averaged.items()}
+        ax.plot(mean_groups_per_time.keys(), mean_groups_per_time.values(), label=f'deltaq: {deltaq}', color=f'C{deltaq}')
+        ax.fill_between(
+            list(mean_groups_per_time.keys()), 
+            (np.array(list(mean_groups_per_time.values())) - np.array(list(std_groups_per_time.values()))), 
+            (np.array(list(mean_groups_per_time.values())) + np.array(list(std_groups_per_time.values()))), 
+            alpha=0.2
+        )
+
+    fig.savefig(f'experiments/deltaq/iterations_by_deltaq.png')
+    plt.close()
 
 
 def plot_results():

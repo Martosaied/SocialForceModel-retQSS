@@ -6,7 +6,7 @@ from src.utils import load_config, create_output_dir, copy_results_to_latest
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from src.plotter import calculate_groups
+from src.math.Clustering import Clustering
 
 
 VOLUMES = [10]
@@ -102,7 +102,7 @@ def plot_results():
                 if index % 5 != 0:
                     continue
 
-                groups = calculate_groups(row, int(particles))
+                groups = Clustering(row, int(particles)).calculate_groups()
                 if row['time'] not in groups_per_time:
                     groups_per_time[row['time']] = [len(groups)]
                 else:

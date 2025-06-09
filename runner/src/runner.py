@@ -5,7 +5,7 @@ import time
 import os
 import subprocess
 
-from src.plotter import generate_gif, generate_grouped_directioned_graph
+from src.plotter import Plotter
 from src.utils import process_parameters, get_parameter_combinations
 
 
@@ -85,7 +85,7 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str = "outp
 
             # Generate GIF
             if iteration == 0 and plot:
-                generate_gif(solution_path, output_dir, parameters)
+                Plotter().flow_graph(solution_path, output_dir, parameters)
 
             # Move and rename the solution file
             if copy_results:

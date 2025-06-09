@@ -3,7 +3,6 @@ import json
 import os
 
 from src.runner import run_experiment, compile_c_code, compile_model
-from src.plotter import generate_gif, generate_grouped_directioned_graph
 from src.utils import load_config, create_output_dir, copy_results_to_latest
 from experiments.performance_n_pedestrians.performance_n_pedestrians import performance_n_pedestrians
 from experiments.performance_n_volumes.performance_n_volumes import performance_n_volumes
@@ -13,6 +12,12 @@ from experiments.lanes_by_volumes.lanes_by_volumes import lanes_by_volumes
 from experiments.lanes_by_iterations.lanes_by_iterations import lanes_by_iterations
 from experiments.lanes_by_width.lanes_by_width import lanes_by_width
 from experiments.deltaq.deltaq import deltaq
+from experiments.lanes_by_B.lanes_by_B import lanes_by_B
+from experiments.lanes_by_R.lanes_by_R import lanes_by_R
+from experiments.lanes_by_A.lanes_by_A import lanes_by_A
+from experiments.lanes_heatmap.lanes_heatmap import lanes_heatmap
+from src.plotter import Plotter
+
 def main():
     parser = argparse.ArgumentParser(description='Run experiments with JSON configuration')
     subparsers = parser.add_subparsers(dest='command', title='Tools', help='sub-command help')
@@ -77,10 +82,14 @@ def main():
         # Load configuration
         config = load_config(args.config)
 
+        plotter = Plotter()
         if args.plot == 'gif':
-            generate_gif(args.solution_file, args.output_dir, config)
+            plotter.flow_graph(args.solution_file, args.output_dir, config)
         elif args.plot == 'grouped_lanes':
-            generate_grouped_directioned_graph([args.solution_file], args.output_dir)
+            plotter.grouped_lanes_graph([args.solution_file], args.output_dir)
+        elif args.plot == 'pedestrian_heatmap':
+            plotter.density_heatmap(args.solution_file, args.output_dir)
+            plotter.density_row_graph(args.solution_file, args.output_dir)
     elif args.command == 'experiments':
         if args.experiment == 'performance_n_pedestrians':
             performance_n_pedestrians()
@@ -98,6 +107,14 @@ def main():
             lanes_by_width()
         elif args.experiment == 'deltaq':
             deltaq()
+        elif args.experiment == 'lanes_by_B':
+            lanes_by_B()
+        elif args.experiment == 'lanes_by_R':
+            lanes_by_R()
+        elif args.experiment == 'lanes_by_A':
+            lanes_by_A()
+        elif args.experiment == 'lanes_heatmap':
+            lanes_heatmap()
         else:
             print(f"Experiment {args.experiment} not found")
     else:

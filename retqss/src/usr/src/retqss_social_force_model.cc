@@ -214,6 +214,53 @@ void social_force_model_repulsiveBorderEffect(
 	
 }
 
+void social_force_model_nearestPoint(
+	int volumeID,
+	double pointX,
+	double pointY,
+	double radius,
+	double *x,
+	double *y,
+	double *z)
+{
+	double borderX, borderY, borderZ;
+	retQSS_volume_centroid(volumeID, &borderX, &borderY, &borderZ);
+
+	double m = (borderY - pointY) / (borderX - pointX);
+	double b = borderY - m * borderX;
+	double h = borderX;
+	double k = borderY;
+	double r = radius;
+
+	double A = 1 + m*m;
+	double B = 2 * m * (b - k) - 2 * h;
+	double C = h*h + (b - k)*(b - k) - r*r;
+
+	// Discriminante
+	double D = B*B - 4 * A * C;
+
+	double sqrt_D = sqrt(D);
+	double x1 = (-B + sqrt_D) / (2 * A);
+	double x2 = (-B - sqrt_D) / (2 * A);
+	double y1 = m * x1 + b;
+	double y2 = m * x2 + b;
+
+	// Calculate the distance to the point
+	double distance1 = sqrt((x1 - pointX)*(x1 - pointX) + (y1 - pointY)*(y1 - pointY));
+	double distance2 = sqrt((x2 - pointX)*(x2 - pointX) + (y2 - pointY)*(y2 - pointY));
+
+	// Choose the nearest point
+	if (distance1 < distance2) {
+		*x = x1;
+		*y = y1;
+	} else {
+		*x = x2;
+		*y = y2;
+	}
+
+	*z = 0;
+}
+
 void social_force_model_neighborsRepulsiveBorderEffect(
 	double A,
 	double B,
@@ -234,31 +281,17 @@ void social_force_model_neighborsRepulsiveBorderEffect(
 	std::vector<int> volumes = neighboring_obstacles[particleID];
 	for (int volume : volumes) {
 		double borderX, borderY, borderZ;
-
-		// Calculate the forces from the centroid to be even from all sides
-		retQSS_volume_centroid(volume, &borderX, &borderY, &borderZ);
+		social_force_model_nearestPoint(volume, pX, pY, cellEdgeLength/2, &borderX, &borderY, &borderZ);
 
 		double deltay = borderY - pY;
 		double deltax = borderX - pX;
 
-		// if (deltay < 0) {
-		// 	deltay = abs(deltay + cellEdgeLength/2);
-		// } else {
-		// 	deltay -= cellEdgeLength/2;
-		// }
-
-		// if (deltax < 0) {
-		// 	deltax = abs(deltax + cellEdgeLength/2);
-		// } else {
-		// 	deltax -= cellEdgeLength/2;
-		// }
-
 		double distanceab = sqrt(deltax*deltax + deltay*deltay);
 
-		double normalizedY = (deltay) / distanceab;
+		double normalizedY = (pY - borderY) / distanceab;
 		double fy = A*exp((r-distanceab)/B)*normalizedY;
 
-		double normalizedX = (deltax) / distanceab;
+		double normalizedX = (pX - borderX) / distanceab;
 		double fx = A*exp((r-distanceab)/B)*normalizedX;
 
 		*x += fx;

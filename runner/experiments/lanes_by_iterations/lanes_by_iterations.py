@@ -2,14 +2,16 @@ import json
 import os
 import subprocess
 from src.runner import run_experiment, compile_c_code, compile_model
-from src.utils import load_config, create_output_dir, copy_results_to_latest
+from src.utils import load_config, create_output_dir, copy_results_to_latest, generate_map
 from src.constants import Constants
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from src.plotter import calculate_groups
+from src.math.Clustering import Clustering
 
-PEDESTRIAN_COUNT = 20 * 50 * 0.3
+PEDESTRIAN_COUNT = int(20 * 50 * 0.3)
+WIDTH = 20
+VOLUMES = 50
 
 def lanes_by_iterations():
     print(f"Running iterations for {PEDESTRIAN_COUNT} pedestrians and plotting lanes by iteration...\n")
@@ -32,12 +34,32 @@ def run():
     config['parameters'][0]['value'] = PEDESTRIAN_COUNT
     config['parameters'][1]['value'] = Constants.MMOC
 
+        # Replace the map in the config
+    generated_map = generate_map(VOLUMES,WIDTH)
+    config['parameters'].append({
+      "name": "OBSTACLES",
+      "type": "map",
+      "map": generated_map
+    })
+
+    # Add from where to where pedestrians are generated
+    config['parameters'].append({
+      "name": "FROM_Y",
+      "type": "value",
+      "value": (VOLUMES/ 2) - int(WIDTH / 2)
+    })
+    config['parameters'].append({
+      "name": "TO_Y",
+      "type": "value",
+      "value": (VOLUMES/ 2) + int(WIDTH / 2)
+    })
+
     # Save config copy in experiment directory
     config_copy_path = os.path.join(output_dir, 'config.json')
     with open(config_copy_path, 'w') as f:
         json.dump(config, f, indent=2)
 
-    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(1) + '/', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model.mo'])
     subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/social_force_model.mo'])
 
     # Compile the C++ code if requested
@@ -88,7 +110,7 @@ def plot_results():
             if index % 5 != 0:
                 continue
 
-            groups = calculate_groups(row, int(particles))
+            groups = Clustering(row, int(particles)).calculate_groups()
             groups_per_time[row['time']] = len(groups)
 
             if row['time'] not in groups_per_time_averaged:

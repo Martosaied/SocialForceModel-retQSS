@@ -2,43 +2,26 @@ import json
 import os
 import subprocess
 from src.runner import run_experiment, compile_c_code, compile_model
-from src.utils import load_config, create_output_dir, copy_results_to_latest
+from src.utils import load_config, create_output_dir, copy_results_to_latest, generate_map
 from src.constants import Constants
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from src.plotter import calculate_groups
+from src.math.Density import Density
 
 
-WIDTHS = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+WIDTHS = [20]
 PEDESTRIAN_DENSITY = 0.3
 VOLUMES = 50
 GRID_SIZE = 50
 CELL_SIZE = GRID_SIZE / VOLUMES
 
-def generate_map(width):
-    """
-    Generate a map with the given width.
-    """
-    if width < 2:
-        raise ValueError("Width must be at least 2 meters.")
-
-    matrix = [[0] * VOLUMES for _ in range(VOLUMES)]
-    
-    # Define how many top/bottom rows to set as obstacle
-    rows_as_obstacle = int((VOLUMES - width) / 2)
-
-    for i in range(rows_as_obstacle):
-        matrix[i] = [1] * VOLUMES
-        matrix[VOLUMES - i - 1] = [1] * VOLUMES
-
-    return matrix
 
 def lanes_by_width():
-    print("Running iterations for 300 pedestrians reducing width and plotting lanes by iteration...\n")
+    print("Running iterations for 300 pedestrians reducing width and plotting lanes by width...\n")
     for width in WIDTHS:
         print(f"Running experiment for width: {width}")
-        run(width)
+        # run(width)
 
     # Plot the results
     print("Plotting results...")
@@ -61,7 +44,7 @@ def run(width):
 
 
     # Replace the map in the config
-    generated_map = generate_map(width)
+    generated_map = generate_map(VOLUMES, width)
     config['parameters'].append({
       "name": "OBSTACLES",
       "type": "map",
@@ -101,7 +84,7 @@ def run(width):
         config, 
         output_dir, 
         'social_force_model', 
-        plot=True, 
+        plot=False, 
         copy_results=True
     )
 
@@ -124,31 +107,51 @@ def plot_results():
     plt.ylabel('Number of groups')
 
     # Read the results directories
-    groups_per_width = {
+    average_groups_per_width = {
+        width: []
+        for width in WIDTHS
+    }
+    std_groups_per_width = {
         width: []
         for width in WIDTHS
     }
     for result_dir in results_dirs:
+        width = float(result_dir.split('_')[1])
         for result_file in os.listdir(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest')):
             if result_file.endswith('.csv'):
                 df = pd.read_csv(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest', result_file))
                 particles = (len(df.columns) - 1) / 5
-                for index, row in df.iterrows():
-                    groups = calculate_groups(row, int(particles))
-                    groups_per_width[float(result_dir.split('_')[1])].append(len(groups))
-                        
+                groups_per_width = []
+                groups = Density(grid_size=100).calculate_lanes_by_density(df, particles)
+                # for index, row in df.iterrows():
+                #     if index < 100 and index % 5 != 0:
+                #         continue
+                #     groups = calculate_groups(
+                #         row, 
+                #         int(particles), 
+                #         from_y=(VOLUMES/ 2) - int(width / 2), 
+                #         to_y=(VOLUMES/ 2) + int(width / 2)
+                #     )
+                #     groups_per_width.append(len(groups))
+
+                print(groups)
+                average_groups_per_width[width].append(groups)
 
     # Mean the groups per width
     for width in WIDTHS:
-        groups_per_width[width] = np.mean(groups_per_width[width])
+        std_groups_per_width[width] = np.std(average_groups_per_width[width])
+        average_groups_per_width[width] = np.mean(average_groups_per_width[width])
 
     # Sort the groups per width_
-    groups_per_width = dict(sorted(groups_per_width.items(), key=lambda item: item[0]))
-    n_groups = np.array(list(groups_per_width.values()))
-    widths = np.array(list(groups_per_width.keys()))
+    average_groups_per_width = dict(sorted(average_groups_per_width.items(), key=lambda item: item[0]))
+    std_groups_per_width = dict(sorted(std_groups_per_width.items(), key=lambda item: item[0]))
+
+    n_groups = np.array(list(average_groups_per_width.values()))
+    std_n_groups = np.array(list(std_groups_per_width.values()))
+    widths = np.array(list(average_groups_per_width.keys()))
 
 
-    plt.scatter(widths, n_groups, label='Data Points')
+    plt.errorbar(widths, n_groups, yerr=std_n_groups, fmt='o', label='Data Points')
     # Fit line using numpy polyfit (degree 1 = linear)
     slope, intercept = np.polyfit(widths, n_groups, 1)
     line = slope * widths + intercept
@@ -164,4 +167,4 @@ def plot_results():
 
 
 if __name__ == '__main__':
-    lanes_by_iterations()
+    lanes_by_width()

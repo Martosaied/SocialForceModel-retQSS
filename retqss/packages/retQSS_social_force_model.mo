@@ -82,6 +82,7 @@ function randomRoute
 	input Real zCoord;
 	input Real fromY;
 	input Real toY;
+	output Integer group;
 	output Real x;
 	output Real y;
 	output Real z;
@@ -92,19 +93,28 @@ protected
 	Real randomValue;
 	Real randomValue2;
 	Real destination;
+	Integer left;
+	Integer right;
 algorithm
 	destination := PEDESTRIAN_DESTINATION();
-	
+
+	left := LEFT();
+	right := RIGHT();
+
 	if randomBoolean(0.5) == 0.0 then
-		randomValue2 := random(0.1, size/3);
+		// randomValue2 := random(0.1, size/3);
 		// randomValue2 := 0.1 * size;
+		randomValue2 := random(0, size);
 		x := randomValue2;
 		dx := 1.5 * size;
+		group := left;
 	else
-		randomValue2 := random(size/3 * 2, size);
+		// randomValue2 := random(size/3 * 2, size);
 		// randomValue2 := 0.9 * size;
+		randomValue2 := random(0, size);
 		x := randomValue2;
 		dx := -0.5 * size;
+		group := right;
 	end if;
 	randomValue := random(fromY, toY);
 	if destination == 0.0 then
@@ -352,6 +362,72 @@ algorithm
 	z := totalRepulsiveZ;	
 end totalRepulsivePedestrianEffect;
 
+function nearestPointOnVolume
+	input Integer volumeID;
+	input Real pointX;
+	input Real pointY;
+	input Real radius;
+	output Real x;
+	output Real y;
+	output Real z;
+protected
+	Real borderX;
+	Real borderY;
+	Real borderZ;
+	Real m;
+	Real b;
+	Real h;
+	Real k;
+	Real r;
+	Real A;
+	Real B;
+	Real C;
+	Real D;
+	Real sqrt_D;
+	Real x1;
+	Real x2;
+	Real y1;
+	Real y2;
+	Real distance1;
+	Real distance2;
+algorithm
+	(borderX, borderY, borderZ) := volume_centroid(volumeID);
+
+	m := (borderY - pointY) / (borderX - pointX);
+	b := borderY - m * borderX;
+	h := borderX;
+	k := borderY;
+	r := radius;
+
+	A := 1 + m*m;
+	B := 2 * m * (b - k) - 2 * h;
+	C := h*h + (b - k)*(b - k) - r*r;
+
+	// Discriminante
+	D := B*B - 4 * A * C;
+
+	sqrt_D := sqrt(D);
+	x1 := (-B + sqrt_D) / (2 * A);
+	x2 := (-B - sqrt_D) / (2 * A);
+	y1 := m * x1 + b;
+	y2 := m * x2 + b;
+
+	// Calculate the distance to the point
+	distance1 := sqrt((x1 - pointX)*(x1 - pointX) + (y1 - pointY)*(y1 - pointY));
+	distance2 := sqrt((x2 - pointX)*(x2 - pointX) + (y2 - pointY)*(y2 - pointY));
+
+	// Choose the nearest point
+	if distance1 < distance2 then
+		x := x1;
+		y := y1;
+	else
+		x := x2;
+		y := y2;
+	end if;
+
+	z := 0;
+end nearestPointOnVolume;
+
 function repulsiveBorderEffect
 	input Integer particleID;
 	input Real cellEdgeLength;
@@ -381,6 +457,7 @@ protected
 	Real fy;
 	Real totalX;
 	Real totalY;
+	Real correction;
 algorithm
 	A := BORDER_A();
 	B := BORDER_B();
@@ -393,30 +470,17 @@ algorithm
 			aX := equationArrayGet(pX, particleID);
 			aY := equationArrayGet(pY, particleID);
 
-			// Calculate the forces from the centroid to be even from all sides
-			(borderX, borderY, borderZ) := volume_centroid(nextObstacle);
+			(borderX, borderY, borderZ) := nearestPointOnVolume(nextObstacle, aX, aY, cellEdgeLength/2);
 
 			deltay := borderY - aY;
 			deltax := borderX - aX;
 
-			if deltay < 0 then
-				deltay := abs(deltay + cellEdgeLength/2);
-			else
-				deltay := deltay - cellEdgeLength/2;
-			end if;
-
-			if deltax < 0 then
-				deltax := abs(deltax + cellEdgeLength/2);
-			else
-				deltax := deltax - cellEdgeLength/2;
-			end if;
-
 			distanceab := sqrt(deltax*deltax + deltay*deltay);
 
-			normalizedY := deltay / distanceab;
+			normalizedY := (aY - borderY) / distanceab;
 			fy := A*exp((R-distanceab)/B)*normalizedY;
 
-			normalizedX := deltax / distanceab;
+			normalizedX := (aX - borderX) / distanceab;
 			fx := A*exp((R-distanceab)/B)*normalizedX;
 
 			totalX := fx;

@@ -156,3 +156,27 @@ def track_and_run(cmd: str):
         time.sleep(1)
 
     return process.communicate()
+
+def generate_map(volumes, width):
+    """
+    Generate a map with the given width.
+    """
+    if width < 2:
+        raise ValueError("Width must be at least 2 meters.")
+
+    matrix = [[0] * volumes for _ in range(volumes)]
+    
+    # Define how many top/bottom rows to set as obstacle
+    rows_as_obstacle = int((volumes - width) / 2)
+
+    for i in range(rows_as_obstacle):
+        matrix[i] = [1] * volumes
+        matrix[volumes - i - 1] = [1] * volumes
+
+    return matrix
+
+def set_fixed_variable(variable: str, value: Any, model_path: str = '../retqss/model/social_force_model.mo'):
+    """
+    Set a fixed variable in the config file.
+    """
+    subprocess.run(['sed', '-i', r's/\b' + variable + '\s*=\s*[0-9]\+/' + variable + ' = ' + str(value) + '/', model_path])
