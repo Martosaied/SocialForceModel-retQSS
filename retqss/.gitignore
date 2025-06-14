@@ -1,0 +1,7 @@
+/bin/
+/build/
+/lib/
+/models/
+/output/
+/packages/pkg_*
+.project

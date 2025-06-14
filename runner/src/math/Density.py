@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.stats as stats
 
 class Density:
     """
@@ -72,6 +73,38 @@ class Density:
         return (density_array - mean) / std
 
     def outlier_cimbala(self, density_array):
+        def iteration(density_array):
+            mean = np.mean(density_array)
+            std = np.std(density_array)
+
+            # Calculate the absolute value of deviation from the mean
+            deviation = np.abs(density_array - mean)
+            
+            # We focus on the row with the max deviation
+            max_deviation = np.max(deviation)
+            max_deviation_index = np.argmax(deviation)
+
+            # Calculate the t-student distribution with alpha = 0.05 and degrees of freedom = len(density_array) - 2
+            t_student = stats.t.ppf(0.99, len(density_array) - 2)
+
+            # Calculate tau
+            tau = t_student * (len(density_array) - 1) / (np.sqrt(len(density_array)) * np.sqrt(len(density_array) - 2 + t_student**2))
+
+            if max_deviation > tau * std:
+                return max_deviation_index
+            else:
+                return None
+        
+        outliers = []
+        while True:
+            index = iteration(density_array)
+            if index is None:
+                break
+            density_array = np.delete(density_array, index)
+            outliers.append(index)
+
+        return outliers
+
 
     def calculate_lanes_by_density(self, df, particles):
         right_pedestrian_counts, left_pedestrian_counts = self.calculate_pedestrian_counts(df, particles)
@@ -81,13 +114,12 @@ class Density:
         # Compute average density per row for left-moving pedestrians
         left_row_avg = np.mean(left_pedestrian_counts, axis=1)
 
-        # Do this 2 times
         right_local_max = []
         left_local_max = []
         # Detect local maximums for right-moving pedestrians
         right_mean = np.mean(right_row_avg)
         right_std = np.std(right_row_avg)
-        right_threshold = right_mean + 3 * right_std  # Threshold for outliers
+        right_threshold = right_mean + 2 * right_std  # Threshold for outliers
         for i in range(1, len(right_row_avg) - 1):
             if right_row_avg[i] > right_row_avg[i - 1] and right_row_avg[i] > right_row_avg[i + 1] and right_row_avg[i] > right_threshold:
                 right_local_max.append(i)
@@ -95,11 +127,9 @@ class Density:
         # Detect local maximums for left-moving pedestrians
         left_mean = np.mean(left_row_avg)
         left_std = np.std(left_row_avg)
-        left_threshold = left_mean + 3 * left_std  # Threshold for outliers
+        left_threshold = left_mean + 2 * left_std  # Threshold for outliers
         for i in range(1, len(left_row_avg) - 1):
             if left_row_avg[i] > left_row_avg[i - 1] and left_row_avg[i] > left_row_avg[i + 1] and left_row_avg[i] > left_threshold:
                 left_local_max.append(i)
 
-        
-        
         return len(right_local_max) + len(left_local_max)

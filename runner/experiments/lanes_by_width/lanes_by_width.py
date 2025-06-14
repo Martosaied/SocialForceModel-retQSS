@@ -10,7 +10,7 @@ import numpy as np
 from src.math.Density import Density
 
 
-WIDTHS = [20]
+WIDTHS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 PEDESTRIAN_DENSITY = 0.3
 VOLUMES = 50
 GRID_SIZE = 50
@@ -21,7 +21,7 @@ def lanes_by_width():
     print("Running iterations for 300 pedestrians reducing width and plotting lanes by width...\n")
     for width in WIDTHS:
         print(f"Running experiment for width: {width}")
-        # run(width)
+        run(width)
 
     # Plot the results
     print("Plotting results...")
@@ -141,6 +141,9 @@ def plot_results():
     for width in WIDTHS:
         std_groups_per_width[width] = np.std(average_groups_per_width[width])
         average_groups_per_width[width] = np.mean(average_groups_per_width[width])
+
+    print(average_groups_per_width)
+    print(std_groups_per_width)
 
     # Sort the groups per width_
     average_groups_per_width = dict(sorted(average_groups_per_width.items(), key=lambda item: item[0]))
