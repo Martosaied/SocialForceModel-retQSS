@@ -1,6 +1,6 @@
-runner/experiments/*/run_*
-runner/experiments/*/latest/*
-runner/experiments/*
+runner/results/*/run_*
+runner/results/*/latest/*
+runner/results/*
 
 retqss/bin/
 retqss/build/
@@ -9,3 +9,13 @@ retqss/models/
 retqss/output/
 retqss/packages/pkg_*
 retqss/.project
+
+result_*.csv
+particle_simulation.gif
+config.json
+benchmark.txt
+frame_*.png
+
+*.pyc
+
+CHANGELOG
