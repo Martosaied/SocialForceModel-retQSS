@@ -10,7 +10,7 @@ import numpy as np
 from src.math.Clustering import Clustering
 
 
-DELTAQ = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+DELTAQ = [-4, -3.5, -3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2]
 PEDESTRIAN_COUNT = int(20 * 50 * 0.3)
 WIDTH = 20
 VOLUMES = 50
@@ -20,11 +20,11 @@ def deltaq():
     print("Running iterations for 300 pedestrians reducing Tolerance and plotting lanes...\n")
     for deltaq in DELTAQ:
         print(f"Running experiment for deltaq: {deltaq}")
-        # run(deltaq)
+        run(deltaq)
 
     # Plot the results
     print("Plotting results...")
-    # plot_results()
+    plot_results()
     plot_iterations_by_deltaq()
 
 def run(deltaq):
@@ -64,11 +64,14 @@ def run(deltaq):
     with open(config_copy_path, 'w') as f:
         json.dump(config, f, indent=2)
 
+    formatted_tolerance = 1 * 10 ** deltaq
+    formatted_abs_tolerance = 1 * 10 ** (deltaq + 3)
+
     # Replace the grid divisions in the model
     subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/social_force_model.mo'])
     subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model.mo'])
-    subprocess.run(['sed', '-i', r's/\Tolerance={1e-[0-9]\+}\+/Tolerance={1e-' + str(deltaq) + '}/', '../retqss/model/social_force_model.mo'])
-    subprocess.run(['sed', '-i', r's/\AbsTolerance={1e-[0-9]\+}\+/AbsTolerance={1e-' + str(deltaq+3) + '}/', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bTolerance\s*=\s*[0-9]\+\.[0-9]\+/Tolerance = ' + str(formatted_tolerance) + '/', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bAbsTolerance\s*=\s*[0-9]\+\.[0-9]\+/AbsTolerance = ' + str(formatted_abs_tolerance) + '/', '../retqss/model/social_force_model.mo'])
 
     # Compile the C++ code if requested
     compile_c_code()
@@ -196,4 +199,4 @@ def plot_results():
 
 
 if __name__ == '__main__':
-    lanes_by_iterations()
+    deltaq()

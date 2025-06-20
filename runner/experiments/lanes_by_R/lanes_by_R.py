@@ -7,10 +7,10 @@ from src.constants import Constants
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from src.math.Clustering import Clustering
+from src.math.Density import Density
 
 
-Rs = [0.8]
+Rs = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
 WIDTH = 15
 PEDESTRIAN_DENSITY = 0.3
 VOLUMES = 50
@@ -65,6 +65,11 @@ def run(r):
     })
     config['parameters'].append({
       "name": "PEDESTRIAN_R",
+      "type": "value",
+      "value": r
+    })
+    config['parameters'].append({
+      "name": "BORDER_R",
       "type": "value",
       "value": r
     })
@@ -129,20 +134,14 @@ def plot_results():
             if result_file.endswith('.csv'):
                 df = pd.read_csv(os.path.join('experiments/lanes_by_R/results', result_dir, 'latest', result_file))
                 particles = (len(df.columns) - 1) / 5
-                groups_per_R = []
-                for index, row in df.iterrows():
-                    if index < 200 or index > 250:
-                        continue
-                    groups = Clustering(
-                        row, 
-                        int(particles), 
-                    ).calculate_groups(
-                        from_y=(VOLUMES/ 2) - int(WIDTH / 2), 
-                        to_y=(VOLUMES/ 2) + int(WIDTH / 2)
-                    )
-                    groups_per_R.append(len(groups))
-
-                average_groups_per_R[r].append(np.mean(groups_per_R))
+                groups = Density(
+                    grid_size=100, 
+                    map_size=100, 
+                ).calculate_lanes_by_density(
+                    df,
+                    particles
+                )
+                average_groups_per_R[r].append(groups)
 
     # Mean the groups per width
     for r in Rs:

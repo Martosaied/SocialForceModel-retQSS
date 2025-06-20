@@ -6,20 +6,20 @@ from src.utils import load_config, create_output_dir, copy_results_to_latest
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from src.math.Clustering import Clustering
+from src.math.Density import Density
 
 
-VOLUMES = [10]
+VOLUMES = [1, 3, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 PEDESTRIANS_IMPLEMENTATION = {
     1: "retqss",
 }
 
-def lanes_by_volumes():
-    print("Running experiments for 300 pedestrians in different volumes...\n")
+def breaking_lanes():
+    print("Running experiments for 300 pedestrians in different volumes to see if the lanes break...\n")
     for volume in VOLUMES:
         for implementation in PEDESTRIANS_IMPLEMENTATION:
             print(f"Running experiment for {volume} volumes with implementation {implementation}...")
-            # run(volume, implementation)
+            run(volume, implementation)
             print(f"Experiment for {volume} volumes with implementation {implementation} completed.\n")
 
     # Plot the results
@@ -89,40 +89,29 @@ def plot_results():
     plt.title('Number of groups per time')
     plt.xlabel('Time')
     plt.ylabel('Number of groups')
+    groups_per_volume = {}
     for result_dir in results_dirs_by_implementation['retqss']:
         # Get the results files
         results_files = [f for f in os.listdir(os.path.join('experiments/lanes_by_volumes/results', result_dir, 'latest')) if f.endswith('.csv')]
 
         # Read the results files
-        groups_per_time = {}
+        all_groups = []
         for result_file in results_files:
             df = pd.read_csv(os.path.join('experiments/lanes_by_volumes/results', result_dir, 'latest', result_file))
             particles = (len(df.columns) - 1) / 5
-            for index, row in df.iterrows():
-                if index % 5 != 0:
-                    continue
+            groups = Density().calculate_lanes_by_density(df, particles)
+            all_groups.append(groups)
 
-                groups = Clustering(row, int(particles)).calculate_groups()
-                if row['time'] not in groups_per_time:
-                    groups_per_time[row['time']] = [len(groups)]
-                else:
-                    groups_per_time[row['time']].append(len(groups))
         
-        # mean_groups_per_time = {k: np.mean(v) for k, v in groups_per_time.items()}
-        # std_groups_per_time = {k: np.std(v) for k, v in groups_per_time.items()}
-        for group in groups_per_time:
-            plt.plot(group, groups_per_time[group], label=result_dir)
-        # plt.fill_between(
-        #     list(mean_groups_per_time.keys()), 
-        #     (np.array(list(mean_groups_per_time.values())) - np.array(list(std_groups_per_time.values()))), 
-        #     (np.array(list(mean_groups_per_time.values())) + np.array(list(std_groups_per_time.values()))), 
-        #     alpha=0.2
-        # )
+        groups_per_volume[result_dir] = all_groups
+
+    # Plot a boxplot per amount of volumes
+    plt.boxplot(groups_per_volume.values(), labels=groups_per_volume.keys())
 
     plt.legend()
-    plt.savefig(f'experiments/lanes_by_volumes/linear_graph.png')
+    plt.savefig(f'experiments/lanes_by_volumes/breaking_lanes.png')
     plt.close()
 
 
 if __name__ == '__main__':
-    performance_n_pedestrians()
+    breaking_lanes()

@@ -8,7 +8,7 @@ from experiments.performance_n_pedestrians.performance_n_pedestrians import perf
 from experiments.performance_n_volumes.performance_n_volumes import performance_n_volumes
 from experiments.performance_n_peds_m_vols.performance_n_peds_m_vols import performance_n_peds_m_vols
 from experiments.average_velocity.average_velocity import average_velocity
-from experiments.lanes_by_volumes.lanes_by_volumes import lanes_by_volumes
+from experiments.lanes_by_volumes.breaking_lanes import breaking_lanes
 from experiments.lanes_by_iterations.lanes_by_iterations import lanes_by_iterations
 from experiments.lanes_by_width.lanes_by_width import lanes_by_width
 from experiments.deltaq.deltaq import deltaq
@@ -99,8 +99,8 @@ def main():
             performance_n_peds_m_vols()
         elif args.experiment == 'average_velocity':
             average_velocity()
-        elif args.experiment == 'lanes_by_volumes':
-            lanes_by_volumes()
+        elif args.experiment == 'breaking_lanes':
+            breaking_lanes()
         elif args.experiment == 'lanes_by_iterations':
             lanes_by_iterations()
         elif args.experiment == 'lanes_by_width':

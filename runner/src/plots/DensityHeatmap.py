@@ -24,7 +24,7 @@ class DensityHeatmap:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
         
         # Plot right-moving pedestrians heatmap
-        im1 = ax1.imshow(right_pedestrian_counts, cmap='Reds', interpolation='nearest')
+        im1 = ax1.imshow(right_pedestrian_counts, cmap='Reds', interpolation='nearest', vmax=0.3)
         ax1.set_title('Right-Moving Pedestrians', fontsize=16)
         ax1.set_xlabel('X Position', fontsize=14)
         ax1.set_ylabel('Y Position', fontsize=14)
@@ -32,7 +32,7 @@ class DensityHeatmap:
         plt.colorbar(im1, ax=ax1, label='Number of pedestrians')
         
         # Plot left-moving pedestrians heatmap
-        im2 = ax2.imshow(left_pedestrian_counts, cmap='Blues', interpolation='nearest')
+        im2 = ax2.imshow(left_pedestrian_counts, cmap='Blues', interpolation='nearest', vmax=0.3)
         ax2.set_title('Left-Moving Pedestrians', fontsize=16)
         ax2.set_xlabel('X Position', fontsize=14)
         ax2.set_ylabel('Y Position', fontsize=14)
