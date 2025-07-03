@@ -199,6 +199,26 @@ package retQSS
         Include="#include \"retqss/retqss_model_api.h\"");
   end particle_crossedFaceNormal;
 
+  function particle_currentPosition
+    input Integer p;
+    output Real x;
+    output Real y;
+    output Real z;
+    external "C" retQSS_particle_currentPosition(p,x,y,z) annotation(
+        Include="#include \"retqss/retqss_model_api.h\"");
+  end particle_currentPosition;
+
+  function particle_currentVelocity
+    input Integer p;
+    output Real vx;
+    output Real vy;
+    output Real vz;
+    external "C" retQSS_particle_currentVelocity(p,vx,vy,vz) annotation(
+        Include="#include \"retqss/retqss_model_api.h\"");
+  end particle_currentVelocity;
+
+  
+
   function particle_initialPosition
     input Integer p;
     output Real x;

@@ -1,4 +1,4 @@
-#include "retqss_social_force_model.hh"
+#include "retqss_social_force_model.h"
 
 #include "retqss/retqss_model_api.h"
 #include "retqss/retqss_interface.hh"
@@ -86,6 +86,9 @@ std::string social_force_model_getParameter(const char *name) {
 		return parameters[name];
 	}
 
+	std::cout << "Parameter " << name << " not found" << std::endl;
+
+	// Read the parameters from the file
 	std::ifstream is_file(PARAMS_FILE);
 	std::string line;
 	while( std::getline(is_file, line) )
@@ -101,6 +104,7 @@ std::string social_force_model_getParameter(const char *name) {
 		}
 	  }
 	}
+
 
 	parameters[name] = std::string("");
 	return std::string("");
@@ -214,6 +218,29 @@ void social_force_model_repulsiveBorderEffect(
 	
 }
 
+void social_force_model_squareNearestPoint(
+	int volumeID,
+	double pointX,
+	double pointY,
+	double radius,
+	double *x,
+	double *y,
+	double *z
+) {
+	double centroidX, centroidY, centroidZ;
+	retQSS_volume_centroid(volumeID, &centroidX, &centroidY, &centroidZ);
+
+    double qx = (pointX - centroidX) / radius;
+    double qy = (pointY - centroidY) / radius;
+
+    double f = std::max(std::abs(qx), std::abs(qy));
+    double intersectX = qx/f;
+    double intersectY = qy/f;
+    *x = intersectX * radius + centroidX;
+    *y = intersectY * radius + centroidY;
+    *z = 0;
+}
+
 void social_force_model_nearestPoint(
 	int volumeID,
 	double pointX,
@@ -281,12 +308,8 @@ void social_force_model_neighborsRepulsiveBorderEffect(
 	std::vector<int> volumes = neighboring_obstacles[particleID];
 	for (int volume : volumes) {
 		double borderX, borderY, borderZ;
-		social_force_model_nearestPoint(volume, pX, pY, cellEdgeLength/2, &borderX, &borderY, &borderZ);
-
-		double deltay = borderY - pY;
-		double deltax = borderX - pX;
-
-		double distanceab = sqrt(deltax*deltax + deltay*deltay);
+		social_force_model_squareNearestPoint(volume, pX, pY, cellEdgeLength/2, &borderX, &borderY, &borderZ);
+		double distanceab = retQSS_volume_distanceToPoint(volume, pX, pY, pZ);
 
 		double normalizedY = (pY - borderY) / distanceab;
 		double fy = A*exp((r-distanceab)/B)*normalizedY;
@@ -307,11 +330,26 @@ void social_force_model_updateNeighboringVolumes(int particleID, int gridDivisio
 	int rightVolumeID = volumeID + 1;
 	int leftVolumeID = volumeID - 1;
 	int upperRightVolumeID = upperVolumeID + 1;
+	int upperRightVolumeID2 = upperVolumeID + 2;
+	int upperRightVolumeID3 = upperVolumeID + 3;
 	int upperLeftVolumeID = upperVolumeID - 1;
+	int upperLeftVolumeID2 = upperVolumeID - 2;
+	int upperLeftVolumeID3 = upperVolumeID - 3;
 	int lowerRightVolumeID = lowerVolumeID + 1;
+	int lowerRightVolumeID2 = lowerVolumeID + 2;
+	int lowerRightVolumeID3 = lowerVolumeID + 3;
 	int lowerLeftVolumeID = lowerVolumeID - 1;
+	int lowerLeftVolumeID2 = lowerVolumeID - 2;
+	int lowerLeftVolumeID3 = lowerVolumeID - 3;
 
-	std::vector<int> volumes = {upperVolumeID, lowerVolumeID, rightVolumeID, leftVolumeID, upperRightVolumeID, upperLeftVolumeID, lowerRightVolumeID, lowerLeftVolumeID};
+	std::vector<int> volumes = {
+		upperVolumeID, lowerVolumeID, 
+		rightVolumeID, leftVolumeID, 
+		upperRightVolumeID, upperLeftVolumeID, lowerRightVolumeID, lowerLeftVolumeID, 
+		upperRightVolumeID2, upperLeftVolumeID2, lowerRightVolumeID2, lowerLeftVolumeID2,
+		upperRightVolumeID3, upperLeftVolumeID3, lowerRightVolumeID3, lowerLeftVolumeID3,
+		upperRightVolumeID2, upperLeftVolumeID2, lowerRightVolumeID2, lowerLeftVolumeID2,
+	};
 
 	// Filter the ones that are not in the grid or not obstacles
 	neighboring_obstacles[particleID] = {};
@@ -384,53 +422,67 @@ bool repulsive_pedestrian_effect(
 	return true;
 }
 
-void social_force_model_totalRepulsiveBorderEffect(
+void social_force_model_volumeBasedRepulsivePedestrianEffect(
 	int particleID,
-	double pX[1],
-	double pY[1],
-	double pZ[1],
-	double *x,
-	double *y,
-	double *z
-)
-{
-	*x = 0;
-	*y = 0;
-	*z = 0;
-	for (int i = 1; i < 400; i++) {
-		if (retQSS_volume_getProperty(i, "isObstacle")) {
-			int index = (particleID-1)*3;
-			double aY = pY[index];
-			double aX = pX[index];
+	double targetX,
+	double targetY,
+	double *totalRepulsiveX,
+	double *totalRepulsiveY,
+	double *totalRepulsiveZ
+) {
 
-			double borderX, borderY, borderZ;
+	double A_1 = model_parameters.PEDESTRIAN_A_1;
+	double B_1 = model_parameters.PEDESTRIAN_B_1;
 
-			// Calculate the forces from the centroid to be even from all sides
-			retQSS_volume_centroid(i, &borderX, &borderY, &borderZ);
+	double A_2 = model_parameters.PEDESTRIAN_A_2;
+	double B_2 = model_parameters.PEDESTRIAN_B_2;
 
-			double A = 100;
-			double B = 0.2;
+	double ra = model_parameters.PEDESTRIAN_R;
+	double rb = model_parameters.PEDESTRIAN_R;
+	double rab = ra + rb;
 
-			double ra = 0.01;
+	*totalRepulsiveX = 0;
+	*totalRepulsiveY = 0;
+	*totalRepulsiveZ = 0;
 
+	int currentVolumeID = retQSS_particle_currentVolumeID(particleID);
+	int particlesInVolume = retQSS_volume_countParticlesInside(currentVolumeID);
 
-			double deltay = borderY - aY;
-			double deltax = borderX - aX;
+	for (int i = 1; i <= particlesInVolume; i++) {
+		int neighborID = retQSS_volume_IDOfParticleInside(currentVolumeID, i);
+		double aX, aY, aZ, bX, bY, bZ;
+		retQSS_particle_currentPosition(particleID, &aX, &aY, &aZ);
+		retQSS_particle_currentPosition(neighborID, &bX, &bY, &bZ);
 
-			double distanceab = sqrt(deltax*deltax + deltay*deltay);
+		double deltax = bX - aX;
+		double deltay = bY - aY;
+		double distanceab = sqrt(deltax*deltax + deltay*deltay);
 
-			double normalizedY = (aY - borderY) / distanceab;
-			double fy = A*exp((ra-distanceab)/B)*normalizedY;
-		
-			double normalizedX = (aX - borderX) / distanceab;
-			double fx = A*exp((ra-distanceab)/B)*normalizedX;
+		double normalizedX = (aX - bX) / distanceab;
+		double normalizedY = (aY - bY) / distanceab;
 
-			*x += fx;
-			*y += fy;
-			*z = 0;
-		}
+		double fx_1 = A_1*exp((rab-distanceab)/B_1)*normalizedX;
+		double fy_1 = A_1*exp((rab-distanceab)/B_1)*normalizedY;
+
+		double fx_2 = A_2*exp((rab-distanceab)/B_2)*normalizedX;
+		double fy_2 = A_2*exp((rab-distanceab)/B_2)*normalizedY;
+
+		double lambda = model_parameters.PEDESTRIAN_LAMBDA;
+		double desiredX, desiredY, desiredZ;
+		social_force_model_desiredDirection(
+			aX, aY, aZ,
+			targetX, targetY, 0,
+			&desiredX, &desiredY, &desiredZ
+		);
+		double cos_phi = -(normalizedX*desiredX) - (normalizedY*desiredY);
+		double area = lambda + (1-lambda)*((1+cos_phi)/2);
+
+		*totalRepulsiveX += (fx_1 * area) + fx_2;
+		*totalRepulsiveY += (fy_1 * area) + fy_2;
+		*totalRepulsiveZ = 0;
 	}
 }
+
 
 void social_force_model_desiredDirection(
 	double currentX,
@@ -571,6 +623,5 @@ Bool social_force_model_setUpWalls() {
 
 	return true;
 }
-
 
 }

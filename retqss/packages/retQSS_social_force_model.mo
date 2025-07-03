@@ -13,21 +13,21 @@ function setUpParticles
 	output Boolean _;
 	external "C" _=social_force_model_setUpParticles(N, cellEdgeLength, gridDivisions, x) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end setUpParticles;
 
 function setUpWalls
 	output Boolean _;
 	external "C" _=social_force_model_setUpWalls() annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end setUpWalls;
 
 function setParameters
 	output Boolean _;
 	external "C" _=social_force_model_setParameters() annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end setParameters;
 
 function internalRepulsiveBorderEffect
@@ -40,7 +40,7 @@ function internalRepulsiveBorderEffect
 	output Real z;
 external "C" social_force_model_repulsiveBorderEffect(A, B, R, particleID, x, y, z) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end internalRepulsiveBorderEffect;
 
 function neighborsRepulsiveBorderEffect
@@ -54,7 +54,7 @@ function neighborsRepulsiveBorderEffect
 	output Real z;
 external "C" social_force_model_neighborsRepulsiveBorderEffect(A, B, R, particleID, cellEdgeLength, x, y, z) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end neighborsRepulsiveBorderEffect;
 
 function updateNeighboringVolumes
@@ -63,8 +63,20 @@ function updateNeighboringVolumes
 	output Boolean _;
 external "C" social_force_model_updateNeighboringVolumes(particleID, gridDivisions) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end updateNeighboringVolumes;
+
+function volumeBasedRepulsivePedestrianEffect
+	input Integer particleID;
+	input Real targetX;
+	input Real targetY;
+	output Real x;
+	output Real y;
+	output Real z;
+external "C" social_force_model_volumeBasedRepulsivePedestrianEffect(particleID, targetX, targetY, x, y, z) annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.h\"");
+end volumeBasedRepulsivePedestrianEffect;
 
 function randomBoolean
 	input Real trueProbability;
@@ -102,16 +114,16 @@ algorithm
 	right := RIGHT();
 
 	if randomBoolean(0.5) == 0.0 then
-		// randomValue2 := random(0.1, size/3);
+		randomValue2 := random(0.1, size/3);
 		// randomValue2 := 0.1 * size;
-		randomValue2 := random(0, size);
+		// randomValue2 := random(0, size);
 		x := randomValue2;
 		dx := 1.5 * size;
 		group := left;
 	else
-		// randomValue2 := random(size/3 * 2, size);
+		randomValue2 := random(size/3 * 2, size);
 		// randomValue2 := 0.9 * size;
-		randomValue2 := random(0, size);
+		// randomValue2 := random(0, size);
 		x := randomValue2;
 		dx := -0.5 * size;
 		group := right;
@@ -319,6 +331,18 @@ protected
 	Real repulsiveZ;
 	Integer i0;
 algorithm
+	if PEDESTRIAN_IMPLEMENTATION() == 2 then
+		totalRepulsiveX := 0;
+		totalRepulsiveY := 0;
+		totalRepulsiveZ := 0;
+
+		(totalRepulsiveX, totalRepulsiveY, totalRepulsiveZ) := volumeBasedRepulsivePedestrianEffect(
+			particleID,
+			targetX,
+			targetY
+		);
+	end if;
+
 	if PEDESTRIAN_IMPLEMENTATION() == 1 then
 		totalRepulsiveX := 0;
 		totalRepulsiveY := 0;
@@ -428,6 +452,42 @@ algorithm
 	z := 0;
 end nearestPointOnVolume;
 
+function squareNearestPointOnVolume
+	input Integer volumeID;
+	input Real pointX;
+	input Real pointY;
+	input Real radius;
+	output Real x;
+	output Real y;
+	output Real z;
+protected
+	Real borderX;
+	Real borderY;
+	Real borderZ;
+	Real qx;
+	Real qy;
+	Real f;
+	Real intersectX;
+	Real intersectY;
+algorithm
+	(borderX, borderY, borderZ) := volume_centroid(volumeID);
+
+    qx := (pointX - borderX) / radius;
+    qy := (pointY - borderY) / radius;
+
+	if abs(qx) > abs(qy) then
+		f := abs(qx);
+	else
+		f := abs(qy);
+	end if;
+
+    intersectX := qx/f;
+    intersectY := qy/f;
+    x := intersectX * radius + borderX;
+    y := intersectY * radius + borderY;
+    z := 0;
+end squareNearestPointOnVolume;
+
 function repulsiveBorderEffect
 	input Integer particleID;
 	input Real cellEdgeLength;
@@ -445,6 +505,10 @@ protected
 	Integer isObstacle;
 	Real aX;
 	Real aY;
+	Real aZ;
+	Real vX;
+	Real vY;
+	Real vZ;
 	Real borderX;
 	Real borderY;
 	Real borderZ;
@@ -467,15 +531,11 @@ algorithm
 	if nextObstacle <> 0 then
 		isObstacle := volume_getProperty(nextObstacle, "isObstacle");
 		if isObstacle then
-			aX := equationArrayGet(pX, particleID);
-			aY := equationArrayGet(pY, particleID);
+			(aX, aY, aZ) := particle_currentPosition(particleID);
+			(vX, vY, vZ) := particle_currentVelocity(particleID);
 
-			(borderX, borderY, borderZ) := nearestPointOnVolume(nextObstacle, aX, aY, cellEdgeLength/2);
-
-			deltay := borderY - aY;
-			deltax := borderX - aX;
-
-			distanceab := sqrt(deltax*deltax + deltay*deltay);
+			(borderX, borderY, borderZ) := squareNearestPointOnVolume(nextObstacle, aX, aY, cellEdgeLength/2);
+			distanceab := volume_distanceToPoint(nextObstacle, aX, aY, aZ);
 
 			normalizedY := (aY - borderY) / distanceab;
 			fy := A*exp((R-distanceab)/B)*normalizedY;

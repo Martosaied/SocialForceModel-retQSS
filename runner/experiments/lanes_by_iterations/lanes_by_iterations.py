@@ -32,7 +32,7 @@ def run():
     print(f"Created output directory: {output_dir}")
 
     config['parameters'][0]['value'] = PEDESTRIAN_COUNT
-    config['parameters'][1]['value'] = Constants.MMOC
+    config['parameters'][1]['value'] = Constants.PEDESTRIAN_MMOC
 
         # Replace the map in the config
     generated_map = generate_map(VOLUMES,WIDTH)

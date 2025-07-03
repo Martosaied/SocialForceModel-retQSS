@@ -19,3 +19,6 @@ frame_*.png
 *.pyc
 
 CHANGELOG
+
+*.png
+*.txt

@@ -116,20 +116,42 @@ class Density:
 
         right_local_max = []
         left_local_max = []
-        # Detect local maximums for right-moving pedestrians
-        right_mean = np.mean(right_row_avg)
-        right_std = np.std(right_row_avg)
-        right_threshold = right_mean + 2 * right_std  # Threshold for outliers
+        outliers = []
+        
+        # Detect local maximums for right-moving pedestrians using z-score
         for i in range(1, len(right_row_avg) - 1):
-            if right_row_avg[i] > right_row_avg[i - 1] and right_row_avg[i] > right_row_avg[i + 1] and right_row_avg[i] > right_threshold:
-                right_local_max.append(i)
+            if (right_row_avg[i] > right_row_avg[i - 1] and right_row_avg[i] > right_row_avg[i + 1]):
+                right_local_max.append(right_row_avg[i])
+                right_row_avg[i] = -1
+
+        # Detect local maximums for left-moving pedestrians using z-score
+        for i in range(1, len(left_row_avg) - 1):
+            if (left_row_avg[i] > left_row_avg[i - 1] and left_row_avg[i] > left_row_avg[i + 1]):
+                left_local_max.append(left_row_avg[i])
+                left_row_avg[i] = -1
+
+        # Remove -1 from the arrays
+        right_row_avg = [x for x in right_row_avg if x > 0]
+        left_row_avg = [x for x in left_row_avg if x > 0]
 
         # Detect local maximums for left-moving pedestrians
         left_mean = np.mean(left_row_avg)
         left_std = np.std(left_row_avg)
         left_threshold = left_mean + 2 * left_std  # Threshold for outliers
-        for i in range(1, len(left_row_avg) - 1):
-            if left_row_avg[i] > left_row_avg[i - 1] and left_row_avg[i] > left_row_avg[i + 1] and left_row_avg[i] > left_threshold:
-                left_local_max.append(i)
 
-        return len(right_local_max) + len(left_local_max)
+        # Detect outliers for right-moving pedestrians
+        right_mean = np.mean(right_row_avg)
+        right_std = np.std(right_row_avg)
+        right_threshold = right_mean + 2 * right_std  # Threshold for outliers
+
+        for i in range(len(right_local_max)):
+            if right_local_max[i] > right_threshold:
+                outliers.append(right_local_max[i])
+
+        for i in range(len(left_local_max)):
+            if left_local_max[i] > left_threshold:
+                outliers.append(left_local_max[i])
+
+
+        return len(outliers)
+        # return len(right_local_max) + len(left_local_max) + len(outliers)

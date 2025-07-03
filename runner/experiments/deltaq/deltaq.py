@@ -3,14 +3,18 @@ import os
 import subprocess
 from src.runner import run_experiment, compile_c_code, compile_model
 from src.utils import load_config, create_output_dir, copy_results_to_latest, generate_map
+from src import utils
 from src.constants import Constants
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from src.math.Density import Density
 from src.math.Clustering import Clustering
+from src.plots.DensityHeatmap import DensityHeatmap
+from src.plots.DensityRowGraph import DensityRowGraph
 
+DELTAQ = [-12, -11, -10, -9, -8, -7, -6, -5, -4, -3.5, -3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2]
 
-DELTAQ = [-4, -3.5, -3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2]
 PEDESTRIAN_COUNT = int(20 * 50 * 0.3)
 WIDTH = 20
 VOLUMES = 50
@@ -20,12 +24,12 @@ def deltaq():
     print("Running iterations for 300 pedestrians reducing Tolerance and plotting lanes...\n")
     for deltaq in DELTAQ:
         print(f"Running experiment for deltaq: {deltaq}")
-        run(deltaq)
+        # run(deltaq)
 
     # Plot the results
     print("Plotting results...")
+    plot_heatmap_by_deltaq()
     plot_results()
-    plot_iterations_by_deltaq()
 
 def run(deltaq):
     """
@@ -38,14 +42,8 @@ def run(deltaq):
     print(f"Created output directory: {output_dir}")
 
     config['parameters'][0]['value'] = PEDESTRIAN_COUNT
-    config['parameters'][1]['value'] = Constants.MMOC
-
-    generated_map = generate_map(VOLUMES, WIDTH)
-    config['parameters'].append({
-      "name": "OBSTACLES",
-      "type": "map",
-      "map": generated_map
-    })
+    config['parameters'][1]['value'] = Constants.PEDESTRIAN_MMOC
+    config['parameters'][2]['value'] = Constants.BORDER_NONE
 
     # Add from where to where pedestrians are generated
     config['parameters'].append({
@@ -64,14 +62,14 @@ def run(deltaq):
     with open(config_copy_path, 'w') as f:
         json.dump(config, f, indent=2)
 
-    formatted_tolerance = 1 * 10 ** deltaq
-    formatted_abs_tolerance = 1 * 10 ** (deltaq + 3)
+    formatted_tolerance = np.format_float_positional(1 * 10 ** deltaq)
+    formatted_abs_tolerance = np.format_float_positional(1 * 10 ** (deltaq + 3))
 
     # Replace the grid divisions in the model
     subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/social_force_model.mo'])
     subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model.mo'])
-    subprocess.run(['sed', '-i', r's/\bTolerance\s*=\s*[0-9]\+\.[0-9]\+/Tolerance = ' + str(formatted_tolerance) + '/', '../retqss/model/social_force_model.mo'])
-    subprocess.run(['sed', '-i', r's/\bAbsTolerance\s*=\s*[0-9]\+\.[0-9]\+/AbsTolerance = ' + str(formatted_abs_tolerance) + '/', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bTolerance=[0-9]*[.]*[0-9]\+[.]*/Tolerance=' + formatted_tolerance + '/g', '../retqss/model/social_force_model.mo'])
+    subprocess.run(['sed', '-i', r's/\bAbsTolerance=[0-9]*[.]*[0-9]\+[.]*/AbsTolerance=' + formatted_abs_tolerance + '/g', '../retqss/model/social_force_model.mo'])
 
     # Compile the C++ code if requested
     compile_c_code()
@@ -93,45 +91,24 @@ def run(deltaq):
 
     print(f"\nExperiment completed. Results saved in {output_dir}")
 
-def plot_iterations_by_deltaq():
-    # Get all the results directories
-    fig, ax = plt.subplots(figsize=(20, 10))
-    ax.set_title('Number of groups per time(averaged)')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Number of groups')
-
+def plot_heatmap_by_deltaq():
     for deltaq in DELTAQ:
-
         # Get the results files
         results_files = [f for f in os.listdir(os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest')) if f.endswith('.csv')]
 
         # Read the results files
         groups_per_time = {}
         groups_per_time_averaged = {}
-        for result_file in results_files:
-            df = pd.read_csv(os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest', result_file))
-            particles = (len(df.columns) - 1) / 5
-            for index, row in df.iterrows():
-                groups = Clustering(row, int(particles)).calculate_groups()
-                groups_per_time[row['time']] = len(groups)
-
-                if row['time'] not in groups_per_time_averaged:
-                    groups_per_time_averaged[row['time']] = [len(groups)]
-                else:
-                    groups_per_time_averaged[row['time']].append(len(groups))
-        
-        mean_groups_per_time = {k: np.mean(v) for k, v in groups_per_time_averaged.items()}
-        std_groups_per_time = {k: np.std(v) for k, v in groups_per_time_averaged.items()}
-        ax.plot(mean_groups_per_time.keys(), mean_groups_per_time.values(), label=f'deltaq: {deltaq}', color=f'C{deltaq}')
-        ax.fill_between(
-            list(mean_groups_per_time.keys()), 
-            (np.array(list(mean_groups_per_time.values())) - np.array(list(std_groups_per_time.values()))), 
-            (np.array(list(mean_groups_per_time.values())) + np.array(list(std_groups_per_time.values()))), 
-            alpha=0.2
-        )
-
-    fig.savefig(f'experiments/deltaq/iterations_by_deltaq.png')
-    plt.close()
+        for result_file in results_files: # Only the first one
+            if 'result_0.csv' in result_file:
+                DensityHeatmap(
+                    os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest', result_file),
+                    os.path.join('experiments/deltaq')
+                ).plot(f'DeltaQ: {deltaq}')
+                DensityRowGraph(
+                    os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest', result_file),
+                    os.path.join('experiments/deltaq')
+                ).plot(f'DeltaQ: {deltaq}')
 
 
 def plot_results():
@@ -151,22 +128,24 @@ def plot_results():
         for deltaq in DELTAQ
     }
     for result_dir in results_dirs:
-        deltaq = int(result_dir.split('_')[1])
+        deltaq = float(result_dir.split('_')[1])
         for result_file in os.listdir(os.path.join('experiments/deltaq/results', result_dir, 'latest')):
             if result_file.endswith('.txt'):
                 with open(os.path.join('experiments/deltaq/results', result_dir, 'latest', result_file), 'r') as f:
                     lines = f.readlines()
                     for line in lines:
                         performance_per_deltaq[deltaq].append(float(line))
-                    
-
-            if result_file.endswith('.csv'):
+            
+            if result_file.endswith('.csv') and 'result_0' in result_file:
                 df = pd.read_csv(os.path.join('experiments/deltaq/results', result_dir, 'latest', result_file))
-                particles = (len(df.columns) - 1) / 5
-                groups = calculate_groups(df.iloc[150], int(particles))
-                groups_per_deltaq[deltaq].append(len(groups))
+                particles = int((len(df.columns) - 1) / 5)
 
-    # Mean the groups per width
+                groups = Clustering(df, particles).calculate_groups(
+                    from_y=(VOLUMES/ 2) - int(WIDTH / 2),
+                    to_y=(VOLUMES/ 2) + int(WIDTH / 2)
+                )
+                groups_per_deltaq[deltaq].append(groups)
+
     for deltaq in DELTAQ:
         groups_per_deltaq[deltaq] = np.mean(groups_per_deltaq[deltaq])
     

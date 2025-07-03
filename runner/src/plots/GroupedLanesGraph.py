@@ -19,12 +19,12 @@ class GroupedLanesGraph:
         for result_file in self.results:
             df = pd.read_csv(result_file)
 
-            particles = (len(df.columns) - 1) / 5
+            particles = int((len(df.columns) - 1) / 5)
             for index, row in df.iterrows():
                 if index % 5 != 0:
                     continue
 
-                groups = Clustering(row, int(particles)).calculate_groups()
+                groups = Clustering(df, int(particles)).calculate_groups_by_time(row)
                 if row['time'] not in groups_per_time:
                     groups_per_time[row['time']] = [len(groups)]
                 else:
@@ -90,7 +90,7 @@ class GroupedLanesGraph:
                 plt.xlabel('X', fontsize=16)
                 plt.ylabel('Y', fontsize=16)
 
-                plt.savefig(f'{output_dir}/group_{index}.png')
+                plt.savefig(f'{self.output_dir}/group_{index}.png')
                 plt.close()
 
         # Create a new figure for the linear graph with title and x and y labels

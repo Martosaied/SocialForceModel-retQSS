@@ -82,7 +82,18 @@ void social_force_model_neighborsRepulsiveBorderEffect(
 	int particleID,
 	double cellEdgeLength,
 	double *x,
-	double *y, double *z);
+	double *y, 
+	double *z
+);
+
+void social_force_model_volumeBasedRepulsivePedestrianEffect(
+	int particleID,
+	double targetX,
+	double targetY,
+	double *totalRepulsiveX,
+	double *totalRepulsiveY,
+	double *totalRepulsiveZ
+);
 
 // void repulsive_pedestrian_effect(
 // 	retQSS::ParticleNeighbor *neighbors,
@@ -109,15 +120,6 @@ void social_force_model_totalRepulsivePedestrianEffect(
 	double *pVZ,
 	double targetX,
 	double targetY,
-	double *x,
-	double *y,
-	double *z);
-
-void social_force_model_totalRepulsiveBorderEffect(
-	int particleID,
-	double pX[1],
-	double pY[1],
-	double pZ[1],
 	double *x,
 	double *y,
 	double *z);

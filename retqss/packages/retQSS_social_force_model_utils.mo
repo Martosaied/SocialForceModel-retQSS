@@ -55,7 +55,7 @@ function setDebugLevel
 	output Boolean status;
 	external "C" status=social_force_model_setDebugLevel(level) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end debug;
 
 /*
@@ -73,7 +73,7 @@ function debug
 	output Boolean status;
 	external "C" status=social_force_model_debug(level, time, format, int1, int2, real1, real2) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end debug;
 
 /*
@@ -85,7 +85,7 @@ function arrayGet
 	output Real value;
 	external "C" value=social_force_model_arrayGet(array, index) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end arrayGet;
 
 /*
@@ -108,7 +108,7 @@ function isInArrayParameter
 	output Boolean result;
 external "C" result=social_force_model_isInArrayParameter(name, value) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end isInArrayParameter;
 
 /*
@@ -120,7 +120,7 @@ function getIntegerModelParameter
 	output Integer value;
 	external "C" value=social_force_model_getIntegerModelParameter(name, defaultValue) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 
 end getIntegerModelParameter;
 
@@ -133,7 +133,7 @@ function getRealModelParameter
 	output Real value;
 	external "C" value=social_force_model_getRealModelParameter(name, defaultValue) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end getRealModelParameter;
 
 /*
@@ -150,7 +150,7 @@ function outputCSV
 	output Boolean status;
 	external "C" status=social_force_model_outputCSV(time, N, x) annotation(
 	    Library="social_force_model",
-	    Include="#include \"retqss_social_force_model.hh\"");
+	    Include="#include \"retqss_social_force_model.h\"");
 end outputCSV;
 
 end retQSS_social_force_model_utils;

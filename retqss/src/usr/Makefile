@@ -8,9 +8,9 @@ INCDIR=./include
 
 # Source files.
 SRC    = $(SRCDIR)mmo_math.c $(SRCDIR)mmo_file.c
-SRCCPP = $(SRCDIR)retqss_pic.cc $(SRCDIR)retqss_boids.cc $(SRCDIR)retqss_md.cc $(SRCDIR)retqss_indinf.cc $(SRCDIR)retqss_covid19.cc $(SRCDIR)retqss_test.cc
+SRCCPP = $(SRCDIR)retqss_pic.cc $(SRCDIR)retqss_boids.cc $(SRCDIR)retqss_md.cc $(SRCDIR)retqss_indinf.cc $(SRCDIR)retqss_covid19.cc $(SRCDIR)retqss_test.cc $(SRCDIR)retqss_social_force_model.cc
 
-TARGET = $(LIBDIR)libmmo_math.a $(LIBDIR)libmmo_file.a $(LIBDIR)libpic.a $(LIBDIR)libboids.a $(LIBDIR)libmd.a $(LIBDIR)libindinf.a $(LIBDIR)libcovid19.a $(LIBDIR)libtest.a
+TARGET = $(LIBDIR)libmmo_math.a $(LIBDIR)libmmo_file.a $(LIBDIR)libpic.a $(LIBDIR)libboids.a $(LIBDIR)libmd.a $(LIBDIR)libindinf.a $(LIBDIR)libcovid19.a $(LIBDIR)libtest.a $(LIBDIR)libsocial_force_model.a
 
 RMS = rm -rf
 

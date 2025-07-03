@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from src.math.Density import Density
+from src.math.Clustering import Clustering
 
 
 WIDTHS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
@@ -21,7 +22,7 @@ def lanes_by_width():
     print("Running iterations for 300 pedestrians reducing width and plotting lanes by width...\n")
     for width in WIDTHS:
         print(f"Running experiment for width: {width}")
-        run(width)
+        # run(width)
 
     # Plot the results
     print("Plotting results...")
@@ -37,13 +38,13 @@ def run(width):
     output_dir = create_output_dir(f'experiments/lanes_by_width/results/width_{width}')
     print(f"Created output directory: {output_dir}")
 
-    pedestrians = int(PEDESTRIAN_DENSITY * width * VOLUMES)
+    pedestrians = int(PEDESTRIAN_DENSITY * width * GRID_SIZE)
 
     config['parameters'][0]['value'] = pedestrians
-    config['parameters'][1]['value'] = Constants.MMOC
+    config['parameters'][1]['value'] = Constants.PEDESTRIAN_MMOC
 
 
-    # Replace the map in the config
+    # # Replace the map in the config
     generated_map = generate_map(VOLUMES, width)
     config['parameters'].append({
       "name": "OBSTACLES",
@@ -55,12 +56,12 @@ def run(width):
     config['parameters'].append({
       "name": "FROM_Y",
       "type": "value",
-      "value": (VOLUMES/ 2) - int(width / 2)
+      "value": (GRID_SIZE/ 2) - int(width / 2)
     })
     config['parameters'].append({
       "name": "TO_Y",
       "type": "value",
-      "value": (VOLUMES/ 2) + int(width / 2)
+      "value": (GRID_SIZE/ 2) + int(width / 2)
     })
 
     # Save config copy in experiment directory
@@ -120,30 +121,20 @@ def plot_results():
         for result_file in os.listdir(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest')):
             if result_file.endswith('.csv'):
                 df = pd.read_csv(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest', result_file))
-                particles = (len(df.columns) - 1) / 5
+                particles = int((len(df.columns) - 1) / 5)
                 groups_per_width = []
-                groups = Density(grid_size=100).calculate_lanes_by_density(df, particles)
-                # for index, row in df.iterrows():
-                #     if index < 100 and index % 5 != 0:
-                #         continue
-                #     groups = calculate_groups(
-                #         row, 
-                #         int(particles), 
-                #         from_y=(VOLUMES/ 2) - int(width / 2), 
-                #         to_y=(VOLUMES/ 2) + int(width / 2)
-                #     )
-                #     groups_per_width.append(len(groups))
+                groups = Clustering(df, particles).calculate_groups(
+                    from_y=(VOLUMES/ 2) - int(width / 2), 
+                    to_y=(VOLUMES/ 2) + int(width / 2)
+                )
 
-                print(groups)
-                average_groups_per_width[width].append(groups)
+            average_groups_per_width[width].append(groups)
 
     # Mean the groups per width
     for width in WIDTHS:
         std_groups_per_width[width] = np.std(average_groups_per_width[width])
         average_groups_per_width[width] = np.mean(average_groups_per_width[width])
 
-    print(average_groups_per_width)
-    print(std_groups_per_width)
 
     # Sort the groups per width_
     average_groups_per_width = dict(sorted(average_groups_per_width.items(), key=lambda item: item[0]))

@@ -124,7 +124,7 @@ def run_experiment(config: dict, output_dir: str, model_name: str, plot: bool = 
 def compile_c_code():
     """Compile the C++ code for the specified model."""
     cmd = f"cd ../retqss/src && make"
-    subprocess.run(cmd, shell=True, check=True, capture_output=True)
+    subprocess.run(cmd, shell=True, check=True, capture_output=False)
 
 
 def compile_model(model_name: str):

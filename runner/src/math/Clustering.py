@@ -9,8 +9,8 @@ class Clustering:
     """
     This class contains the functions to cluster the pedestrians.
     """
-    def __init__(self, row, particles, min_x_distance=MIN_X_DISTANCE, min_y_distance=MIN_Y_DISTANCE):
-        self.row = row
+    def __init__(self, df, particles, min_x_distance=MIN_X_DISTANCE, min_y_distance=MIN_Y_DISTANCE):
+        self.df = df
         self.particles = particles
         self.min_x_distance = min_x_distance
         self.min_y_distance = min_y_distance
@@ -44,9 +44,30 @@ class Clustering:
 
         return particle_group
 
-    def calculate_groups(self, from_y=0, to_y=50):    
-        # initializing list
-        particles_list = [(i, self.row[f'PX[{i}]'], self.row[f'PY[{i}]'], self.row[f'PS[{i}]']) for i in range(1, self.particles) if self.row[f'PY[{i}]'] >= from_y and self.row[f'PY[{i}]'] <= to_y]
+    def calculate_groups(self, from_y=0, to_y=50):
+        groups = []
+        for index, row in self.df.iterrows():
+            # initializing list
+            particles_list = [(i, row[f'PX[{i}]'], row[f'PY[{i}]'], row[f'PS[{i}]']) for i in range(1, self.particles) if row[f'PY[{i}]'] >= from_y and row[f'PY[{i}]'] <= to_y]
+
+            particles_groups = []
+            for particle in particles_list:
+                particle_group = self.direct_group(particle, particles_list)
+                particles_groups.append(particle_group)
+
+
+            previous_group_quantity = 0
+            while len(particles_groups) != previous_group_quantity:
+                previous_group_quantity = len(particles_groups)
+                particles_groups = self.join_groups(particles_groups)
+                particles_groups = self.unify_groups(particles_groups)
+
+            groups.append(len([group for group in particles_groups if len(group) > 3]))
+
+        return groups
+
+    def calculate_groups_by_time(self, row, from_y=0, to_y=50):
+        particles_list = [(i, row[f'PX[{i}]'], row[f'PY[{i}]'], row[f'PS[{i}]']) for i in range(1, self.particles) if row[f'PY[{i}]'] >= from_y and row[f'PY[{i}]'] <= to_y]
 
         particles_groups = []
         for particle in particles_list:

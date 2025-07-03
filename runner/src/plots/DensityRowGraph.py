@@ -12,7 +12,7 @@ class DensityRowGraph:
         self.solution_file = solution_file
         self.output_dir = output_dir
 
-    def plot(self):
+    def plot(self, title):
         df = pd.read_csv(self.solution_file)
         particles = (len(df.columns) - 1) / 5
         right_pedestrian_counts, left_pedestrian_counts = Density(grid_size=100).calculate_pedestrian_counts(df, particles)
@@ -62,11 +62,10 @@ class DensityRowGraph:
         # print("Local maximums for left-moving pedestrians:", left_local_max)
 
         lanes = Density(grid_size=100).calculate_lanes_by_density(df, particles)
-        print(lanes)
         
         # Adjust layout and save
-        plt.suptitle('Average Density per Row by Direction', fontsize=20, y=1.05)
+        plt.suptitle(f'{title} - Average Density per Row by Direction', fontsize=20, y=1.05)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, 'row_density_graphs.png'), dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(self.output_dir, f'{title}_row_density_graphs.png'), dpi=300, bbox_inches='tight')
         plt.close()
         

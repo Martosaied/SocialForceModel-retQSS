@@ -114,15 +114,16 @@ initial algorithm
     end for;
 
 	// setup the particles in RETQSS
-    _ := debug(INFO(), time, "Particles setup. N = %d", N,_,_,_);
+    _ := debug(INFO(), time, "Particles setup. N = %d", N,_,_,_);	
 	_ := setUpParticles(N, CELL_EDGE_LENGTH, GRID_DIVISIONS, x);
     _ := debug(INFO(), time, "Particles setup ended. N = %d", N,_,_,_);
 
-		// setup the particles half in the left side and half in the right side of the grid
+	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
         (groupID, x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
 		_ := particle_setProperty(i, "type", groupID);
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
+		_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
     end for;
 
 	// setup the walls in RETQSS
@@ -149,6 +150,9 @@ initial algorithm
 	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
+    _ := debug(INFO(), time, "Pedestrian implementation: %d", PEDESTRIAN_IMPLEMENTATION,_,_,_);
+	_ := debug(INFO(), time, "Border implementation: %d", BORDER_IMPLEMENTATION,_,_,_);
+
     
 /*
   Model's diferential equations: for particles movements and volumes concentration
@@ -227,9 +231,12 @@ algorithm
 				if x[i] > GRID_SIZE then
 					hx := 0.0;
 				end if;
+				
+				if hx <> x[i] then
+					reinit(x[i], hx);
+					_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
+				end if;
 			end if;
-			reinit(x[i], hx);
-			_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
 		end for;
 	end when;
 
@@ -251,8 +258,8 @@ annotation(
 		Jacobian=Dense,
 		StartTime=0.0,
 		StopTime=1000.0,
-		Tolerance={1e-5},
-		AbsTolerance={1e-8}
+		Tolerance=0.00000001,
+		AbsTolerance=0.00001
 	));
 
 end social_force_model;

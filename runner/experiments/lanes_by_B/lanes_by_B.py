@@ -40,7 +40,7 @@ def run(b):
     pedestrians = int(PEDESTRIAN_DENSITY * WIDTH * VOLUMES)
 
     config['parameters'][0]['value'] = pedestrians
-    config['parameters'][1]['value'] = Constants.MMOC
+    config['parameters'][1]['value'] = Constants.PEDESTRIAN_MMOC
 
 
     # Replace the map in the config
