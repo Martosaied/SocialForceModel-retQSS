@@ -11,7 +11,7 @@
 #include <ctime>
 #include <cstddef>
 
-int debugLevel;
+int covid19_debugLevel;
 
 ContagionConstants contagionConstants;
 std::map<int, TracingConstants> tracingConstants;
@@ -30,13 +30,13 @@ extern "C"
 
 int covid19_setDebugLevel(int level)
 {
-	debugLevel = level;
+	covid19_debugLevel = level;
 	return level;
 }
 
 int covid19_isDebugLevelEnabled(int level)
 {
-	return level <= debugLevel;
+	return level <= covid19_debugLevel;
 }
 
 int covid19_debug(int level, double time, const char *format, int int1, int int2, double double1, double double2)

@@ -1,3 +1,5 @@
+import numpy as np
+
 """
 This module contains the functions to cluster the pedestrians.
 """
@@ -64,7 +66,7 @@ class Clustering:
 
             groups.append(len([group for group in particles_groups if len(group) > 3]))
 
-        return groups
+        return np.mean(groups)
 
     def calculate_groups_by_time(self, row, from_y=0, to_y=50):
         particles_list = [(i, row[f'PX[{i}]'], row[f'PY[{i}]'], row[f'PS[{i}]']) for i in range(1, self.particles) if row[f'PY[{i}]'] >= from_y and row[f'PY[{i}]'] <= to_y]

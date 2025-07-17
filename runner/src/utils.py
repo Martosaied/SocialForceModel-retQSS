@@ -108,7 +108,7 @@ def process_parameter(param: dict) -> dict:
 
 def process_parameters(parameters: list) -> dict:
     """Process parameter configuration and return a dictionary."""
-    return {param['name']: process_parameter(param) for param in parameters}
+    return {param['name']: process_parameter(param) for param in parameters.values()}
 
 def get_parameter_combinations(params_dict: Dict[str, List[Any]]) -> Iterator[Dict[str, Any]]:
     """

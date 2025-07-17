@@ -1,114 +1,7 @@
 package retQSS_covid19_utils
 
 import retQSS;
-
-/*
-  Useful constant for comparing to zero or triggering immediate events (ie time + EPS())
-*/
-function EPS
-	output Real eps;
-algorithm
-	eps := 1e-5;
-end EPS;
-
-/*
-  PI constant
-*/
-function PI
-	output Real pi;
-algorithm
-	pi := 3.1415926536;
-end PI;
-
-/*
-  Useful placeholder as unused arguments values
-*/
-function EMPTY
-	output Real _;
-algorithm
-	_ := 0;
-end EMPTY;
-
-/*
-  INFO logging level constante value (0)
-*/
-function INFO
-	output Integer level;
-algorithm
-	level := 0;
-end INFO;
-
-/*
-  DEBUG logging level constante value (1)
-*/
-function DEBUG
-	output Integer level;
-algorithm
-	level := 1;
-end DEBUG;
-
-/*
-  Sets the debug level
-*/
-function setDebugLevel
-	input Integer level;
-	output Boolean status;
-	external "C" status=covid19_setDebugLevel(level) annotation(
-	    Library="covid19",
-	    Include="#include \"retqss_covid19.h\"");
-end debug;
-
-/*
-  Logs a debug message. This function is implemented in C because it writes a log file.
-  Accepts C-like message formmating (ie: %f %s %d)
-*/
-function debug
-	input Integer level;
-	input Real time;
-	input String format;
-	input Integer int1;
-	input Integer int2;
-	input Real real1;
-	input Real real2;
-	output Boolean status;
-	external "C" status=covid19_debug(level, time, format, int1, int2, real1, real2) annotation(
-	    Library="covid19",
-	    Include="#include \"retqss_covid19.h\"");
-end debug;
-
-/*
-  Gets an element of discrete array. Only way to access arrays outside main module (?)
-*/
-function arrayGet
-	input Real array[1];
-	input Integer index;
-	output Real value;
-	external "C" value=covid19_arrayGet(array, index) annotation(
-	    Library="covid19",
-	    Include="#include \"retqss_covid19.h\"");
-end arrayGet;
-
-/*
-  Gets an element of normal non-discrete array used in equations section. Only way to access arrays outside main module (?)
-*/
-function equationArrayGet
-	input Real array[1];
-	input Integer index;
-	output Real value;
-algorithm
-	value := arrayGet(array, (index-1)*3+1);
-end equationArrayGet;
-/*
-function arraySet
-	input Real array[1];
-	input Integer index;
-	input Real value;
-	output Boolean status;
-	external "C" status=covid19_arraySet(array, index, value) annotation(
-	    Library="covid19",
-	    Include="#include \"retqss_covid19.h\"");
-end arraySet;
-*/
+import retQSS_utils;
 
 /*
   Returns a random 3d-point given an XY square size and a fixed z-coordinate
@@ -225,43 +118,6 @@ algorithm
 	x := (floor(particle_getProperty(particleID, "initialX")/edge)+dx)*edge;
 	y := (floor(particle_getProperty(particleID, "initialY")/edge)+0.5)*edge;
 end getClassroomDoor;
-
-/*
-  Util function for retrieving an array of integers from parameters.config file
-*/
-function isInArrayParameter
-	input String name;
-	input Integer value;
-	output Boolean result;
-external "C" result=covid19_isInArrayParameter(name, value) annotation(
-	    Library="covid19",
-	    Include="#include \"retqss_covid19.h\"");
-end isInArrayParameter;
-
-/*
-  Util function for retrieving an integer value from parameters.config file
-*/
-function getIntegerModelParameter
-	input String name;
-	input Integer defaultValue;
-	output Integer value;
-	external "C" value=covid19_getIntegerModelParameter(name, defaultValue) annotation(
-	    Library="covid19",
-	    Include="#include \"retqss_covid19.h\"");
-
-end getIntegerModelParameter;
-
-/*
-  Util function for retrieving a real value from parameters.config file
-*/
-function getRealModelParameter
-	input String name;
-	input Real defaultValue;
-	output Real value;
-	external "C" value=covid19_getRealModelParameter(name, defaultValue) annotation(
-	    Library="covid19",
-	    Include="#include \"retqss_covid19.h\"");
-end getRealModelParameter;
 
 /*
   Returns a random (x,y) vector given its distance from origen (r)
@@ -398,7 +254,7 @@ end incrementProperty;
   Dump the state of the whole model (states of all particles and volumes) in a CSV line
   This function is implemented in C
 */
-function outputCSV
+function covid19_outputCSV
 	input Real time;
 	input Integer N;
 	input Real x[1];
@@ -411,6 +267,6 @@ function outputCSV
 	external "C" status=covid19_outputCSV(time, N, x, V, volumeConcentration, recoveredCount, infectionsCount) annotation(
 	    Library="covid19",
 	    Include="#include \"retqss_covid19.h\"");
-end outputCSV;
+end covid19_outputCSV;
 
 end retQSS_covid19_utils;

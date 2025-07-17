@@ -2,6 +2,7 @@ model social_force_model
 
 import retQSS;
 import retQSS_social_force_model;
+import retQSS_utils;
 import retQSS_social_force_model_utils;
 import retQSS_social_force_model_params;
 import retQSS_social_force_model_types;
@@ -12,7 +13,7 @@ import retQSS_social_force_model_types;
 
 constant Integer
 	N = 300,
-	GRID_DIVISIONS = 50,
+	GRID_DIVISIONS = 60,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -191,7 +192,7 @@ algorithm
 
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
-		_ := outputCSV(time, N, x, y, vx, vy);
+		_ := social_force_model_outputCSV(time, N, x, y, vx, vy);
 		nextOutputTick := time + OUTPUT_UPDATE_DT;
 	end when;
 
@@ -258,8 +259,8 @@ annotation(
 		Jacobian=Dense,
 		StartTime=0.0,
 		StopTime=1000.0,
-		Tolerance=0.00000001,
-		AbsTolerance=0.00001
+		Tolerance={1e-5},
+		AbsTolerance={1e-8}
 	));
 
 end social_force_model;

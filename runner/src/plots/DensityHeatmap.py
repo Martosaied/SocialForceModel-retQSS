@@ -15,7 +15,7 @@ class DensityHeatmap:
         self.output_dir = output_dir
 
 
-    def plot(self, title):
+    def plot(self, title = 'Density Heatmap'):
         df = pd.read_csv(self.solution_file)
         particles = (len(df.columns) - 1) / 5
         right_pedestrian_counts, left_pedestrian_counts = Density(map_size=50, grid_size=200).calculate_pedestrian_counts(df, particles)
@@ -24,7 +24,7 @@ class DensityHeatmap:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
         
         # Plot right-moving pedestrians heatmap
-        im1 = ax1.imshow(right_pedestrian_counts, cmap='Reds', interpolation='nearest')
+        im1 = ax1.imshow(right_pedestrian_counts, cmap='Reds', interpolation='nearest', vmin=0, vmax=0.1)
         ax1.set_title(f'{title} - Right-Moving Pedestrians', fontsize=16)
         ax1.set_xlabel('X Position', fontsize=14)
         ax1.set_ylabel('Y Position', fontsize=14)
@@ -32,7 +32,7 @@ class DensityHeatmap:
         plt.colorbar(im1, ax=ax1, label='Number of pedestrians')
         
         # Plot left-moving pedestrians heatmap
-        im2 = ax2.imshow(left_pedestrian_counts, cmap='Blues', interpolation='nearest')
+        im2 = ax2.imshow(left_pedestrian_counts, cmap='Blues', interpolation='nearest', vmin=0, vmax=0.1)
         ax2.set_title(f'{title} - Left-Moving Pedestrians', fontsize=16)
         ax2.set_xlabel('X Position', fontsize=14)
         ax2.set_ylabel('Y Position', fontsize=14)

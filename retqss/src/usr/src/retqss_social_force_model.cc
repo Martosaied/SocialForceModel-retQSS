@@ -3,6 +3,7 @@
 #include "retqss/retqss_model_api.h"
 #include "retqss/retqss_interface.hh"
 #include "retqss/retqss_utilities.hh"
+#include "retqss_utils.hh"
 
 #include <cmath>
 #include <fstream>
@@ -11,15 +12,13 @@
 #include <ctime>
 #include <cstddef>
 
-int debugLevel;
-std::map<std::string, std::string> parameters;
 std::list<Wall> walls;
 std::map<int, std::vector<int>> neighboring_obstacles;
 
 ModelParameters model_parameters;
 
-std::ofstream outputCSV("solution.csv");
-bool started = false;
+std::ofstream sfm_outputCSV("solution.csv");
+bool social_force_model_started = false;
 
 #define IC_FILE "initial_conditions.ic"
 #define PARAMS_FILE "parameters.config"
@@ -29,112 +28,20 @@ extern "C"
 {
 
 Bool social_force_model_setParameters() {
-	model_parameters.PEDESTRIAN_A_1 = social_force_model_getRealModelParameter("PEDESTRIAN_A_1", 2.1);
-	model_parameters.PEDESTRIAN_B_1 = social_force_model_getRealModelParameter("PEDESTRIAN_B_1", 0.3);
-	model_parameters.PEDESTRIAN_A_2 = social_force_model_getRealModelParameter("PEDESTRIAN_A_2", 2.1);
-	model_parameters.PEDESTRIAN_B_2 = social_force_model_getRealModelParameter("PEDESTRIAN_B_2", 0.3);
-	model_parameters.PEDESTRIAN_R = social_force_model_getRealModelParameter("PEDESTRIAN_R", 0.1);
-	model_parameters.PEDESTRIAN_LAMBDA = social_force_model_getRealModelParameter("PEDESTRIAN_LAMBDA", 0.3);
-	model_parameters.PEDESTRIAN_IMPLEMENTATION = social_force_model_getRealModelParameter("PEDESTRIAN_IMPLEMENTATION", 0);
+	model_parameters.PEDESTRIAN_A_1 = utils_getRealModelParameter("PEDESTRIAN_A_1", 2.1);
+	model_parameters.PEDESTRIAN_B_1 = utils_getRealModelParameter("PEDESTRIAN_B_1", 0.3);
+	model_parameters.PEDESTRIAN_A_2 = utils_getRealModelParameter("PEDESTRIAN_A_2", 2.1);
+	model_parameters.PEDESTRIAN_B_2 = utils_getRealModelParameter("PEDESTRIAN_B_2", 0.3);
+	model_parameters.PEDESTRIAN_R = utils_getRealModelParameter("PEDESTRIAN_R", 0.1);
+	model_parameters.PEDESTRIAN_LAMBDA = utils_getRealModelParameter("PEDESTRIAN_LAMBDA", 0.3);
+	model_parameters.PEDESTRIAN_IMPLEMENTATION = utils_getRealModelParameter("PEDESTRIAN_IMPLEMENTATION", 0);
 
-	model_parameters.BORDER_IMPLEMENTATION = social_force_model_getRealModelParameter("BORDER_IMPLEMENTATION", 0);
-	model_parameters.BORDER_A = social_force_model_getRealModelParameter("BORDER_A", 10);
-	model_parameters.BORDER_B = social_force_model_getRealModelParameter("BORDER_B", 0.7);
-	model_parameters.BORDER_R = social_force_model_getRealModelParameter("BORDER_R", 0.1);
+	model_parameters.BORDER_IMPLEMENTATION = utils_getRealModelParameter("BORDER_IMPLEMENTATION", 0);
+	model_parameters.BORDER_A = utils_getRealModelParameter("BORDER_A", 10);
+	model_parameters.BORDER_B = utils_getRealModelParameter("BORDER_B", 0.7);
+	model_parameters.BORDER_R = utils_getRealModelParameter("BORDER_R", 0.1);
 
 	return true;
-}
-
-int social_force_model_setDebugLevel(int level)
-{
-	debugLevel = level;
-	return level;
-}
-
-Bool social_force_model_isDebugLevelEnabled(int level)
-{
-	return level <= debugLevel;
-}
-
-int social_force_model_debug(int level, double time, const char *format, int int1, int int2, double double1, double double2)
-{
-	if (social_force_model_isDebugLevelEnabled(level)) {
-	    std::time_t current_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	    char * ct = std::ctime(&current_time);
-	    ct[strcspn(ct, "\n")] = '\0';
-	    printf("[%s] (t=%.2f) ", ct, time);
-	    printf(format, (int) int1, (int) int2, double1, double2);
-	    printf("\n");
-	}
-	return level;
-}
-
-double social_force_model_arrayGet(double *array, int index)
-{
-	return array[index-1];
-}
-
-Bool social_force_model_arraySet(double *array, int index, double value)
-{
-	array[index-1] = value;
-	return true;
-}
-
-
-std::string social_force_model_getParameter(const char *name) {
-	if (parameters.find(name) != parameters.end()) {
-		return parameters[name];
-	}
-
-	std::cout << "Parameter " << name << " not found" << std::endl;
-
-	// Read the parameters from the file
-	std::ifstream is_file(PARAMS_FILE);
-	std::string line;
-	while( std::getline(is_file, line) )
-	{
-	  std::istringstream is_line(line);
-	  std::string key;
-	  if( std::getline(is_line, key, '=') && key == name)
-	  {
-	    std::string value;
-	    if( std::getline(is_line, value) ){
-			parameters[name] = value;
-			return value;
-		}
-	  }
-	}
-
-
-	parameters[name] = std::string("");
-	return std::string("");
-}
-
-Bool social_force_model_isInArrayParameter(const char *name, int value) {
-	std::string parameter = social_force_model_getParameter(name);
-	// Convert the string to an array of integers
-	std::vector<int> array;
-	std::stringstream ss(parameter);
-	std::string item;
-	while (std::getline(ss, item, ',')) {
-		array.push_back(std::stoi(item));
-	}
-
-	if (array.empty()) {
-		return false;
-	} else {
-		return std::find(array.begin(), array.end(), value) != array.end();
-	}
-}
-
-int social_force_model_getIntegerModelParameter(const char *name, int defaultValue) {
-	std::string value = social_force_model_getParameter(name);
-	return value == "" ? defaultValue : std::stoi(value);
-}
-
-double social_force_model_getRealModelParameter(const char *name, double defaultValue) {
-	std::string value = social_force_model_getParameter(name);
-	return value == "" ? defaultValue : std::stof(value);
 }
 
 // Function to compute the dot product of two vectors
@@ -557,24 +464,24 @@ Bool social_force_model_outputCSV(double time,
 	int N,
 	double *x)
 {
-	if(!started) {
-		outputCSV << "time";
+	if(!social_force_model_started) {
+		sfm_outputCSV << "time";
 		for(int i=1; i<=N; i++) {
-			outputCSV << ",PX[" << i << "],PY[" << i << "],VX[" << i << "],VY[" << i << "],PS[" << i << "]";
+			sfm_outputCSV << ",PX[" << i << "],PY[" << i << "],VX[" << i << "],VY[" << i << "],PS[" << i << "]";
 		}
-		outputCSV << std::endl;
-		started = true;
+		sfm_outputCSV << std::endl;
+		social_force_model_started = true;
 	} 
-	outputCSV << std::fixed << std::setprecision(4) << time;
+	sfm_outputCSV << std::fixed << std::setprecision(4) << time;
 	for(int i=0; i < N; i++){
 	    int pType = (int) RETQSS()->particle_get_property(i, "type");
 		double y = x[(i+N)*3];
 		double vx = x[(i+2*N)];
 		double vy = x[(i+3*N)];
-		outputCSV << "," << x[i*3] << "," << y << "," << vx << "," << vy << "," << pType;
+		sfm_outputCSV << "," << x[i*3] << "," << y << "," << vx << "," << vy << "," << pType;
 	}
-	outputCSV << std::endl;
-	outputCSV.flush();
+	sfm_outputCSV << std::endl;
+	sfm_outputCSV.flush();
 	return true;
 }
 
@@ -601,7 +508,7 @@ Bool social_force_model_setUpParticles(
 }
 
 Bool social_force_model_setUpWalls() {
-	std::string walls_str = social_force_model_getParameter("WALLS");
+	std::string walls_str = utils_getParameter("WALLS");
 	
 	std::string item;
 	std::stringstream ss(walls_str);

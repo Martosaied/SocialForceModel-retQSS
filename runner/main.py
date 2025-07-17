@@ -8,7 +8,8 @@ from experiments.performance_n_pedestrians.performance_n_pedestrians import perf
 from experiments.performance_n_volumes.performance_n_volumes import performance_n_volumes
 from experiments.performance_n_peds_m_vols.performance_n_peds_m_vols import performance_n_peds_m_vols
 from experiments.average_velocity.average_velocity import average_velocity
-from experiments.lanes_by_volumes.breaking_lanes import breaking_lanes
+from experiments.breaking_lanes.breaking_lanes import breaking_lanes
+from experiments.breaking_obstacles.breaking_obstacles import breaking_obstacles
 from experiments.lanes_by_iterations.lanes_by_iterations import lanes_by_iterations
 from experiments.lanes_by_width.lanes_by_width import lanes_by_width
 from experiments.deltaq.deltaq import deltaq
@@ -90,6 +91,8 @@ def main():
         elif args.plot == 'pedestrian_heatmap':
             plotter.density_heatmap(args.solution_file, args.output_dir)
             plotter.density_row_graph(args.solution_file, args.output_dir)
+        elif args.plot == 'flow_graph_infections':
+            plotter.flow_graph_infections(args.solution_file, args.output_dir, config)
     elif args.command == 'experiments':
         if args.experiment == 'performance_n_pedestrians':
             performance_n_pedestrians()
@@ -115,6 +118,8 @@ def main():
             lanes_by_A()
         elif args.experiment == 'lanes_heatmap':
             lanes_heatmap()
+        elif args.experiment == 'breaking_obstacles':
+            breaking_obstacles()
         else:
             print(f"Experiment {args.experiment} not found")
     else:

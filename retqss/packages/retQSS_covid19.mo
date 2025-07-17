@@ -1,6 +1,7 @@
 package retQSS_covid19
 
 import retQSS;
+import retQSS_utils;
 import retQSS_covid19_utils;
 import retQSS_covid19_fsm;
 

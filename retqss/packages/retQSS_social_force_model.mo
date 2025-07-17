@@ -1,6 +1,7 @@
 package retQSS_social_force_model
 
 import retQSS;
+import retQSS_utils;
 import retQSS_social_force_model_params;
 import retQSS_social_force_model_utils;
 import retQSS_social_force_model_types;
@@ -114,18 +115,18 @@ algorithm
 	right := RIGHT();
 
 	if randomBoolean(0.5) == 0.0 then
-		randomValue2 := random(0.1, size/3);
-		// randomValue2 := 0.1 * size;
+		// randomValue2 := random(0.1, size/3);
+		randomValue2 := 0.1 * size;
 		// randomValue2 := random(0, size);
 		x := randomValue2;
-		dx := 1.5 * size;
+		dx := random(10, 12.5);
 		group := left;
 	else
-		randomValue2 := random(size/3 * 2, size);
-		// randomValue2 := 0.9 * size;
+		// randomValue2 := random(size/3 * 2, size);
+		randomValue2 := 0.9 * size;
 		// randomValue2 := random(0, size);
 		x := randomValue2;
-		dx := -0.5 * size;
+		dx := random(40, 42.5);
 		group := right;
 	end if;
 	randomValue := random(fromY, toY);
@@ -166,8 +167,8 @@ protected
 	Real norm;
 algorithm
 	norm := vectorNorm((targetX - currentX), (targetY - currentY), (targetZ - currentZ));
-	desiredX := ((targetX - currentX) / norm);
-	desiredY := ((targetY - currentY) / norm);
+	desiredX := ((targetX - currentX));
+	desiredY := ((targetY - currentY));
 	desiredZ := currentZ;
 end desiredDirection;
 

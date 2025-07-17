@@ -1,5 +1,5 @@
 {
-  "iterations": 1,
+  "iterations": 5,
   "parameters": [
     {
       "name": "N",
@@ -14,7 +14,7 @@
     {
       "name": "BORDER_IMPLEMENTATION",
       "type": "value",
-      "value": 0
+      "value": 10
     },
     {
       "name": "PEDESTRIAN_DESTINATION",

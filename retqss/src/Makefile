@@ -77,8 +77,8 @@ install: all
 	ln -sf $(ROOT)/src/mmoc/usr/bin/mmoc $(ROOT)/bin/
 	@echo "Installing SBML translator."
 	ln -sf $(ROOT)/src/interfaces/sbml/usr/bin/translate-sbml $(ROOT)/bin/
-	@echo "Installing solver GUI."
-	@install $(ROOT)/src/gui/usr/bin/qss-solver $(ROOT)/bin/
+	# @echo "Installing solver GUI."
+	# @install $(ROOT)/src/gui/usr/bin/qss-solver $(ROOT)/bin/
 	@echo "Installing user libraries."
 	ln -sf $(ROOT)/src/usr/lib/* $(ROOT)/lib/
 ifeq ($(OS),Linux)

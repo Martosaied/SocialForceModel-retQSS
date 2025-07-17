@@ -12,7 +12,7 @@ class DensityRowGraph:
         self.solution_file = solution_file
         self.output_dir = output_dir
 
-    def plot(self, title):
+    def plot(self, title = 'Density Row Graph'):
         df = pd.read_csv(self.solution_file)
         particles = (len(df.columns) - 1) / 5
         right_pedestrian_counts, left_pedestrian_counts = Density(grid_size=100).calculate_pedestrian_counts(df, particles)

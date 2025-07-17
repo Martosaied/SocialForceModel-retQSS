@@ -24,12 +24,12 @@ def deltaq():
     print("Running iterations for 300 pedestrians reducing Tolerance and plotting lanes...\n")
     for deltaq in DELTAQ:
         print(f"Running experiment for deltaq: {deltaq}")
-        # run(deltaq)
+        run(deltaq)
 
     # Plot the results
     print("Plotting results...")
-    plot_heatmap_by_deltaq()
-    plot_results()
+    # plot_heatmap_by_deltaq()
+    # plot_results()
 
 def run(deltaq):
     """

@@ -53,22 +53,6 @@ Bool social_force_model_setUpWalls();
 
 Bool social_force_model_setParameters();
 
-int social_force_model_setDebugLevel(int level);
-
-Bool social_force_model_isDebugLevelEnabled(int level);
-
-int social_force_model_debug(int level, double time, const char *format, int int1, int int2, double double1, double double2);
-
-double social_force_model_arrayGet(double *array, int index);
-
-Bool social_force_model_arraySet(double *array, int index, double value);
-
-int social_force_model_getIntegerModelParameter(const char *name, int defaultValue);
-
-double social_force_model_getRealModelParameter(const char *name, double defaultValue);
-
-Bool social_force_model_isInArrayParameter(const char *name, int value);
-
 Bool social_force_model_outputCSV(double time, 
 	int N,
 	double *x);

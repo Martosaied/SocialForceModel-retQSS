@@ -1,5 +1,6 @@
 package retQSS_social_force_model_params
 
+import retQSS_utils;
 import retQSS_social_force_model_utils;
 
 // Pedestrian destination

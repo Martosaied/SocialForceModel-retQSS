@@ -6,7 +6,29 @@ import imageio
 from math import sqrt
 from src.utils import parse_walls, process_parameters, get_parameter_combinations
 
-class FlowGraph:
+# SEIR-like model states 
+state_id = {
+    0: "SUSCEPTIBLE",
+    1: "EXPOSED",
+    2: "PRE_SYMPTOMATIC",
+    3: "SYMPTOMATIC",
+    4: "ASYMPTOMATIC",
+    5: "RECOVERED",
+    6: "DEAD"
+}
+
+state_color = {
+    "SUSCEPTIBLE": "blue",
+    "EXPOSED": "yellow",
+    "PRE_SYMPTOMATIC": "purple",
+    "SYMPTOMATIC": "red",
+    "ASYMPTOMATIC": "orange",
+    "RECOVERED": "green",
+    "DEAD": "black"
+}
+
+
+class FlowGraphInfections:
     """
     Plot a flow graph of the simulation.
 
@@ -28,6 +50,9 @@ class FlowGraph:
 
     def plot(self):
         walls = self.parameters.get('WALLS', [])
+        GRID_SIZE = self.parameters.get('GRID_SIZE', 1)
+        VOLUMES_COUNT = self.parameters.get('VOLUMES_COUNT', 20)
+        CELL_SIZE = GRID_SIZE / VOLUMES_COUNT
         walls = parse_walls(walls)
 
         frames_dir = os.path.join(self.output_dir, 'frames')
@@ -39,20 +64,36 @@ class FlowGraph:
         # Create frames
         prev_row = None
         for index, row in df.iterrows():
-            # if index % 10 != 0:
-                # continue
-
             # Create a new figure for each frame
             plt.figure(figsize=(20, 20))
 
             # Set up the plot area
-            plt.xlim(0, self.parameters.get('GRID_SIZE', 1))
-            plt.ylim(0, self.parameters.get('GRID_SIZE', 1))
+            plt.xlim(0, GRID_SIZE)
+            plt.ylim(0, GRID_SIZE)
 
-            # Add grid lines
-            for i in range(21):  # 21 lines to create 20 divisions
-                plt.axhline(y=2.5 * i, color='gray', linestyle='-', alpha=0.3)
-                plt.axvline(x=2.5 * i, color='gray', linestyle='-', alpha=0.3)
+            # Add grid lines and color cells based on VC[ID] values
+            for i in range(VOLUMES_COUNT + 1):  # 21 lines to create 20 divisions
+                plt.axhline(y=CELL_SIZE * i, color='gray', linestyle='-', alpha=0.3)
+                plt.axvline(x=CELL_SIZE * i, color='gray', linestyle='-', alpha=0.3)
+            
+            # Color each cell based on VC[ID] values
+            for i in range(VOLUMES_COUNT):
+                for j in range(VOLUMES_COUNT):
+                    cell_id = i % VOLUMES_COUNT + VOLUMES_COUNT * j + 1
+                    vc_value = row.get(f'VC[{cell_id}]', 0)
+                    
+                    # Color the cell based on VC value (red intensity)
+                    if vc_value > 0:
+                        # Create a rectangle for the cell
+                        rect = plt.Rectangle(
+                            (j * CELL_SIZE, i * CELL_SIZE), 
+                            CELL_SIZE, 
+                            CELL_SIZE, 
+                            facecolor='red', 
+                            alpha=min(1, vc_value),  # Normalize and cap alpha
+                            edgecolor='none'
+                        )
+                        plt.gca().add_patch(rect)
 
             # Plot wall segments
             for wall in walls:
@@ -80,6 +121,8 @@ class FlowGraph:
                 x = row[f'PX[{i}]']
                 y = row[f'PY[{i}]']
                 state = row[f'PS[{i}]']
+                infected = row[f'infectionsCount']
+                recovered = row[f'recoveredCount']
 
                 # Calculate velocities from position changes if we have a previous frame
                 vx = 0
@@ -92,10 +135,7 @@ class FlowGraph:
                         vx = (x - prev_x) / dt
                         vy = (y - prev_y) / dt
 
-                if state == 1:  # Right
-                    color = 'red'
-                else:  # Left
-                    color = 'blue'
+                color = state_color[state_id[state]]
 
                 frame_positions_x.append(x)
                 frame_positions_y.append(y)
@@ -108,8 +148,7 @@ class FlowGraph:
             
             # Create legend elements
             legend_elements = [
-                plt.scatter([], [], c='blue', s=300, label='Left'),
-                plt.scatter([], [], c='green', s=300, label='Right')
+                plt.scatter([], [], c=state_color[state_id[i]], s=300, label=state_id[i]) for i in range(7)
             ]
             
             # Add legend
@@ -134,8 +173,8 @@ class FlowGraph:
                         color='black', alpha=0.5, width=0.003)
 
             # Add main title and timestamp
-            plt.suptitle('Pedestrian Movement Simulation', fontsize=20)
-            plt.title(f'Time: {row["time"]:.2f}', fontsize=16)
+            plt.suptitle('Subway Simulation', fontsize=20)
+            plt.title(f'Time: {row["time"]:.2f} Infected: {infected} Recovered: {recovered}', fontsize=16)
             
             # Save the frame
             plt.savefig(os.path.join(frames_dir, f'frame_{index:04d}.png'), dpi=50)

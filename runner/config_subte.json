@@ -1,0 +1,553 @@
+{
+  "iterations": 1,
+  "parameters": {
+    "N": {
+      "name": "N",
+      "type": "value",
+      "value": 168
+    },
+    "PEDESTRIAN_IMPLEMENTATION": {
+      "name": "PEDESTRIAN_IMPLEMENTATION",
+      "type": "value",
+      "value": 1
+    },
+    "BORDER_IMPLEMENTATION": {
+      "name": "BORDER_IMPLEMENTATION",
+      "type": "value",
+      "value": 2
+    },
+    "PEDESTRIAN_DESTINATION": {
+      "name": "PEDESTRIAN_DESTINATION",
+      "type": "value",
+      "value": 2
+    },
+    "CONVEYOR_BELT_EFFECT": {
+      "name": "CONVEYOR_BELT_EFFECT",
+      "type": "value",
+      "value": 1
+    },
+    "FORCE_TERMINATION_AT": {
+      "name": "FORCE_TERMINATION_AT",
+      "type": "value",
+      "value": 200.0
+    },
+    "GRID_SIZE": {
+      "name": "GRID_SIZE",
+      "type": "value",
+      "value": 50.0
+    },
+    "WALLS": {
+      "name": "WALLS",
+      "type": "custom",
+      "value": [
+        {
+          "from_x": 10,
+          "from_y": 0,
+          "to_x": 12.5,
+          "to_y": 0
+        },
+        {
+          "from_x": 10,
+          "from_y": 17.5,
+          "to_x": 10.75,
+          "to_y": 17.5
+        },
+        {
+          "from_x": 11.75,
+          "from_y": 17.5,
+          "to_x": 12.5,
+          "to_y": 17.5
+        },
+        {
+          "from_x": 10,
+          "from_y": 0.0,
+          "to_x": 10,
+          "to_y": 2.2
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 0.0,
+          "to_x": 12.5,
+          "to_y": 2.2
+        },
+        {
+          "from_x": 10,
+          "from_y": 3.7,
+          "to_x": 10,
+          "to_y": 5.9
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 3.7,
+          "to_x": 12.5,
+          "to_y": 5.9
+        },
+        {
+          "from_x": 10,
+          "from_y": 7.4,
+          "to_x": 10,
+          "to_y": 9.6
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 7.4,
+          "to_x": 12.5,
+          "to_y": 9.6
+        },
+        {
+          "from_x": 10,
+          "from_y": 11.1,
+          "to_x": 10,
+          "to_y": 13.3
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 11.1,
+          "to_x": 12.5,
+          "to_y": 13.3
+        },
+        {
+          "from_x": 10,
+          "from_y": 14.8,
+          "to_x": 10,
+          "to_y": 17.5
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 14.8,
+          "to_x": 12.5,
+          "to_y": 17.5
+        },
+        {
+          "from_x": 10,
+          "from_y": 35,
+          "to_x": 10.75,
+          "to_y": 35
+        },
+        {
+          "from_x": 11.75,
+          "from_y": 35,
+          "to_x": 12.5,
+          "to_y": 35
+        },
+        {
+          "from_x": 10,
+          "from_y": 17.5,
+          "to_x": 10,
+          "to_y": 19.2
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 17.5,
+          "to_x": 12.5,
+          "to_y": 19.2
+        },
+        {
+          "from_x": 10,
+          "from_y": 20.7,
+          "to_x": 10,
+          "to_y": 22.9
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 20.7,
+          "to_x": 12.5,
+          "to_y": 22.9
+        },
+        {
+          "from_x": 10,
+          "from_y": 24.4,
+          "to_x": 10,
+          "to_y": 26.6
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 24.4,
+          "to_x": 12.5,
+          "to_y": 26.6
+        },
+        {
+          "from_x": 10,
+          "from_y": 28.1,
+          "to_x": 10,
+          "to_y": 30.3
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 28.1,
+          "to_x": 12.5,
+          "to_y": 30.3
+        },
+        {
+          "from_x": 10,
+          "from_y": 31.8,
+          "to_x": 10,
+          "to_y": 35.0
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 31.8,
+          "to_x": 12.5,
+          "to_y": 35.0
+        },
+        {
+          "from_x": 10,
+          "from_y": 50,
+          "to_x": 12.5,
+          "to_y": 50
+        },
+        {
+          "from_x": 10,
+          "from_y": 35.0,
+          "to_x": 10,
+          "to_y": 36.2
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 35.0,
+          "to_x": 12.5,
+          "to_y": 36.2
+        },
+        {
+          "from_x": 10,
+          "from_y": 37.7,
+          "to_x": 10,
+          "to_y": 39.9
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 37.7,
+          "to_x": 12.5,
+          "to_y": 39.9
+        },
+        {
+          "from_x": 10,
+          "from_y": 41.4,
+          "to_x": 10,
+          "to_y": 43.6
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 41.4,
+          "to_x": 12.5,
+          "to_y": 43.6
+        },
+        {
+          "from_x": 10,
+          "from_y": 45.1,
+          "to_x": 10,
+          "to_y": 47.3
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 45.1,
+          "to_x": 12.5,
+          "to_y": 47.3
+        },
+        {
+          "from_x": 10,
+          "from_y": 48.8,
+          "to_x": 10,
+          "to_y": 50.0
+        },
+        {
+          "from_x": 12.5,
+          "from_y": 48.8,
+          "to_x": 12.5,
+          "to_y": 50.0
+        },
+        {
+          "from_x": 40,
+          "from_y": 0,
+          "to_x": 42.5,
+          "to_y": 0
+        },
+        {
+          "from_x": 40,
+          "from_y": 17.5,
+          "to_x": 40.75,
+          "to_y": 17.5
+        },
+        {
+          "from_x": 41.75,
+          "from_y": 17.5,
+          "to_x": 42.5,
+          "to_y": 17.5
+        },
+        {
+          "from_x": 40,
+          "from_y": 0.0,
+          "to_x": 40,
+          "to_y": 2.2
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 0.0,
+          "to_x": 42.5,
+          "to_y": 2.2
+        },
+        {
+          "from_x": 40,
+          "from_y": 3.7,
+          "to_x": 40,
+          "to_y": 5.9
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 3.7,
+          "to_x": 42.5,
+          "to_y": 5.9
+        },
+        {
+          "from_x": 40,
+          "from_y": 7.4,
+          "to_x": 40,
+          "to_y": 9.6
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 7.4,
+          "to_x": 42.5,
+          "to_y": 9.6
+        },
+        {
+          "from_x": 40,
+          "from_y": 11.1,
+          "to_x": 40,
+          "to_y": 13.3
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 11.1,
+          "to_x": 42.5,
+          "to_y": 13.3
+        },
+        {
+          "from_x": 40,
+          "from_y": 14.8,
+          "to_x": 40,
+          "to_y": 17.5
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 14.8,
+          "to_x": 42.5,
+          "to_y": 17.5
+        },
+        {
+          "from_x": 40,
+          "from_y": 35,
+          "to_x": 40.75,
+          "to_y": 35
+        },
+        {
+          "from_x": 41.75,
+          "from_y": 35,
+          "to_x": 42.5,
+          "to_y": 35
+        },
+        {
+          "from_x": 40,
+          "from_y": 17.5,
+          "to_x": 40,
+          "to_y": 19.2
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 17.5,
+          "to_x": 42.5,
+          "to_y": 19.2
+        },
+        {
+          "from_x": 40,
+          "from_y": 20.7,
+          "to_x": 40,
+          "to_y": 22.9
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 20.7,
+          "to_x": 42.5,
+          "to_y": 22.9
+        },
+        {
+          "from_x": 40,
+          "from_y": 24.4,
+          "to_x": 40,
+          "to_y": 26.6
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 24.4,
+          "to_x": 42.5,
+          "to_y": 26.6
+        },
+        {
+          "from_x": 40,
+          "from_y": 28.1,
+          "to_x": 40,
+          "to_y": 30.3
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 28.1,
+          "to_x": 42.5,
+          "to_y": 30.3
+        },
+        {
+          "from_x": 40,
+          "from_y": 31.8,
+          "to_x": 40,
+          "to_y": 35.0
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 31.8,
+          "to_x": 42.5,
+          "to_y": 35.0
+        },
+        {
+          "from_x": 40,
+          "from_y": 50,
+          "to_x": 42.5,
+          "to_y": 50
+        },
+        {
+          "from_x": 40,
+          "from_y": 35.0,
+          "to_x": 40,
+          "to_y": 36.2
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 35.0,
+          "to_x": 42.5,
+          "to_y": 36.2
+        },
+        {
+          "from_x": 40,
+          "from_y": 37.7,
+          "to_x": 40,
+          "to_y": 39.9
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 37.7,
+          "to_x": 42.5,
+          "to_y": 39.9
+        },
+        {
+          "from_x": 40,
+          "from_y": 41.4,
+          "to_x": 40,
+          "to_y": 43.6
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 41.4,
+          "to_x": 42.5,
+          "to_y": 43.6
+        },
+        {
+          "from_x": 40,
+          "from_y": 45.1,
+          "to_x": 40,
+          "to_y": 47.3
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 45.1,
+          "to_x": 42.5,
+          "to_y": 47.3
+        },
+        {
+          "from_x": 40,
+          "from_y": 48.8,
+          "to_x": 40,
+          "to_y": 50.0
+        },
+        {
+          "from_x": 42.5,
+          "from_y": 48.8,
+          "to_x": 42.5,
+          "to_y": 50.0
+        }
+      ]
+    },
+    "PEDESTRIAN_A_1": {
+      "name": "PEDESTRIAN_A_1",
+      "type": "value",
+      "value": 0.0
+    },
+    "PEDESTRIAN_A_2": {
+      "name": "PEDESTRIAN_A_2",
+      "type": "value",
+      "value": 2.5
+    },
+    "PEDESTRIAN_B_1": {
+      "name": "PEDESTRIAN_B_1",
+      "type": "value",
+      "value": 1
+    },
+    "PEDESTRIAN_B_2": {
+      "name": "PEDESTRIAN_B_2",
+      "type": "value",
+      "value": 1
+    },
+    "PEDESTRIAN_R": {
+      "name": "PEDESTRIAN_R",
+      "type": "value",
+      "value": 0.6
+    },
+    "PEDESTRIAN_LAMBDA": {
+      "name": "PEDESTRIAN_LAMBDA",
+      "type": "value",
+      "value": 0.3
+    },
+    "BORDER_A": {
+      "name": "BORDER_A",
+      "type": "value",
+      "value": 2
+    },
+    "BORDER_B": {
+      "name": "BORDER_B",
+      "type": "value",
+      "value": 0.7
+    },
+    "BORDER_R": {
+      "name": "BORDER_R",
+      "type": "value",
+      "value": 0.1
+    },
+    "SPEED_MU": {
+      "name": "SPEED_MU",
+      "type": "value",
+      "value": 1.35
+    },
+    "SPEED_SIGMA": {
+      "name": "SPEED_SIGMA",
+      "type": "value",
+      "value": 0.26
+    },
+    "FROM_Y": {
+      "name": "FROM_Y",
+      "type": "value",
+      "value": 1.0
+    },
+    "TO_Y": {
+      "name": "TO_Y",
+      "type": "value",
+      "value": 50.0
+    },
+    "VOLUMES_COUNT": {
+      "name": "VOLUMES_COUNT",
+      "type": "value",
+      "value": 20
+    },
+    "SOCIAL_FORCE_MODEL": {
+      "name": "SOCIAL_FORCE_MODEL",
+      "type": "value",
+      "value": 0
+    }
+  }
+}

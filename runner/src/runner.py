@@ -1,17 +1,23 @@
+import distutils.dir_util
 import subprocess
 import shutil
 import random
 import time
 import os
-import subprocess
+import multiprocessing
+import string
+import pandas as pd
+import numpy as np
 
 from src.plotter import Plotter
+from src.math.Density import Density
+from src.math.Clustering import Clustering
 from src.utils import process_parameters, get_parameter_combinations
 
 
-def run_model(model_name: str):
+def run_model(model_name: str, directory: str, parameters: dict):
     """Run the specified model command and handle the solution file."""
-    cmd = f"../retqss/build/{model_name}/{model_name}.sh"
+    cmd = f"{directory}/{model_name}.sh"
     cmd_dir = os.path.dirname(cmd)
     solution_path = os.path.join(cmd_dir, "solution.csv")
 
@@ -26,14 +32,28 @@ def run_model(model_name: str):
             shell=True,
             check=True,
             text=True,
-            capture_output=False
+            capture_output=True
         )
+
+        # Get the time from the output
+        time = result.stderr.split('User time (seconds): ')[1].split('\n')[0].strip()
+        memory_usage = result.stderr.split('Maximum resident set size (kbytes): ')[1].split('\n')[0].strip()
+
+        df = pd.read_csv(solution_path)
+        particles = parameters.get('N', 300)
+        groups = Density(map_size=50, grid_size=200).calculate_lanes_by_density(df, particles)
+        clustering_based_groups = Clustering(df, particles).calculate_groups()
 
         # Check if solution.csv was created
         if not os.path.exists(solution_path):
             raise FileNotFoundError(f"Solution file not found at: {solution_path}")
 
-        return solution_path
+        return solution_path, {
+            'time': time,
+            'memory_usage': memory_usage,
+            'density_based_groups': groups,
+            'clustering_based_groups': clustering_based_groups,
+        }
 
     except subprocess.CalledProcessError as e:
         print(f"Error running {model_name} model: {e}")
@@ -41,71 +61,111 @@ def run_model(model_name: str):
         raise
 
 
-def setup_parameters(model_name: str, parameters: dict, iteration: int):
+def setup_parameters(model_name: str, parameters: dict, iteration: int, directory: str):
     """Setup parameters for the model."""
 
     random.seed(iteration)
     seed = random.randint(0, 1000000)
-
     # Create a parameters.config file
-    f = open(f"../retqss/build/{model_name}/parameters.config", "w")
+    f = open(f"{directory}/parameters.config", "w")
     for param, value in parameters.items():
         f.write(f"{param}={value}\n")
 
     f.write(f"RANDOM_SEED={seed}\n")
     f.close()
 
+def change_sh_file(model_name: str, random_str: str):
+    """Change the sh file to run the model with the specified parameters."""
+    # Using sed to change the sh file change /build/social_force_model/ for /build/tmp_<random_string>/<model_name>/
+    # Get the directory of the sh file
+    sh_file = f"../retqss/build/{model_name}_{random_str}/{model_name}.sh"
+    subprocess.run(['sed', '-i', r's/\/build\/' + model_name + '\//\/build\/' + model_name + '_' + random_str + '\//', sh_file])
+
+    # Add time to the sh file
+    subprocess.run(['sed', '-i', r's/\.\/' + model_name + '/\/usr\/bin\/time -v \.\/' + model_name + '/', sh_file])
+
+
+def run_parallel_model(
+    model_name: str, 
+    parameters: dict, 
+    iteration: int, 
+    directory: str, 
+    metrics_file: str, 
+    output_dir: str, 
+    plot: bool, 
+    copy_results: bool,
+    results: list):
+    try:
+        print("Setting up parameters...")
+        setup_parameters(model_name, parameters, iteration, directory)
+
+        # Run the model and get path to solution file
+        solution_path, metrics = run_model(model_name, directory, parameters)
+
+        # Write metrics to file
+        metrics_file.write(f"{metrics['time']},{metrics['memory_usage']},{metrics['density_based_groups']},{metrics['clustering_based_groups']}\n")
+
+        print(f"Flushing metrics file")
+        metrics_file.flush()
+
+        # Define the destination path for this iteration
+        result_file = os.path.join(output_dir, f'result_{iteration}.csv')
+
+        # Move and rename the solution file
+        if copy_results:
+            shutil.move(solution_path, result_file)
+            print(f"Saved results for iteration {iteration} to {result_file}")
+
+        # Remove the tmp directory 
+        print(f"Removing {directory}")
+        shutil.rmtree(directory)
+
+    except Exception as e:
+        print(f"Error in iteration {iteration}: {str(e)}")
+        # Create error log file
+        error_file = os.path.join(output_dir, f'error_iteration_{iteration}.txt')
+        with open(error_file, 'w') as f:
+            f.write(f"Error during iteration {iteration}:\n{str(e)}")
+        raise
+
+
 
 def run_iterations(num_iterations: int, model_name: str, output_dir: str = "output", parameters: dict = {}, plot: bool = True, copy_results: bool = True):
     """Run experiment iterations using the specified model."""
 
-    time_file = os.path.join(output_dir, f'benchmark.txt')
-    time_file = open(time_file, 'w')
+    metrics_file = os.path.join(output_dir, f'metrics.csv')
+
+    metrics_file = open(metrics_file, 'w')
+    metrics_file.write('time,memory_usage,density_based_groups,clustering_based_groups\n')
+    metrics_file.flush()
     results = []
+    processes = []
     for iteration in range(num_iterations):
         print(f"\nStarting iteration {iteration + 1}/{num_iterations}")
 
+        random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
+        tmp_dir = f"../retqss/build/{model_name}_{random_str}"
+        print(f"Copying from ../retqss/build/{model_name} to {tmp_dir}")
+        compile_c_code()
+        compile_model(model_name)
         try:
-            print("Setting up parameters...")
-            setup_parameters(model_name, parameters, iteration)
+            distutils.dir_util.copy_tree(f"../retqss/build/{model_name}", tmp_dir)
+            subprocess.run( f"cp ../retqss/build/{model_name}/{model_name} {tmp_dir}", shell=True, check=True, capture_output=False)
+            change_sh_file(model_name, random_str)
 
-            # Measure time
-            start_time = time.time()
-
-            # Run the model and get path to solution file
-            solution_path = run_model(model_name)
-
-            # Measure time
-            end_time = time.time()
-            time_file.write(f"{end_time - start_time}\n")
-
-            # Define the destination path for this iteration
-            result_file = os.path.join(output_dir, f'result_{iteration}.csv')
-            results.append(result_file)
-
-            # Generate GIF
-            if iteration == 0 and plot:
-                Plotter().flow_graph(solution_path, output_dir, parameters)
-
-            # Move and rename the solution file
-            if copy_results:
-                shutil.move(solution_path, result_file)
-                print(f"Saved results for iteration {iteration} to {result_file}")
+            # Run the model in parallel
+            p = multiprocessing.Process(target=run_parallel_model, args=(model_name, parameters, iteration, tmp_dir, metrics_file, output_dir, plot, copy_results, results))
+            p.start()
+            processes.append(p)
 
         except Exception as e:
-            print(f"Error in iteration {iteration}: {str(e)}")
-            # Create error log file
-            error_file = os.path.join(output_dir, f'error_iteration_{iteration}.txt')
-            with open(error_file, 'w') as f:
-                f.write(f"Error during iteration {iteration}:\n{str(e)}")
-            raise
+            print(f"Error copying ../retqss/build/{model_name} to {tmp_dir}: {e}")
 
-    # if plot:
-    #     # Create a directory for the grouped directioned graph
-    #     generate_grouped_directioned_graph(results, output_dir)
-    #     print(f"Generated visual representations of lanes")
+    for p in processes:
+        p.join()
+        print(f"Iteration {p.name} completed")
 
-    time_file.close()
+    metrics_file.close()
 
 
 def run_experiment(config: dict, output_dir: str, model_name: str, plot: bool = True, copy_results: bool = True):
@@ -113,7 +173,7 @@ def run_experiment(config: dict, output_dir: str, model_name: str, plot: bool = 
     num_iterations = config.get('iterations', 1)
     print(f"Running {num_iterations} iterations for {model_name}...")
 
-    parameters = process_parameters(config.get('parameters', []))
+    parameters = process_parameters(config.get('parameters', {}))
 
     grouped_parameters = get_parameter_combinations(parameters)
     for params in grouped_parameters:
@@ -124,7 +184,7 @@ def run_experiment(config: dict, output_dir: str, model_name: str, plot: bool = 
 def compile_c_code():
     """Compile the C++ code for the specified model."""
     cmd = f"cd ../retqss/src && make"
-    subprocess.run(cmd, shell=True, check=True, capture_output=False)
+    subprocess.run(cmd, shell=True, check=True, capture_output=True)
 
 
 def compile_model(model_name: str):
