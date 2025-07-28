@@ -90,6 +90,48 @@ algorithm
 	end if;
 end randomBoolean;
 
+function randomInitialSubwayPosition
+	output Real x;
+	output Real y;
+	output Real z;
+	output Real dx;
+	output Real dy;
+	output Real dz;
+protected
+	Integer i0;
+	Integer randomValue;
+	Integer rX;
+	Integer rY;
+	Integer rZ;
+algorithm
+	for i0 in 1:10000 loop
+		randomValue := geometry_randomVolumeID();
+		if volume_getProperty(randomValue, "isStation") then
+			(rX, rY, rZ) := volume_randomPoint(randomValue);
+			x := rX;
+			y := rY;
+			z := rZ;
+			dx := rX;
+			dy := rY;
+			dz := rZ;
+			return;
+		end if;
+	end for;
+end randomInitialSubwayPosition;
+
+function randomNextStation
+	input Integer particleID;
+	input Real currentDx;
+	input Real currentDy;
+	input Real currentDz;
+	output Real dx;
+	output Real dy;
+	output Real dz;
+external "C" social_force_model_randomNextStation(particleID, currentDx, currentDy, currentDz, dx, dy, dz) annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.h\"");
+end randomNextStation;
+
 function randomRoute
 	input Real size;
 	input Real zCoord;
@@ -163,13 +205,8 @@ function desiredDirection
 	output Real desiredX;
 	output Real desiredY;
 	output Real desiredZ;
-protected
-	Real norm;
 algorithm
-	norm := vectorNorm((targetX - currentX), (targetY - currentY), (targetZ - currentZ));
-	desiredX := ((targetX - currentX));
-	desiredY := ((targetY - currentY));
-	desiredZ := currentZ;
+	(desiredX, desiredY, desiredZ) := vectorWithNorm((targetX - currentX), (targetY - currentY), (targetZ - currentZ), 1.0);
 end desiredDirection;
 
 
@@ -228,7 +265,7 @@ algorithm
 	// The acceleration is the difference between the desired acceleration and the current acceleration
 	// The acceleration has a relaxation time of 0.5 seconds
 
-	relaxationTime := 1/0.5;
+	relaxationTime := 1/0.5; // 0.5 seconds
 	x := (desiredX - currentVX) * relaxationTime;
 	y := (desiredY - currentVY) * relaxationTime;
 	z := 0;
@@ -672,5 +709,30 @@ algorithm
 	z := resultZ;
 end pedestrianTotalMotivation;
 
+function updateInStationPosition
+	input Integer particleID;
+	output Real dx;
+	output Real dy;
+	output Real dz;
+protected
+	Real x;
+	Real y;
+	Real z;
+	Integer nextVolume;
+	Boolean isStation;
+algorithm
+	nextVolume := particle_nextVolumeID(particleID);
+	if nextVolume <> 0 then
+		isStation := volume_getProperty(nextVolume, "isStation");
+		if isStation then
+			(x, y, z) := volume_randomPoint(nextVolume);
+			dx := x;
+			dy := y;
+			dz := z;
+			return;
+		end if;
+		(dx, dy, dz) := volume_centroid(nextVolume);
+	end if;
+end updateInStationPosition;
 
 end retQSS_social_force_model;

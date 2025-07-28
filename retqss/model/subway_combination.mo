@@ -1,4 +1,4 @@
-model subte
+model subte_combination
 
 import retQSS;
 import retQSS_utils;
@@ -17,8 +17,8 @@ import retQSS_covid19_fsm;
 */
 
 constant Integer
-	N = 1000,
-	GRID_DIVISIONS = 20;
+	N = 300,
+	GRID_DIVISIONS = 11;
 
 // Initial conditions parameters
 parameter Integer
@@ -30,17 +30,17 @@ parameter Integer
 	SOCIAL_FORCE_MODEL = getIntegerModelParameter("SOCIAL_FORCE_MODEL", 0),
 
 	INITIAL_EXPOSED = getIntegerModelParameter("INITIAL_EXPOSED", 0),
-	INITIAL_INFECTED = getIntegerModelParameter("INITIAL_INFECTED", 8);
+	INITIAL_INFECTED = getIntegerModelParameter("INITIAL_INFECTED", 20);
 
 // Output delta time parameter
 parameter Real
-	DEFAULT_SPEED = getRealModelParameter("DEFAULT_SPEED", 80.4), // 1.34 m/s
-	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 0.1), // 0.5 minutes
-	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.01), // 0.01 minutes
-	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.001), // 0.005 minutes
-	DESTINATION_UPDATE_DT = getRealModelParameter("DESTINATION_UPDATE_DT", 10), // 10 minutes
-	SPEED_MU = getRealModelParameter("SPEED_MU", 80.4), // 1.34 m/s
-	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 15.6), // 0.26 m/s
+	DEFAULT_SPEED = getRealModelParameter("DEFAULT_SPEED", 1.34), // 1.34 m/s or 80.4 m/min
+	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 1), // 0.5 seconds
+	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.5), // 0.5 seconds
+	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1), // 0.5 seconds
+	DESTINATION_UPDATE_DT = getRealModelParameter("DESTINATION_UPDATE_DT", 130), // 130 seconds
+	SPEED_MU = getRealModelParameter("SPEED_MU", 1.34), // 1.34 m/s or 80.4 m/min
+	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 0.26), // 0.26 m/s or 15.6 m/min
 	FROM_Y = getRealModelParameter("FROM_Y", 0.0),
 	TO_Y = getRealModelParameter("TO_Y", 20.0);
 
@@ -74,9 +74,9 @@ parameter Real
 
 	VOLUME_CONCENTRATION_LAMBDA = getRealModelParameter("VOLUME_CONCENTRATION_LAMBDA", 5.8), // JLJ Table SI-4 (classroom / prepandemic scenario) = lambda (hourly to daily conversion) 
 
-	BREATHING_INTERVAL_TIME = getRealModelParameter("BREATHING_INTERVAL_TIME", 1.0 / 13.8), //~ 13.8 breaths per minute  https://my.clevelandclinic.org/health/articles/10881-vital-signs#:~:text=Respiratory%20rate%3A%20A%20person's%20respiratory,while%20resting%20is%20considered%20abnormal.
+	BREATHING_INTERVAL_TIME = getRealModelParameter("BREATHING_INTERVAL_TIME", 13.8 / 60), //~ 13.8 breaths per minute  https://my.clevelandclinic.org/health/articles/10881-vital-signs#:~:text=Respiratory%20rate%3A%20A%20person's%20respiratory,while%20resting%20is%20considered%20abnormal.
 
-	SYMPTOMATIC_EMISSION_RATE = getRealModelParameter("SYMPTOMATIC_EMISSION_RATE", 18.6 * (1.0 / (13.8 * 60.0)) * 1.0), // JLJ Table SI-4 (classroom / prepandemic scenario) = E_P0 * (1/breaths per hour) * r_E * (fe x fi)
+	SYMPTOMATIC_EMISSION_RATE = getRealModelParameter("SYMPTOMATIC_EMISSION_RATE", 18.6 * 1.0 * 1.0), // JLJ Table SI-4 (classroom / prepandemic scenario) = E_P0 * (1/breaths per hour) * r_E * (fe x fi)
 	ASYMPTOMATIC_EMISSION_RATE = getRealModelParameter("ASYMPTOMATIC_EMISSION_RATE", SYMPTOMATIC_EMISSION_RATE), //same as symptomatic
 
 	BREATHING_INHALATION_VOLUME = getRealModelParameter("BREATHING_INHALATION_VOLUME", 0.288 * 0.001 * 1.1 * 1.0); // JLJ Table SI-4 (classroom / prepandemic scenario) = B0 * (1/breaths per hour) * rB * fI
@@ -184,6 +184,7 @@ initial algorithm
 
 	for i in 1:VOLUMES_COUNT loop
 		_ := volume_setProperty(i, "isObstacle", isInArrayParameter("OBSTACLES", i));
+		_ := volume_setProperty(i, "isStation", isInArrayParameter("STATIONS", i));
 		volumeConcentration[i] := 0.0;
 		volumeEmissionRate[i] := 0.0;
 		volumeLambda[i] := VOLUME_CONCENTRATION_LAMBDA;
@@ -201,8 +202,7 @@ initial algorithm
 
 	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
-        (groupID, x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
-		_ := particle_setProperty(i, "type", groupID);
+        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomInitialSubwayPosition();
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
 		_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
     end for;
@@ -229,6 +229,9 @@ initial algorithm
 		else
 			infectionStartTime[i] := INF;
 			_ := particle_setProperty(i, "status", SUSCEPTIBLE());
+		end if;
+		if i == 1 then
+			_ := particle_setProperty(i, "status", RECOVERED());
 		end if;
 		symptomsStartTime[i] := INF;
 		infectionFinishTime[i] := INF;
@@ -305,6 +308,7 @@ algorithm
 			if BORDER_IMPLEMENTATION == 3 then
 				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
 			end if;
+			(dx[i], dy[i], dz[i]) := updateInStationPosition(i);
 		end when;
 
 		//EVENT: particle is exposed
@@ -358,7 +362,12 @@ algorithm
 		nextDestinationTick := time + DESTINATION_UPDATE_DT;
 		_ := debug(INFO(), time, "Updating particles destination",_,_,_,_);
 		for i in 1:N loop
-			(_, _, _, _, dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
+			hx := dx[i];
+			hy := dy[i];
+			hz := dz[i];
+			if randomBoolean(0.4) then
+				(dx[i], dy[i], dz[i]) := randomNextStation(i, hx, hy, hz);
+			end if;
 		end for;
 	end when;
 
@@ -380,7 +389,7 @@ algorithm
 	when time > nextMotivationTick then
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
 		if SOCIAL_FORCE_MODEL == 1 then
-			_ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
+			// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
 			for i in 1:N loop
 				hx := dx[i];
 				hy := dy[i];
@@ -434,7 +443,7 @@ annotation(
 		MMO_Scheduler=ST_Binary,
 		Jacobian=Dense,
 		StartTime=0.0,
-		StopTime=1000.0,
+		StopTime=10000.0,
 		Tolerance={1e-5},
 		AbsTolerance={1e-8}
 	));

@@ -64,6 +64,9 @@ class FlowGraphInfections:
         # Create frames
         prev_row = None
         for index, row in df.iterrows():
+            if index % 3 != 0:
+                continue
+
             # Create a new figure for each frame
             plt.figure(figsize=(20, 20))
 
@@ -90,7 +93,7 @@ class FlowGraphInfections:
                             CELL_SIZE, 
                             CELL_SIZE, 
                             facecolor='red', 
-                            alpha=min(1, vc_value),  # Normalize and cap alpha
+                            alpha=min(1, vc_value*10),  # Normalize and cap alpha
                             edgecolor='none'
                         )
                         plt.gca().add_patch(rect)
@@ -144,7 +147,7 @@ class FlowGraphInfections:
                 frame_velocities_y.append(vy)
 
             # Plot scatter points
-            scatter = plt.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=300)
+            scatter = plt.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=100)
             
             # Create legend elements
             legend_elements = [
