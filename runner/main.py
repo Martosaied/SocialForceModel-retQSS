@@ -17,7 +17,9 @@ from experiments.lanes_by_B.lanes_by_B import lanes_by_B
 from experiments.lanes_by_R.lanes_by_R import lanes_by_R
 from experiments.lanes_by_A.lanes_by_A import lanes_by_A
 from experiments.lanes_heatmap.lanes_heatmap import lanes_heatmap
+from experiments.subway_attack_rate.subway_attack_rate import subway_attack_rate
 from src.plotter import Plotter
+
 
 def main():
     parser = argparse.ArgumentParser(description='Run experiments with JSON configuration')
@@ -32,7 +34,7 @@ def main():
     run_parser.add_argument('--output-dir', type=str, default='results',
                             help='Base directory for experiment outputs (default: results)')
     run_parser.add_argument('--plot', action='store_true', help='Plot the results')
-    
+
     plot_parser = subparsers.add_parser('plot', description='Plot results')
     plot_parser.add_argument('plot', type=str, help='plot type (gif, grouped_lanes)')
     plot_parser.add_argument('solution_file', type=str, help='Path to solution file')
@@ -120,6 +122,8 @@ def main():
             lanes_heatmap()
         elif args.experiment == 'breaking_obstacles':
             breaking_obstacles()
+        elif args.experiment == 'subway_attack_rate':
+            subway_attack_rate()
         else:
             print(f"Experiment {args.experiment} not found")
     else:
