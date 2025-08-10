@@ -93,7 +93,7 @@ class FlowGraphInfections:
                             CELL_SIZE, 
                             CELL_SIZE, 
                             facecolor='red', 
-                            alpha=min(1, vc_value*10),  # Normalize and cap alpha
+                            alpha=min(1, vc_value*5),  # Normalize and cap alpha
                             edgecolor='none'
                         )
                         plt.gca().add_patch(rect)
@@ -117,7 +117,7 @@ class FlowGraphInfections:
             left_scatter = None
             right_scatter = None
             
-            for i in range(1, self.parameters.get('N', 300)):  # 300 particles
+            for i in range(1, self.parameters.get('N', 300) + 1):  # 300 particles
                 if row.get(f'PX[{i}]') is None:
                     continue
 

@@ -135,14 +135,6 @@ void social_force_model_desiredDirection(
 	double *desiredY,
 	double *desiredZ);
 
-void social_force_model_randomNextStation(
-	int particleID,
-	double currentDx,
-	double currentDy,
-	double currentDz,
-	double *dx,
-	double *dy,
-	double *dz);
 
 #ifdef __cplusplus
 }

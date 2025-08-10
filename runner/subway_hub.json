@@ -1,0 +1,309 @@
+{
+  "iterations": 1,
+  "parameters": {
+    "N": {
+      "name": "N",
+      "type": "value",
+      "value": 1
+    },
+    "PEDESTRIAN_IMPLEMENTATION": {
+      "name": "PEDESTRIAN_IMPLEMENTATION",
+      "type": "value",
+      "value": 1
+    },
+    "BORDER_IMPLEMENTATION": {
+      "name": "BORDER_IMPLEMENTATION",
+      "type": "value",
+      "value": 2
+    },
+    "PEDESTRIAN_DESTINATION": {
+      "name": "PEDESTRIAN_DESTINATION",
+      "type": "value",
+      "value": 2
+    },
+    "CONVEYOR_BELT_EFFECT": {
+      "name": "CONVEYOR_BELT_EFFECT",
+      "type": "value",
+      "value": 1
+    },
+    "FORCE_TERMINATION_AT": {
+      "name": "FORCE_TERMINATION_AT",
+      "type": "value",
+      "value": 3600.0
+    },
+    "GRID_SIZE": {
+      "name": "GRID_SIZE",
+      "type": "value",
+      "value": 100.0
+    },
+    "PEDESTRIAN_A_1": {
+      "name": "PEDESTRIAN_A_1",
+      "type": "value",
+      "value": 0.0
+    },
+    "PEDESTRIAN_A_2": {
+      "name": "PEDESTRIAN_A_2",
+      "type": "value",
+      "value": 2
+    },
+    "PEDESTRIAN_B_1": {
+      "name": "PEDESTRIAN_B_1",
+      "type": "value",
+      "value": 0.7
+    },
+    "PEDESTRIAN_B_2": {
+      "name": "PEDESTRIAN_B_2",
+      "type": "value",
+      "value": 0.7
+    },
+    "PEDESTRIAN_R": {
+      "name": "PEDESTRIAN_R",
+      "type": "value",
+      "value": 0.3
+    },
+    "PEDESTRIAN_LAMBDA": {
+      "name": "PEDESTRIAN_LAMBDA",
+      "type": "value",
+      "value": 0.3
+    },
+    "BORDER_A": {
+      "name": "BORDER_A",
+      "type": "value",
+      "value": 3
+    },
+    "BORDER_B": {
+      "name": "BORDER_B",
+      "type": "value",
+      "value": 0.7
+    },
+    "BORDER_R": {
+      "name": "BORDER_R",
+      "type": "value",
+      "value": 0.6
+    },
+    "VOLUMES_COUNT": {
+      "name": "VOLUMES_COUNT",
+      "type": "value",
+      "value": 10
+    },
+    "SOCIAL_FORCE_MODEL": {
+      "name": "SOCIAL_FORCE_MODEL",
+      "type": "value",
+      "value": 1
+    },
+    "WALLS": {
+      "name": "WALLS",
+      "type": "custom",
+      "value": [
+        {
+          "from_x": 0.0,
+          "from_y": 0.0,
+          "to_x": 100.0,
+          "to_y": 0.0
+        },
+        {
+          "from_x": 0.0,
+          "from_y": 100.0,
+          "to_x": 100.0,
+          "to_y": 100.0
+        },
+        {
+          "from_x": 0.0,
+          "from_y": 80.0,
+          "to_x": 0.0,
+          "to_y": 100.0
+        },
+        {
+          "from_x": 0.0,
+          "from_y": 80.0,
+          "to_x": 0.0,
+          "to_y": 80.0
+        },
+        {
+          "from_x": 10.0,
+          "from_y": 90.0,
+          "to_x": 10.0,
+          "to_y": 100.0
+        },
+        {
+          "from_x": 100.0,
+          "from_y": 100.0,
+          "to_x": 100.0,
+          "to_y": 90.0
+        },
+        {
+          "from_x": 100.0,
+          "from_y": 90.0,
+          "to_x": 100.0,
+          "to_y": 80.0
+        },
+        {
+          "from_x": 10.0,
+          "from_y": 90.0,
+          "to_x": 10.0,
+          "to_y": 80.0
+        },
+        {
+          "from_x": 10.0,
+          "from_y": 80.0,
+          "to_x": 100.0,
+          "to_y": 80.0
+        },
+        {
+          "from_x": 10.0,
+          "from_y": 90.0,
+          "to_x": 8.0,
+          "to_y": 90.0
+        },
+        {
+          "from_x": 0.0,
+          "from_y": 90.0,
+          "to_x": 2.0,
+          "to_y": 90.0
+        },
+        {
+          "from_x": 0.0,
+          "from_y": 70.0,
+          "to_x": 90.0,
+          "to_y": 70.0
+        },
+        {
+          "from_x": 90.0,
+          "from_y": 70.0,
+          "to_x": 90.0,
+          "to_y": 60.0
+        },
+        {
+          "from_x": 100.0,
+          "from_y": 70.0,
+          "to_x": 100.0,
+          "to_y": 60.0
+        },
+        {
+          "from_x": 90.0,
+          "from_y": 60.0,
+          "to_x": 90.0,
+          "to_y": 50.0
+        },
+        {
+          "from_x": 100.0,
+          "from_y": 60.0,
+          "to_x": 100.0,
+          "to_y": 50.0
+        },
+        {
+          "from_x": 90.0,
+          "from_y": 50.0,
+          "to_x": 90.0,
+          "to_y": 40.0
+        },
+        {
+          "from_x": 100.0,
+          "from_y": 50.0,
+          "to_x": 100.0,
+          "to_y": 40.0
+        },
+        {
+          "from_x": 100.0,
+          "from_y": 30.0,
+          "to_x": 10.0,
+          "to_y": 30.0
+        },
+        {
+          "from_x": 90.0,
+          "from_y": 40.0,
+          "to_x": 0.0,
+          "to_y": 40.0
+        },
+        {
+          "from_x": 10.0,
+          "from_y": 30.0,
+          "to_x": 10.0,
+          "to_y": 20.0
+        },
+        {
+          "from_x": 10.0,
+          "from_y": 20.0,
+          "to_x": 10.0,
+          "to_y": 10.0
+        },
+        {
+          "from_x": 0.0,
+          "from_y": 10.0,
+          "to_x": 10.0,
+          "to_y": 10.0
+        },
+        {
+          "from_x": 0.0,
+          "from_y": 20.0,
+          "to_x": 2.0,
+          "to_y": 20.0
+        },
+        {
+          "from_x": 8.0,
+          "from_y": 20.0,
+          "to_x": 10.0,
+          "to_y": 20.0
+        },
+        {
+          "from_x": 90.0,
+          "from_y": 50.0,
+          "to_x": 92.0,
+          "to_y": 50.0
+        },
+        {
+          "from_x": 98.0,
+          "from_y": 50.0,
+          "to_x": 100.0,
+          "to_y": 50.0
+        },
+        {
+          "from_x": 98.0,
+          "from_y": 60.0,
+          "to_x": 100.0,
+          "to_y": 60.0
+        },
+        {
+          "from_x": 92.0,
+          "from_y": 60.0,
+          "to_x": 90.0,
+          "to_y": 60.0
+        },
+        {
+          "from_x": 0.0,
+          "from_y": 70.0,
+          "to_x": 0.0,
+          "to_y": 40.0
+        },
+        {
+          "from_x": 100.0,
+          "from_y": 30.0,
+          "to_x": 100.0,
+          "to_y": 0.0
+        },
+        {
+          "from_x": 10.0,
+          "from_y": 10.0,
+          "to_x": 100.0,
+          "to_y": 10.0
+        }
+      ]
+    },
+    "SUBWAYS": {
+      "name": "SUBWAYS",
+      "type": "map",
+      "map": [
+       [1,0,0,0,0,0,0,0,0,0],
+       [0,0,0,0,0,0,0,0,0,0],
+       [0,0,0,0,0,0,0,0,0,0],
+       [0,0,0,0,0,0,0,0,0,0],
+       [0,0,0,0,0,0,0,0,0,1],
+       [0,0,0,0,0,0,0,0,0,0],
+       [0,0,0,0,0,0,0,0,0,0],
+       [0,0,0,0,0,0,0,0,0,0],
+       [1,0,0,0,0,0,0,0,0,0],
+       [0,0,0,0,0,0,0,0,0,0]
+      ]
+    }
+  }
+}

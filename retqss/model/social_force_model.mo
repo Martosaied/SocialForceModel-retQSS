@@ -13,7 +13,7 @@ import retQSS_social_force_model_types;
 
 constant Integer
 	N = 300,
-	GRID_DIVISIONS = 60,
+	GRID_DIVISIONS = 50,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -43,7 +43,7 @@ parameter Real
 	INF = 1e20,
 	EPS = 1e-5,
 	PI = 3.1415926,
-	PROGRESS_UPDATE_DT = 0.01,
+	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.01),
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;

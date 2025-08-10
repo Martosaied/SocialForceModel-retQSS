@@ -18,6 +18,7 @@ from experiments.lanes_by_R.lanes_by_R import lanes_by_R
 from experiments.lanes_by_A.lanes_by_A import lanes_by_A
 from experiments.lanes_heatmap.lanes_heatmap import lanes_heatmap
 from experiments.subway_attack_rate.subway_attack_rate import subway_attack_rate
+from experiments.progress_update_dt.progress_update_dt import progress_update_dt
 from src.plotter import Plotter
 
 
@@ -124,6 +125,8 @@ def main():
             breaking_obstacles()
         elif args.experiment == 'subway_attack_rate':
             subway_attack_rate()
+        elif args.experiment == 'progress_update_dt':
+            progress_update_dt()
         else:
             print(f"Experiment {args.experiment} not found")
     else:

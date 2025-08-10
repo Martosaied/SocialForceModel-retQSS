@@ -1,4 +1,4 @@
-model subte_combination
+model random_pathways
 
 import retQSS;
 import retQSS_utils;
@@ -8,7 +8,7 @@ import retQSS_social_force_model_utils;
 import retQSS_social_force_model_params;
 import retQSS_social_force_model_types;
 
-import retQSS_subway_stations;
+import retQSS_pathways;
 
 import retQSS_covid19;
 import retQSS_covid19_utils;
@@ -19,8 +19,8 @@ import retQSS_covid19_fsm;
 */
 
 constant Integer
-	N = 150,
-	GRID_DIVISIONS = 11;
+	N = 50,
+	GRID_DIVISIONS = 10;
 
 // Initial conditions parameters
 parameter Integer
@@ -40,7 +40,7 @@ parameter Real
 	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 1), // 0.5 seconds
 	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.5), // 0.5 seconds
 	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1), // 0.5 seconds
-	DESTINATION_UPDATE_DT = getRealModelParameter("DESTINATION_UPDATE_DT", 600), // 10 minutes
+	DESTINATION_UPDATE_DT = getRealModelParameter("DESTINATION_UPDATE_DT", 0.1), // 0.1 seconds
 	SPEED_MU = getRealModelParameter("SPEED_MU", 1.34), // 1.34 m/s or 80.4 m/min
 	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 0.26), // 0.26 m/s or 15.6 m/min
 	FROM_Y = getRealModelParameter("FROM_Y", 0.0),
@@ -207,18 +207,14 @@ initial algorithm
 
 	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
-        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomInitialSubwayPosition();
+		_ := setUpRandomPathways(i, 10);
+        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := getInitialPosition(i);
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
 		_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
-		_ := debug(INFO(), time, "Particle %d setup started", i,_,_,_);
-		_ := setUpPedestrianVolumePaths(i, 10);
-		_ := debug(INFO(), time, "Particle %d setup ended", i,_,_,_);
     end for;
 
 	// setup the walls in RETQSS
 	_ := setUpWalls();
-
-	_ := debug(INFO(), time, "Walls setup ended",_,_,_,_);
 
 	// setup the particles initial state
 	for i in 1:N loop
@@ -314,7 +310,6 @@ algorithm
 			if BORDER_IMPLEMENTATION == 3 then
 				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
 			end if;
-			// (dx[i], dy[i], dz[i]) := updateInStationPosition(i);
 		end when;
 
 		//EVENT: particle is exposed
@@ -368,10 +363,7 @@ algorithm
 		nextDestinationTick := time + DESTINATION_UPDATE_DT;
 		_ := debug(INFO(), time, "Updating particles destination",_,_,_,_);
 		for i in 1:N loop
-			hx := dx[i];
-			hy := dy[i];
-			hz := dz[i];
-			(dx[i], dy[i], dz[i]) := nextStation(i, hx, hy, hz);
+			(dx[i], dy[i], dz[i]) := getNextPosition(i);
 		end for;
 	end when;
 
@@ -393,7 +385,7 @@ algorithm
 	when time > nextMotivationTick then
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
 		if SOCIAL_FORCE_MODEL == 1 then
-			// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
+			_ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
 			for i in 1:N loop
 				hx := dx[i];
 				hy := dy[i];
@@ -452,4 +444,4 @@ annotation(
 		AbsTolerance={1e-8}
 	));
 
-end social_force_model;
+end random_pathways;

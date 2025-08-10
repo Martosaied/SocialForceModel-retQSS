@@ -531,57 +531,6 @@ Bool social_force_model_setUpWalls() {
 	return true;
 }
 
-void social_force_model_randomNextStation(
-	int particleID,
-	double currentDx,
-	double currentDy,
-	double currentDz,
-	double *dx,
-	double *dy,
-	double *dz)
-{
-	std::list<int> stations;
-	int volumes = retQSS_geometry_countVolumes();
-	for (int i = 1; i <= volumes; i++) {
-		if (retQSS_volume_getProperty(i, "isStation")) {
-			stations.push_back(i);
-		}
-	}
 
-	int currentVolumeID = retQSS_particle_currentVolumeID(particleID);
-	if (currentVolumeID == 0 || !retQSS_volume_getProperty(currentVolumeID, "isStation")) {
-		*dx = currentDx;
-		*dy = currentDy;
-		*dz = currentDz;
-		return;
-	}
 
-	std::vector<int> neighboringStations;
-	for (int station : stations) {
-		int idDifference = abs(station - currentVolumeID);
-		if (idDifference == 55 || idDifference == 5) {
-			neighboringStations.push_back(station);
-		}
-	}
-
-	// Get a random neighboring station
-	double minDistanceStation = std::numeric_limits<double>::max();
-	int nextStation = 0;
-	for (int station : neighboringStations) {
-		double currentX, currentY, currentZ;
-		retQSS_particle_currentPosition(particleID, &currentX, &currentY, &currentZ);
-		double distance = retQSS_volume_distanceToPoint(station, currentX, currentY, currentZ);
-		if (distance < minDistanceStation) {
-			minDistanceStation = distance;
-			nextStation = station;
-		}
-	}
-
-	// Get a random point in the station
-	double centroidX, centroidY, centroidZ;
-	retQSS_volume_centroid(nextStation, &centroidX, &centroidY, &centroidZ);
-	*dx = centroidX;
-	*dy = centroidY;
-	*dz = centroidZ;
-}
 }

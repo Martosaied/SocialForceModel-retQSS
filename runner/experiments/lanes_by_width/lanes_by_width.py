@@ -40,29 +40,29 @@ def run(width):
 
     pedestrians = int(PEDESTRIAN_DENSITY * width * GRID_SIZE)
 
-    config['parameters'][0]['value'] = pedestrians
-    config['parameters'][1]['value'] = Constants.PEDESTRIAN_MMOC
+    config['parameters']['N']['value'] = pedestrians
+    config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = Constants.PEDESTRIAN_MMOC
 
 
     # # Replace the map in the config
     generated_map = generate_map(VOLUMES, width)
-    config['parameters'].append({
+    config['parameters']['OBSTACLES'] = {
       "name": "OBSTACLES",
       "type": "map",
       "map": generated_map
-    })
+    }
 
     # Add from where to where pedestrians are generated
-    config['parameters'].append({
+    config['parameters']['FROM_Y'] = {
       "name": "FROM_Y",
       "type": "value",
       "value": (GRID_SIZE/ 2) - int(width / 2)
-    })
-    config['parameters'].append({
+    }
+    config['parameters']['TO_Y'] = {
       "name": "TO_Y",
       "type": "value",
       "value": (GRID_SIZE/ 2) + int(width / 2)
-    })
+    }
 
     # Save config copy in experiment directory
     config_copy_path = os.path.join(output_dir, 'config.json')

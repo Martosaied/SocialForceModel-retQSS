@@ -1,4 +1,4 @@
-model subte_combination
+model subway_hub
 
 import retQSS;
 import retQSS_utils;
@@ -8,7 +8,8 @@ import retQSS_social_force_model_utils;
 import retQSS_social_force_model_params;
 import retQSS_social_force_model_types;
 
-import retQSS_subway_stations;
+import retQSS_subway_hub;
+import retQSS_pathways;
 
 import retQSS_covid19;
 import retQSS_covid19_utils;
@@ -19,8 +20,8 @@ import retQSS_covid19_fsm;
 */
 
 constant Integer
-	N = 150,
-	GRID_DIVISIONS = 11;
+	N = 1,
+	GRID_DIVISIONS = 10;
 
 // Initial conditions parameters
 parameter Integer
@@ -41,6 +42,7 @@ parameter Real
 	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.5), // 0.5 seconds
 	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1), // 0.5 seconds
 	DESTINATION_UPDATE_DT = getRealModelParameter("DESTINATION_UPDATE_DT", 600), // 10 minutes
+	OBJECTIVE_SUBWAY_HUB_DT = getRealModelParameter("OBJECTIVE_SUBWAY_HUB_DT", 600), // 10 minutes in each subway
 	SPEED_MU = getRealModelParameter("SPEED_MU", 1.34), // 1.34 m/s or 80.4 m/min
 	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 0.26), // 0.26 m/s or 15.6 m/min
 	FROM_Y = getRealModelParameter("FROM_Y", 0.0),
@@ -155,6 +157,9 @@ discrete Real nextDestinationTick;
 // This variable is used to simulate particles brething (they all breath at the same periodic time)
 discrete Real nextBreathingTick;
 
+// Variable used to control and trigger subway hub update
+discrete Real nextSubwayHubTick;
+
 // Disease evolution time-events variables
 discrete Real expositionTime[N];
 discrete Real infectionStartTime[N];
@@ -189,7 +194,7 @@ initial algorithm
 
 	for i in 1:VOLUMES_COUNT loop
 		_ := volume_setProperty(i, "isObstacle", isInArrayParameter("OBSTACLES", i));
-		_ := volume_setProperty(i, "isStation", isInArrayParameter("STATIONS", i));
+		_ := volume_setProperty(i, "isSubway", isInArrayParameter("SUBWAYS", i));
 		volumeConcentration[i] := 0.0;
 		volumeEmissionRate[i] := 0.0;
 		volumeLambda[i] := VOLUME_CONCENTRATION_LAMBDA;
@@ -205,18 +210,24 @@ initial algorithm
 	_ := setUpParticles(N, CELL_EDGE_LENGTH, GRID_DIVISIONS, x);
     _ := debug(INFO(), time, "Particles setup ended. N = %d", N,_,_,_);
 
+	for i in 1:N loop
+		_ := particle_setProperty(i, "isObjective", 1);
+	end for;
+
+	_ := setUpParticleMovement(N);
+
 	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
-        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomInitialSubwayPosition();
+		_ := particle_setProperty(i, "isObjective", 1);
+        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := getInitialPosition(i);
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
 		_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
-		_ := debug(INFO(), time, "Particle %d setup started", i,_,_,_);
-		_ := setUpPedestrianVolumePaths(i, 10);
 		_ := debug(INFO(), time, "Particle %d setup ended", i,_,_,_);
     end for;
 
 	// setup the walls in RETQSS
 	_ := setUpWalls();
+
 
 	_ := debug(INFO(), time, "Walls setup ended",_,_,_,_);
 
@@ -314,7 +325,6 @@ algorithm
 			if BORDER_IMPLEMENTATION == 3 then
 				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
 			end if;
-			// (dx[i], dy[i], dz[i]) := updateInStationPosition(i);
 		end when;
 
 		//EVENT: particle is exposed
@@ -364,17 +374,6 @@ algorithm
 	end when;
 
 
-	when time > nextDestinationTick then
-		nextDestinationTick := time + DESTINATION_UPDATE_DT;
-		_ := debug(INFO(), time, "Updating particles destination",_,_,_,_);
-		for i in 1:N loop
-			hx := dx[i];
-			hy := dy[i];
-			hz := dz[i];
-			(dx[i], dy[i], dz[i]) := nextStation(i, hx, hy, hz);
-		end for;
-	end when;
-
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
 		_ := covid19_outputCSV(time, N, x, y, VOLUMES_COUNT, volumeConcentration, recoveredCount, infectedCount);
@@ -389,9 +388,20 @@ algorithm
 		terminate();
 	end when;
 
+	//EVENT: Next subway hub time: updates the particles destination
+	when time > nextSubwayHubTick then
+		nextSubwayHubTick := time + OBJECTIVE_SUBWAY_HUB_DT;
+		for i in 1:N loop
+			(dx[i], dy[i], dz[i]) := getNextPosition(i);
+		end for;
+	end when;
 	
 	when time > nextMotivationTick then
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
+		for i in 1:N loop
+			(dx[i], dy[i], dz[i]) := moveOutOfSubway(i, dx[i], dy[i], dz[i]);
+		end for;
+
 		if SOCIAL_FORCE_MODEL == 1 then
 			// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
 			for i in 1:N loop
@@ -452,4 +462,4 @@ annotation(
 		AbsTolerance={1e-8}
 	));
 
-end social_force_model;
+end subway_hub;

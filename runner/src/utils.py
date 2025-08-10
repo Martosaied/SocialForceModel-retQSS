@@ -69,7 +69,7 @@ def process_walls(walls: List[List[Dict[str, int]]]) -> List[str]:
     return [f'{",".join(processed_walls)}']
 
 def parse_walls(walls: str) -> List[Dict[str, int]]:
-    if walls is '' or walls is None:
+    if walls is '' or walls is None or walls == []:
         return []
 
     walls = walls.split(',')
