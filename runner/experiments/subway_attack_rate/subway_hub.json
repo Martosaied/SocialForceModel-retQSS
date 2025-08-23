@@ -1,5 +1,5 @@
 {
-  "iterations": 1,
+  "iterations": 10,
   "parameters": {
     "N": {
       "name": "N",
@@ -30,6 +30,11 @@
       "name": "FORCE_TERMINATION_AT",
       "type": "value",
       "value": 1500.0
+    },
+    "OBJECTIVE_SUBWAY_HUB_DT": {
+      "name": "OBJECTIVE_SUBWAY_HUB_DT",
+      "type": "value",
+      "value": 600.0
     },
     "GRID_SIZE": {
       "name": "GRID_SIZE",

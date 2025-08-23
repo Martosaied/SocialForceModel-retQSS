@@ -57,7 +57,7 @@ def process_map(mapping: List[List[int]]) -> List[int]:
     for i in range(len(mapping)):
         for j in range(len(mapping[i])):
             if mapping[i][j] == 1:
-                obstacle_indices.append(i % len(mapping) + len(mapping[i]) * j + 1)
+                obstacle_indices.append(i % len(mapping) + len(mapping[i]) * j + 2)
     
     return obstacle_indices
 

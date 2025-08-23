@@ -13,6 +13,7 @@ from src.plotter import Plotter
 from src.math.Density import Density
 from src.math.Clustering import Clustering
 from src.utils import process_parameters, get_parameter_combinations
+from src.config_manager import get_config
 
 
 def run_model(model_name: str, directory: str, parameters: dict):
@@ -26,34 +27,46 @@ def run_model(model_name: str, directory: str, parameters: dict):
         raise FileNotFoundError(f"Model command not found or not executable: {cmd}")
 
     try:
+        config = get_config()
         # Run the command
         result = subprocess.run(
             cmd,
             shell=True,
             check=True,
             text=True,
-            capture_output=True
+            capture_output=not config.verbose
         )
 
-        # Get the time from the output
-        time = result.stderr.split('User time (seconds): ')[1].split('\n')[0].strip()
-        memory_usage = result.stderr.split('Maximum resident set size (kbytes): ')[1].split('\n')[0].strip()
+        metrics = {
+            'time': 0,
+            'memory_usage': 0,
+            'density_based_groups': 0,
+            'clustering_based_groups': 0,
+        }
+        if not config.verbose:
+            # Get the time from the output
+            metrics['time'] = result.stderr.split('User time (seconds): ')[1].split('\n')[0].strip()
+            metrics['memory_usage'] = result.stderr.split('Maximum resident set size (kbytes): ')[1].split('\n')[0].strip()
 
-        df = pd.read_csv(solution_path)
-        particles = parameters.get('N', 300)
-        groups = Density(map_size=50, grid_size=200).calculate_lanes_by_density(df, particles)
-        clustering_based_groups = Clustering(df, particles).calculate_groups()
+            # Use config properties to determine what to calculate
+            if not config.skip_metrics:
+                df = pd.read_csv(solution_path)
+                particles = parameters.get('N', 300)
+                
+                # Calculate density-based groups if not skipped
+                # metrics['density_based_groups'] = Density(df, particles).calculate_groups()
+                
+                # Calculate clustering-based groups if not skipped
+                metrics['clustering_based_groups'] = Clustering(df, particles).calculate_groups()
+            else:
+                # In fast mode, skip all calculations
+                print("Fast mode enabled: skipping density and clustering calculations")
 
         # Check if solution.csv was created
         if not os.path.exists(solution_path):
             raise FileNotFoundError(f"Solution file not found at: {solution_path}")
 
-        return solution_path, {
-            'time': time,
-            'memory_usage': memory_usage,
-            'density_based_groups': groups,
-            'clustering_based_groups': clustering_based_groups,
-        }
+        return solution_path, metrics
 
     except subprocess.CalledProcessError as e:
         print(f"Error running {model_name} model: {e}")

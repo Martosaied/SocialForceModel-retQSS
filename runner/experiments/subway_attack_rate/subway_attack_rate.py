@@ -3,428 +3,423 @@ import os
 import subprocess
 from src.runner import run_experiment, compile_c_code, compile_model
 from src.utils import load_config, create_output_dir, copy_results_to_latest
+from src.config_manager import print_config_status, get_performance_mode
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import glob
 
+def check_experiment_flags():
+    """Check and display the current experiment flags."""
+    print_config_status()
+
+def get_experiment_flags():
+    """Get the current experiment flags as a dictionary."""
+    from src.config_manager import get_config
+    return get_config().to_dict()
 
 def subway_attack_rate():
     """
-    Run the subway_combination model experiment comparing attack rate with and without social force model.
+    Run the subway_hub model experiment comparing social force model with/without
+    across different simulation durations (FORCE_TERMINATION_AT: 1800, 1200, 900).
+    Keeps OBJECTIVE_SUBWAY_HUB_DT at 600 for consistent station changes.
     """
-    print("Running subway combination model with social force comparison...\n")
+    print("Running subway hub model with social force comparison across different durations...\n")
+    
+    # Check and display experiment flags
+    check_experiment_flags()
 
-    # Run experiments for both configurations
-    output_dirs = run_social_force_comparison()
+    # # Define the different termination times to test
+    # termination_times = [1800, 1200, 900]  # 30min, 20min, 15min
+    
+    # output_dirs = {}
+    
+    # # Run experiments for each duration and social force configuration
+    # for termination_time in termination_times:
+    #     print(f"\n=== Testing FORCE_TERMINATION_AT = {termination_time}s ({termination_time/60:.1f} min) ===")
+        
+    #     # Run without social force model
+    #     output_dirs[f'{termination_time}s_no_sf'] = run_single_experiment(termination_time, social_force=0)
+        
+    #     # Run with social force model
+    #     output_dirs[f'{termination_time}s_with_sf'] = run_single_experiment(termination_time, social_force=1)
+    
+    # # Analyze and plot comparative results
+    # print("\nAnalyzing comparative results...")
+    # plot_comparative_results(output_dirs, termination_times, "duration")
+    
+    # Run population size experiment
+    print("\n" + "="*80)
+    print("RUNNING POPULATION SIZE EXPERIMENT")
+    print("="*80)
+    run_population_size_experiment()
+    
+    print(f"\nComparative experiment completed. Results saved in experiments/subway_attack_rate/results")
 
-    # Analyze and plot comparative attack rate evolution
-    print("Analyzing comparative attack rate evolution...")
-    plot_comparative_attack_rate_evolution(output_dirs)
 
-    print(f"\nComparative experiment completed. Results saved in {output_dirs}")
-
-
-def run_social_force_comparison():
+def run_population_size_experiment():
     """
-    Run the subway_combination model experiment comparing social force model enabled vs disabled.
+    Run experiment comparing social force model with/without across different population sizes.
+    Tests N values: 300, 500, 700 with PEDESTRIANS_COUNT = N - 20.
+    Keeps FORCE_TERMINATION_AT fixed at 1800s.
     """
-    print("Running comparative social force model experiments...")
+    print("Running population size experiment...\n")
+    
+    # Define the different population sizes to test
+    population_sizes = [300, 500, 700]  # N values
+    termination_time = 1800  # Fixed at 30 minutes
     
     output_dirs = {}
     
+    # Run experiments for each population size and social force configuration
+    for n in population_sizes:
+        pedestrians_count = n - 20  # Always difference of 20
+        print(f"\n=== Testing N = {n}, PEDESTRIANS_COUNT = {pedestrians_count} ===")
+        
+        # Run without social force model
+        output_dirs[f'N{n}_no_sf'] = run_population_experiment(n, pedestrians_count, termination_time, social_force=0)
+        
+        # Run with social force model
+        output_dirs[f'N{n}_with_sf'] = run_population_experiment(n, pedestrians_count, termination_time, social_force=1)
+    
+    # Analyze and plot comparative results
+    print("\nAnalyzing population size comparative results...")
+    plot_comparative_results(output_dirs, population_sizes, "population")
+
+
+def run_population_experiment(n, pedestrians_count, termination_time, social_force):
+    """
+    Run the subway_hub model experiment with specific population parameters.
+    
+    Args:
+        n: Total population size (N)
+        pedestrians_count: Number of pedestrians (PEDESTRIANS_COUNT)
+        termination_time: FORCE_TERMINATION_AT value in seconds
+        social_force: 0 for disabled, 1 for enabled
+    
+    Returns:
+        Output directory path
+    """
+    sf_label = "with_sf" if social_force else "no_sf"
+    print(f"Running experiment: N={n}, PEDESTRIANS_COUNT={pedestrians_count}, social force {'ENABLED' if social_force else 'DISABLED'}...")
+    
     # Load the base configuration
-    base_config = load_config('config_subte_comb.json')
+    base_config = load_config('./experiments/subway_attack_rate/subway_hub.json')
     
-    # Configuration 1: Social Force Model DISABLED (0)
-    print("\n1. Running experiment with Social Force Model DISABLED...")
-    config_no_sf = base_config.copy()
-    config_no_sf['parameters']['SOCIAL_FORCE_MODEL']['value'] = 0
+    # Modify configuration
+    config = base_config.copy()
+    config['parameters']['FORCE_TERMINATION_AT']['value'] = termination_time
+    config['parameters']['SOCIAL_FORCE_MODEL']['value'] = social_force
+    config['parameters']['N']['value'] = n
     
-    output_dir_no_sf = create_output_dir(
+    # Ensure OBJECTIVE_SUBWAY_HUB_DT is set to 600 (10 minutes)
+    if 'OBJECTIVE_SUBWAY_HUB_DT' not in config['parameters']:
+        config['parameters']['OBJECTIVE_SUBWAY_HUB_DT'] = {
+            "name": "OBJECTIVE_SUBWAY_HUB_DT",
+            "type": "value",
+            "value": 600.0
+        }
+    else:
+        config['parameters']['OBJECTIVE_SUBWAY_HUB_DT']['value'] = 600.0
+    
+    # Create output directory
+    output_dir = create_output_dir(
         'experiments/subway_attack_rate/results',
-        'subway_no_social_force'
+        f'subway_N{n}_ped{pedestrians_count}_{sf_label}'
     )
-    print(f"Created output directory: {output_dir_no_sf}")
     
     # Save config copy
-    config_copy_path = os.path.join(output_dir_no_sf, 'config.json')
+    config_copy_path = os.path.join(output_dir, 'config.json')
     with open(config_copy_path, 'w') as f:
-        json.dump(config_no_sf, f, indent=2)
+        json.dump(config, f, indent=2)
+    
+    # Modify the model file using sed commands
+    print(f"Modifying model file: N={n}, PEDESTRIANS_COUNT={pedestrians_count}")
+    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(n) + '/', '../retqss/model/subway_hub.mo'])
+    subprocess.run(['sed', '-i', r's/\bPEDESTRIANS_COUNT\s*=\s*[0-9]\+/PEDESTRIANS_COUNT = ' + str(pedestrians_count) + '/', '../retqss/model/subway_hub.mo'])
     
     # Compile and run
     compile_c_code()
-    compile_model('subway_combination')
+    compile_model('subway_hub')
     
-    # run_experiment(
-    #     config_no_sf,
-    #     output_dir_no_sf,
-    #     'subway_combination',
-    #     plot=False,
-    #     copy_results=True
-    # )
-    copy_results_to_latest(output_dir_no_sf)
-    output_dirs['no_social_force'] = output_dir_no_sf
-    
-    # Configuration 2: Social Force Model ENABLED (1)
-    print("\n2. Running experiment with Social Force Model ENABLED...")
-    config_with_sf = base_config.copy()
-    config_with_sf['parameters']['SOCIAL_FORCE_MODEL']['value'] = 1
-    
-    output_dir_with_sf = create_output_dir(
-        'experiments/subway_attack_rate/results',
-        'subway_with_social_force'
+    run_experiment(
+        config,
+        output_dir,
+        'subway_hub',
+        plot=False,
+        copy_results=True
     )
-    print(f"Created output directory: {output_dir_with_sf}")
+    copy_results_to_latest(output_dir)
+
+    # remove all other columns from the result_*.csv files.
+    for result_file in glob.glob(os.path.join(output_dir, 'result_*.csv')):
+        df = pd.read_csv(result_file)
+        df = df[['PS[1]']]
+        df.to_csv(result_file, index=False)
     
-    # Save config copy
-    config_copy_path = os.path.join(output_dir_with_sf, 'config.json')
-    with open(config_copy_path, 'w') as f:
-        json.dump(config_with_sf, f, indent=2)
-    
-    # run_experiment(
-    #     config_with_sf,
-    #     output_dir_with_sf,
-    #     'subway_combination',
-    #     plot=False,
-    #     copy_results=True
-    # )
-    copy_results_to_latest(output_dir_with_sf)
-    output_dirs['with_social_force'] = output_dir_with_sf
-    
-    return output_dirs
+    return output_dir
 
 
-def analyze_multiple_iterations(results_dir, config_path=None):
+def run_single_experiment(termination_time, social_force):
     """
-    Analyze multiple iterations and calculate averaged attack rate data.
+    Run the subway_hub model experiment with specific parameters.
     
     Args:
-        results_dir: Directory containing result_0.csv, result_1.csv, etc.
-        config_path: Path to config file for initial conditions
+        termination_time: FORCE_TERMINATION_AT value in seconds
+        social_force: 0 for disabled, 1 for enabled
     
     Returns:
-        Dictionary with averaged data across all iterations
+        Output directory path
     """
-    # Find all result files
-    result_files = []
-    for i in range(100):  # Check up to 100 iterations
-        result_file = os.path.join(results_dir, f'result_{i}.csv')
-        if os.path.exists(result_file):
-            result_files.append(result_file)
-        else:
-            break
+    sf_label = "with_sf" if social_force else "no_sf"
+    print(f"Running experiment: {termination_time}s, social force {'ENABLED' if social_force else 'DISABLED'}...")
     
+    # Load the base configuration
+    base_config = load_config('./experiments/subway_attack_rate/subway_hub.json')
+    
+    # Modify configuration
+    config = base_config.copy()
+    config['parameters']['FORCE_TERMINATION_AT']['value'] = termination_time
+    config['parameters']['SOCIAL_FORCE_MODEL']['value'] = social_force
+    
+    # Ensure OBJECTIVE_SUBWAY_HUB_DT is set to 600 (10 minutes)
+    if 'OBJECTIVE_SUBWAY_HUB_DT' not in config['parameters']:
+        config['parameters']['OBJECTIVE_SUBWAY_HUB_DT'] = {
+            "name": "OBJECTIVE_SUBWAY_HUB_DT",
+            "type": "value",
+            "value": 600.0
+        }
+    else:
+        config['parameters']['OBJECTIVE_SUBWAY_HUB_DT']['value'] = 600.0
+    
+    # Create output directory
+    output_dir = create_output_dir(
+        'experiments/subway_attack_rate/results',
+        f'subway_{termination_time}s_{sf_label}'
+    )
+    
+    # Save config copy
+    config_copy_path = os.path.join(output_dir, 'config.json')
+    with open(config_copy_path, 'w') as f:
+        json.dump(config, f, indent=2)
+    
+    # Compile and run
+    compile_c_code()
+    compile_model('subway_hub')
+    
+    run_experiment(
+        config,
+        output_dir,
+        'subway_hub',
+        plot=False,
+        copy_results=True
+    )
+    copy_results_to_latest(output_dir)
+
+    # remove all other columns from the result_*.csv files.
+    for result_file in glob.glob(os.path.join(output_dir, 'result_*.csv')):
+        df = pd.read_csv(result_file)
+        df = df[['PS[1]']]
+        df.to_csv(result_file, index=False)
+    
+    return output_dir
+
+
+def analyze_particle_1_exposure_rate(results_dir):
+    """
+    Analyze the exposure rate of particle 1 across all iterations.
+    
+    Args:
+        results_dir: Directory containing result_*.csv files
+    
+    Returns:
+        Dictionary with particle 1 exposure statistics
+    """
+    result_files = glob.glob(os.path.join(results_dir, 'result_*.csv'))
+
     if not result_files:
         raise FileNotFoundError(f"No result files found in {results_dir}")
     
-    print(f"Found {len(result_files)} iterations to analyze")
+    exposed_count = 0
+    total_iterations = len(result_files)
     
-    # Analyze each iteration
-    all_iterations_data = []
     for result_file in result_files:
-        data = analyze_attack_rate_data(result_file, config_path)
-        all_iterations_data.append(data)
-    
-    # Calculate averages across iterations
-    return calculate_averaged_data(all_iterations_data)
-
-
-def calculate_averaged_data(all_iterations_data):
-    """
-    Calculate averaged data across multiple iterations.
-    
-    Args:
-        all_iterations_data: List of data dictionaries from each iteration
-    
-    Returns:
-        Dictionary with averaged data
-    """
-    if not all_iterations_data:
-        return {}
-    
-    # Get the number of iterations
-    num_iterations = len(all_iterations_data)
-    
-    # Find the common time points across all iterations
-    # We'll use the shortest time series to ensure all iterations have data
-    min_length = min(len(data['times']) for data in all_iterations_data)
-    
-    # Initialize averaged data
-    averaged_data = {
-        'times': all_iterations_data[0]['times'][:min_length],
-        'attack_rates': [],
-        'attack_rates_pct': [],
-        'susceptible_counts': [],
-        'exposed_counts': [],
-        'infected_counts': [],
-        'recovered_counts': [],
-        'final_attack_rates': [],
-        'final_attack_rates_pct': [],
-        'initial_infected': all_iterations_data[0]['initial_infected'],
-        'initial_susceptible': all_iterations_data[0]['initial_susceptible'],
-        'total_population': all_iterations_data[0]['total_population'],
-        'num_iterations': num_iterations
-    }
-    
-    # Calculate averages for each time point
-    for t in range(min_length):
-        attack_rates_at_t = [data['attack_rates'][t] for data in all_iterations_data]
-        attack_rates_pct_at_t = [data['attack_rates_pct'][t] for data in all_iterations_data]
-        susceptible_at_t = [data['susceptible_counts'][t] for data in all_iterations_data]
-        exposed_at_t = [data['exposed_counts'][t] for data in all_iterations_data]
-        infected_at_t = [data['infected_counts'][t] for data in all_iterations_data]
-        recovered_at_t = [data['recovered_counts'][t] for data in all_iterations_data]
-        
-        averaged_data['attack_rates'].append(np.mean(attack_rates_at_t))
-        averaged_data['attack_rates_pct'].append(np.mean(attack_rates_pct_at_t))
-        averaged_data['susceptible_counts'].append(np.mean(susceptible_at_t))
-        averaged_data['exposed_counts'].append(np.mean(exposed_at_t))
-        averaged_data['infected_counts'].append(np.mean(infected_at_t))
-        averaged_data['recovered_counts'].append(np.mean(recovered_at_t))
-    
-    # Calculate averages for final attack rates
-    final_attack_rates = [data['final_attack_rate'] for data in all_iterations_data]
-    final_attack_rates_pct = [data['final_attack_rate_pct'] for data in all_iterations_data]
-    
-    averaged_data['final_attack_rate'] = np.mean(final_attack_rates)
-    averaged_data['final_attack_rate_pct'] = np.mean(final_attack_rates_pct)
-    averaged_data['final_attack_rate_std'] = np.std(final_attack_rates)
-    averaged_data['final_attack_rate_pct_std'] = np.std(final_attack_rates_pct)
-    
-    # Also calculate standard deviations for time series (for error bars)
-    averaged_data['attack_rates_std'] = []
-    averaged_data['attack_rates_pct_std'] = []
-    
-    for t in range(min_length):
-        attack_rates_at_t = [data['attack_rates'][t] for data in all_iterations_data]
-        attack_rates_pct_at_t = [data['attack_rates_pct'][t] for data in all_iterations_data]
-        
-        averaged_data['attack_rates_std'].append(np.std(attack_rates_at_t))
-        averaged_data['attack_rates_pct_std'].append(np.std(attack_rates_pct_at_t))
-    
-    return averaged_data
-
-
-def analyze_attack_rate_data(result_csv_path, config_path=None):
-    """
-    Helper function to analyze attack rate data from a result CSV file.
-    Returns times, attack_rates, and population counts.
-    
-    Attack Rate Formula: AR = (E/Nsus) / I₀
-    Where:
-    - E = final number of agents in the Exposed state at the end of the simulation
-    - Nsus = initial number of Susceptible agents (calculated as N - I₀)
-    - I₀ = initial number of Infected agents
-    - N = total number of agents
-    """
-    df = pd.read_csv(result_csv_path)
-    
-    # Get initial conditions from config file if provided
-    initial_infected = 9  # default value from model
-    total_population = 150  # default value from model
-    
-    if config_path and os.path.exists(config_path):
         try:
-            with open(config_path, 'r') as f:
-                config = json.load(f)
-            initial_infected = config.get('parameters', {}).get('INITIAL_INFECTED', {}).get('value', 9)
-            total_population = config.get('parameters', {}).get('N', {}).get('value', 150)
-        except:
-            pass  # use defaults if config can't be read
+            df = pd.read_csv(result_file)
+            
+            if 'PS[1]' in df.columns and len(df) > 0:
+                final_state = df['PS[1]'].iloc[-1]
+                if pd.notna(final_state) and final_state == 1:  # EXPOSED state
+                    exposed_count += 1
+        except Exception as e:
+            print(f"Warning: Could not process {result_file}: {e}")
+            continue
     
-    # Calculate initial susceptible population
-    initial_susceptible = total_population - initial_infected
-    
-    times = []
-    attack_rates = []
-    attack_rates_pct = []
-    susceptible_counts = []
-    exposed_counts = []
-    infected_counts = []
-    recovered_counts = []
-
-    for index, row in df.iterrows():
-        time = row['time']
-
-        # Count particles in each state
-        susceptible = 0
-        exposed = 0
-        infected = 0
-        recovered = 0
-
-        # Count particles by state (PS[i] columns)
-        for col in df.columns:
-            if col.startswith('PS[') and col.endswith(']'):
-                state = row[col]
-                if pd.notna(state):
-                    if state == 0:  # SUSCEPTIBLE
-                        susceptible += 1
-                    elif state == 1:  # EXPOSED
-                        exposed += 1
-                    elif state in [2, 3, 4]:  # PRE_SYMPTOMATIC, SYMPTOMATIC, ASYMPTOMATIC
-                        infected += 1
-                    elif state == 5:  # RECOVERED
-                        recovered += 1
-
-        times.append(time)
-        susceptible_counts.append(susceptible)
-        exposed_counts.append(exposed)
-        infected_counts.append(infected)
-        recovered_counts.append(recovered)
-
-    # Calculate attack rate using AR = (E_final/Nsus) / I₀
-    # We use the final exposed count from the last time step
-    final_exposed = exposed_counts[-1] if exposed_counts else 0
-    
-    if initial_susceptible > 0 and initial_infected > 0:
-        attack_rate = (final_exposed / initial_susceptible) / initial_infected
-    else:
-        attack_rate = 0
-    
-    # For time series, we calculate incremental attack rates based on exposed at each time
-    for i, exposed in enumerate(exposed_counts):
-        if initial_susceptible > 0 and initial_infected > 0:
-            time_attack_rate = (exposed / initial_susceptible) / initial_infected
-        else:
-            time_attack_rate = 0
-        
-        attack_rates.append(time_attack_rate)
-        attack_rates_pct.append(time_attack_rate)
+    exposure_rate = exposed_count / total_iterations if total_iterations > 0 else 0
+    exposure_rate_pct = exposure_rate * 100
     
     return {
-        'times': times,
-        'attack_rates': attack_rates,
-        'attack_rates_pct': attack_rates_pct,
-        'susceptible_counts': susceptible_counts,
-        'exposed_counts': exposed_counts,
-        'infected_counts': infected_counts,
-        'recovered_counts': recovered_counts,
-        'final_attack_rate': attack_rate,
-        'final_attack_rate_pct': attack_rate,
-        'initial_infected': initial_infected,
-        'initial_susceptible': initial_susceptible,
-        'total_population': total_population
+        'total_iterations': total_iterations,
+        'exposed_count': exposed_count,
+        'exposure_rate': exposure_rate,
+        'exposure_rate_pct': exposure_rate_pct
     }
 
 
-def plot_comparative_attack_rate_evolution(output_dirs):
+def plot_comparative_results(output_dirs, test_values, experiment_type):
     """
-    Plot comparative analysis of attack rate evolution with and without social force model.
+    Create simple comparative plots showing the differences.
+    
+    Args:
+        output_dirs: Dictionary containing paths to experiment results
+        test_values: List of test values (durations or population sizes)
+        experiment_type: "duration" or "population"
     """
-    print("Creating comparative attack rate analysis...")
+    print(f"Creating {experiment_type} comparative plots...")
     
-    # Analyze data from both experiments using multiple iterations
-    # The output_dirs contain the run directory path, we need to get the latest directory
-    no_sf_results_dir = os.path.join(os.path.dirname(output_dirs['no_social_force']), 'latest')
-    with_sf_results_dir = os.path.join(os.path.dirname(output_dirs['with_social_force']), 'latest')
+    # Collect data for all experiments
+    data = {}
     
-    # Config paths for reading initial conditions
-    no_sf_config_path = os.path.join(no_sf_results_dir, 'config.json')
-    with_sf_config_path = os.path.join(with_sf_results_dir, 'config.json')
+    if experiment_type == "duration":
+        for test_value in test_values:
+            try:
+                # Get results for both social force configurations
+                no_sf_results_dir = os.path.join(os.path.dirname(output_dirs[f'{test_value}s_no_sf']), 'latest')
+                with_sf_results_dir = os.path.join(os.path.dirname(output_dirs[f'{test_value}s_with_sf']), 'latest')
+                
+                data[f'{test_value}s'] = {
+                    'no_sf': analyze_particle_1_exposure_rate(no_sf_results_dir),
+                    'with_sf': analyze_particle_1_exposure_rate(with_sf_results_dir)
+                }
+            except Exception as e:
+                print(f"Warning: Could not analyze data for {test_value}s: {e}")
+                continue
+    else:  # population
+        for test_value in test_values:
+            try:
+                # Get results for both social force configurations
+                no_sf_results_dir = os.path.join(os.path.dirname(output_dirs[f'N{test_value}_no_sf']), 'latest')
+                with_sf_results_dir = os.path.join(os.path.dirname(output_dirs[f'N{test_value}_with_sf']), 'latest')
+                
+                data[f'N{test_value}'] = {
+                    'no_sf': analyze_particle_1_exposure_rate(no_sf_results_dir),
+                    'with_sf': analyze_particle_1_exposure_rate(with_sf_results_dir)
+                }
+            except Exception as e:
+                print(f"Warning: Could not analyze data for N{test_value}: {e}")
+                continue
     
-    data_no_sf = analyze_multiple_iterations(no_sf_results_dir, no_sf_config_path)
-    data_with_sf = analyze_multiple_iterations(with_sf_results_dir, with_sf_config_path)
+    if not data:
+        print("Error: No data available for plotting")
+        return
     
-    # Create comprehensive comparative plot
-    fig = plt.figure(figsize=(20, 16))
+    # Create simple comparison plot
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
     
-    # Plot 1: Direct comparison of attack rates with error bars
-    ax1 = plt.subplot(3, 2, 1)
-    ax1.plot(data_no_sf['times'], data_no_sf['attack_rates_pct'], 
-             'b-', linewidth=3, label=f'Without SF ({data_no_sf["num_iterations"]} iter)', alpha=0.8)
-    ax1.plot(data_with_sf['times'], data_with_sf['attack_rates_pct'], 
-             'r-', linewidth=3, label=f'With SF ({data_with_sf["num_iterations"]} iter)', alpha=0.8)
+    # Prepare data for plotting
+    if experiment_type == "duration":
+        labels = [f'{t}s\n({t/60:.1f}min)' for t in test_values if f'{t}s' in data]
+        no_sf_rates = [data[f'{t}s']['no_sf']['exposure_rate_pct'] for t in test_values if f'{t}s' in data]
+        with_sf_rates = [data[f'{t}s']['with_sf']['exposure_rate_pct'] for t in test_values if f'{t}s' in data]
+        title_suffix = "by Duration and Social Force Model"
+        xlabel = "Simulation Duration"
+    else:  # population
+        labels = [f'N={t}\n(ped={t-20})' for t in test_values if f'N{t}' in data]
+        no_sf_rates = [data[f'N{t}']['no_sf']['exposure_rate_pct'] for t in test_values if f'N{t}' in data]
+        with_sf_rates = [data[f'N{t}']['with_sf']['exposure_rate_pct'] for t in test_values if f'N{t}' in data]
+        title_suffix = "by Population Size and Social Force Model"
+        xlabel = "Population Size (N)"
     
-    # Add error bars
-    ax1.fill_between(data_no_sf['times'], 
-                     np.array(data_no_sf['attack_rates_pct']) - np.array(data_no_sf['attack_rates_pct_std']),
-                     np.array(data_no_sf['attack_rates_pct']) + np.array(data_no_sf['attack_rates_pct_std']),
-                     alpha=0.2, color='blue')
-    ax1.fill_between(data_with_sf['times'], 
-                     np.array(data_with_sf['attack_rates_pct']) - np.array(data_with_sf['attack_rates_pct_std']),
-                     np.array(data_with_sf['attack_rates_pct']) + np.array(data_with_sf['attack_rates_pct_std']),
-                     alpha=0.2, color='red')
+    if not labels:
+        print("Error: No valid data for plotting")
+        return
     
-    ax1.set_xlabel('Time (s)', fontsize=12)
-    ax1.set_ylabel('Attack Rate', fontsize=12)
-    ax1.set_title('Attack Rate Comparison: Social Force Model Impact\n(AR = (E/Nsus) / I₀)', fontsize=14, fontweight='bold')
-    ax1.grid(True, alpha=0.3)
-    ax1.legend(fontsize=11)
+    # Plot 1: Bar chart comparing exposure rates
+    x = np.arange(len(labels))
+    width = 0.35
     
-    # Add max value annotations
-    max_no_sf = max(data_no_sf['attack_rates_pct'])
-    max_with_sf = max(data_with_sf['attack_rates_pct'])
-    max_idx_no_sf = data_no_sf['attack_rates_pct'].index(max_no_sf)
-    max_idx_with_sf = data_with_sf['attack_rates_pct'].index(max_with_sf)
+    bars1 = ax1.bar(x - width/2, no_sf_rates, width, label='Without Social Force', 
+                    color='lightblue', alpha=0.8, edgecolor='black', linewidth=1)
+    bars2 = ax1.bar(x + width/2, with_sf_rates, width, label='With Social Force', 
+                    color='lightcoral', alpha=0.8, edgecolor='black', linewidth=1)
     
-    ax1.annotate(f'Max Without SF: {max_no_sf:.2f}%', 
-                xy=(data_no_sf['times'][max_idx_no_sf], max_no_sf),
-                xytext=(10, 10), textcoords='offset points',
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7),
-                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+    ax1.set_xlabel(xlabel, fontsize=12)
+    ax1.set_ylabel('Particle 1 Exposure Rate (%)', fontsize=12)
+    ax1.set_title(f'Exposure Rate Comparison {title_suffix}', fontsize=14, fontweight='bold')
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(labels)
+    ax1.legend()
+    ax1.grid(True, alpha=0.3, axis='y')
     
-    ax1.annotate(f'Max With SF: {max_with_sf:.2f}%', 
-                xy=(data_with_sf['times'][max_idx_with_sf], max_with_sf),
-                xytext=(10, -30), textcoords='offset points',
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightcoral', alpha=0.7),
-                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+    # Add value labels on bars
+    for bars in [bars1, bars2]:
+        for bar in bars:
+            height = bar.get_height()
+            if height > 0:  # Only add labels for non-zero values
+                ax1.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                        f'{height:.1f}%', ha='center', va='bottom', fontweight='bold', fontsize=10)
     
-    # Plot 2: Active cases comparison (Exposed + Infected)
-    ax2 = plt.subplot(3, 2, 2)
-    active_no_sf = [e + i for e, i in zip(data_no_sf['exposed_counts'], data_no_sf['infected_counts'])]
-    active_with_sf = [e + i for e, i in zip(data_with_sf['exposed_counts'], data_with_sf['infected_counts'])]
+    # Plot 2: Difference between with/without social force
+    differences = [with_sf - no_sf for with_sf, no_sf in zip(with_sf_rates, no_sf_rates)]
+    colors = ['red' if d > 0 else 'green' for d in differences]
     
-    ax2.plot(data_no_sf['times'], active_no_sf, 'b-', linewidth=3, label='Without Social Force Model', alpha=0.8)
-    ax2.plot(data_with_sf['times'], active_with_sf, 'r-', linewidth=3, label='With Social Force Model', alpha=0.8)
-    ax2.fill_between(data_no_sf['times'], active_no_sf, alpha=0.2, color='blue')
-    ax2.fill_between(data_with_sf['times'], active_with_sf, alpha=0.2, color='red')
-    ax2.set_xlabel('Time (s)', fontsize=12)
-    ax2.set_ylabel('Active Cases (Exposed + Infected)', fontsize=12)
-    ax2.set_title('Active Cases Comparison', fontsize=14, fontweight='bold')
-    ax2.grid(True, alpha=0.3)
-    ax2.legend(fontsize=11)
+    bars_diff = ax2.bar(labels, differences, color=colors, alpha=0.8, 
+                        edgecolor='black', linewidth=1)
+    ax2.set_xlabel(xlabel, fontsize=12)
+    ax2.set_ylabel('Difference in Exposure Rate (%)', fontsize=12)
+    ax2.set_title('Social Force Model Impact\n(With SF - Without SF)', fontsize=14, fontweight='bold')
+    ax2.grid(True, alpha=0.3, axis='y')
+    ax2.axhline(y=0, color='black', linestyle='-', alpha=0.5)
     
-    # Plot 3: Population distribution without social force
-    ax3 = plt.subplot(3, 2, 3)
-    ax3.stackplot(data_no_sf['times'], 
-                  data_no_sf['susceptible_counts'], 
-                  data_no_sf['exposed_counts'], 
-                  data_no_sf['infected_counts'], 
-                  data_no_sf['recovered_counts'],
-                  labels=['Susceptible', 'Exposed', 'Infected', 'Recovered'],
-                  colors=['lightblue', 'yellow', 'red', 'lightgreen'],
-                  alpha=0.8)
-    ax3.set_xlabel('Time (s)', fontsize=12)
-    ax3.set_ylabel('Number of Individuals', fontsize=12)
-    ax3.set_title('Population Distribution - WITHOUT Social Force Model', fontsize=14, fontweight='bold')
-    ax3.grid(True, alpha=0.3)
-    ax3.legend(loc='upper right', fontsize=10)
-    
-    # Plot 4: Population distribution with social force
-    ax4 = plt.subplot(3, 2, 4)
-    ax4.stackplot(data_with_sf['times'], 
-                  data_with_sf['susceptible_counts'], 
-                  data_with_sf['exposed_counts'], 
-                  data_with_sf['infected_counts'], 
-                  data_with_sf['recovered_counts'],
-                  labels=['Susceptible', 'Exposed', 'Infected', 'Recovered'],
-                  colors=['lightblue', 'yellow', 'red', 'lightgreen'],
-                  alpha=0.8)
-    ax4.set_xlabel('Time (s)', fontsize=12)
-    ax4.set_ylabel('Number of Individuals', fontsize=12)
-    ax4.set_title('Population Distribution - WITH Social Force Model', fontsize=14, fontweight='bold')
-    ax4.grid(True, alpha=0.3)
-    ax4.legend(loc='upper right', fontsize=10)
+    # Add value labels on bars
+    for bar, diff in zip(bars_diff, differences):
+        height = bar.get_height()
+        if abs(height) > 0.1:  # Only add labels for significant differences
+            ax2.text(bar.get_x() + bar.get_width()/2., height + (0.1 if diff > 0 else -0.3),
+                    f'{diff:+.1f}%', ha='center', va='bottom' if diff > 0 else 'top', 
+                    fontweight='bold', fontsize=10)
     
     plt.tight_layout()
     
-    # Save the comparative plot
+    # Save the plot
     base_results_dir = 'experiments/subway_attack_rate/results'
-    comparative_plot_path = os.path.join(base_results_dir, 'social_force_comparison.png')
-    plt.savefig(comparative_plot_path, dpi=300, bbox_inches='tight')
-    print(f"Comparative analysis plot saved to: {comparative_plot_path}")
+    os.makedirs(base_results_dir, exist_ok=True)
+    comparison_plot_path = os.path.join(base_results_dir, f'social_force_{experiment_type}_comparison.png')
+    plt.savefig(comparison_plot_path, dpi=300, bbox_inches='tight')
+    print(f"Comparative plot saved to: {comparison_plot_path}")
     
     plt.close()
     
+    # Print summary results
+    print(f"\n" + "="*80)
+    print(f"SUMMARY RESULTS - {experiment_type.upper()} EXPERIMENT")
+    print(f"="*80)
+    
+    if experiment_type == "duration":
+        for test_value in test_values:
+            if f'{test_value}s' in data:
+                no_sf_data = data[f'{test_value}s']['no_sf']
+                with_sf_data = data[f'{test_value}s']['with_sf']
+                diff = with_sf_data['exposure_rate_pct'] - no_sf_data['exposure_rate_pct']
+                
+                print(f"{test_value}s ({test_value/60:.1f} min):")
+                print(f"  Without Social Force: {no_sf_data['exposure_rate_pct']:.1f}% ({no_sf_data['exposed_count']}/{no_sf_data['total_iterations']})")
+                print(f"  With Social Force:    {with_sf_data['exposure_rate_pct']:.1f}% ({with_sf_data['exposed_count']}/{with_sf_data['total_iterations']})")
+                print(f"  Difference:          {diff:+.1f} percentage points")
+                print()
+    else:  # population
+        for test_value in test_values:
+            if f'N{test_value}' in data:
+                no_sf_data = data[f'N{test_value}']['no_sf']
+                with_sf_data = data[f'N{test_value}']['with_sf']
+                diff = with_sf_data['exposure_rate_pct'] - no_sf_data['exposure_rate_pct']
+                
+                print(f"N={test_value} (pedestrians={test_value-20}):")
+                print(f"  Without Social Force: {no_sf_data['exposure_rate_pct']:.1f}% ({no_sf_data['exposed_count']}/{no_sf_data['total_iterations']})")
+                print(f"  With Social Force:    {with_sf_data['exposure_rate_pct']:.1f}% ({with_sf_data['exposed_count']}/{with_sf_data['total_iterations']})")
+                print(f"  Difference:          {diff:+.1f} percentage points")
+                print()
+
+
 if __name__ == '__main__':
     subway_attack_rate()

@@ -52,7 +52,7 @@ protected
 	Integer stopID;
 algorithm
 	stopID := getNextStop(particleID);
-	(x, y, z) := volume_randomPoint(stopID);
+	(x, y, z) := volume_centroid(stopID);
 end getNextPosition;
 
 function getInitialPosition

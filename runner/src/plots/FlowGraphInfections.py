@@ -54,6 +54,7 @@ class FlowGraphInfections:
         VOLUMES_COUNT = self.parameters.get('VOLUMES_COUNT', 20)
         CELL_SIZE = GRID_SIZE / VOLUMES_COUNT
         walls = parse_walls(walls)
+        N = self.parameters.get('N', 300)
 
         frames_dir = os.path.join(self.output_dir, 'frames')
         df = pd.read_csv(self.solution_file)
@@ -61,94 +62,146 @@ class FlowGraphInfections:
         # Create output directory for frames if it doesn't exist
         os.makedirs(frames_dir, exist_ok=True)
 
-        # Create frames
-        prev_row = None
-        for index, row in df.iterrows():
-            if index % 3 != 0:
-                continue
+        # Pre-calculate cell positions and IDs for efficiency
+        cell_positions = []
+        cell_ids = []
+        for i in range(VOLUMES_COUNT):
+            for j in range(VOLUMES_COUNT):
+                cell_id = i % VOLUMES_COUNT + VOLUMES_COUNT * j + 1
+                cell_positions.append((j * CELL_SIZE, i * CELL_SIZE))
+                cell_ids.append(cell_id)
+        
+        # Pre-calculate grid lines
+        grid_lines_x = [CELL_SIZE * i for i in range(VOLUMES_COUNT + 1)]
+        grid_lines_y = [CELL_SIZE * i for i in range(VOLUMES_COUNT + 1)]
 
+        # Pre-calculate particle column names for vectorized access
+        px_cols = [f'PX[{i}]' for i in range(1, N + 1)]
+        py_cols = [f'PY[{i}]' for i in range(1, N + 1)]
+        ps_cols = [f'PS[{i}]' for i in range(1, N + 1)]
+        vc_cols = [f'VC[{i}]' for i in range(1, VOLUMES_COUNT * VOLUMES_COUNT + 1)]
+        
+        # Pre-calculate state colors for faster lookup
+        state_colors_array = [state_color[state_id[i]] for i in range(7)]
+
+        # Filter rows to process (every 3rd row)
+        rows_to_process = df.iloc[::3].copy()
+        
+        # Pre-calculate all particle data for vectorized operations
+        particle_data = {}
+        for idx, row_idx in enumerate(rows_to_process.index):
+            row = rows_to_process.loc[row_idx]
+            
+            # Get all particle positions and states at once
+            positions_x = [row.get(col, np.nan) for col in px_cols]
+            positions_y = [row.get(col, np.nan) for col in py_cols]
+            states = [row.get(col, 0) for col in ps_cols]
+            
+            # Filter out particles with NaN positions
+            valid_mask = ~(np.isnan(positions_x) | np.isnan(positions_y))
+            
+            particle_data[idx] = {
+                'positions_x': np.array(positions_x)[valid_mask],
+                'positions_y': np.array(positions_y)[valid_mask],
+                'states': np.array(states)[valid_mask],
+                'colors': [state_colors_array[int(s)] for s in np.array(states)[valid_mask]],
+                'vc_values': [row.get(col, 0) for col in vc_cols],
+                'time': row['time'],
+                'infected': row['infectionsCount'],
+                'recovered': row['recoveredCount'],
+                'velocities': None  # Initialize velocities as None for all frames
+            }
+
+        # Pre-calculate velocities for all frames
+        for idx in range(1, len(particle_data)):
+            prev_data = particle_data[idx - 1]
+            curr_data = particle_data[idx]
+            
+            dt = curr_data['time'] - prev_data['time']
+            if dt > 0:
+                # Calculate velocities for particles that exist in both frames
+                min_particles = min(len(prev_data['positions_x']), len(curr_data['positions_x']))
+                if min_particles > 0:
+                    vx = (curr_data['positions_x'][:min_particles] - prev_data['positions_x'][:min_particles]) / dt
+                    vy = (curr_data['positions_y'][:min_particles] - prev_data['positions_y'][:min_particles]) / dt
+                    
+                    # Calculate normalized velocities efficiently
+                    lengths = np.sqrt(vx**2 + vy**2)
+                    valid_velocities = lengths > 0
+                    
+                    normalized_vx = np.zeros_like(vx)
+                    normalized_vy = np.zeros_like(vy)
+                    if valid_velocities.any():
+                        # Use boolean indexing correctly
+                        valid_indices = np.where(valid_velocities)[0]
+                        normalized_vx[valid_indices] = vx[valid_indices] / lengths[valid_indices]
+                        normalized_vy[valid_indices] = vy[valid_indices] / lengths[valid_indices]
+                    
+                    particle_data[idx]['velocities'] = {
+                        'vx': vx,
+                        'vy': vy,
+                        'normalized_vx': normalized_vx,
+                        'normalized_vy': normalized_vy,
+                        'valid': valid_velocities
+                    }
+                else:
+                    particle_data[idx]['velocities'] = None
+            else:
+                particle_data[idx]['velocities'] = None
+
+        # Create frames with optimized plotting
+        for idx, (frame_idx, data) in enumerate(particle_data.items()):
             # Create a new figure for each frame
-            plt.figure(figsize=(20, 20))
+            fig, ax = plt.subplots(figsize=(20, 20))
 
             # Set up the plot area
-            plt.xlim(0, GRID_SIZE)
-            plt.ylim(0, GRID_SIZE)
+            ax.set_xlim(0, GRID_SIZE)
+            ax.set_ylim(0, GRID_SIZE)
 
-            # Add grid lines and color cells based on VC[ID] values
-            for i in range(VOLUMES_COUNT + 1):  # 21 lines to create 20 divisions
-                plt.axhline(y=CELL_SIZE * i, color='gray', linestyle='-', alpha=0.3)
-                plt.axvline(x=CELL_SIZE * i, color='gray', linestyle='-', alpha=0.3)
+            # Add grid lines efficiently
+            for x in grid_lines_x:
+                ax.axvline(x=x, color='gray', linestyle='-', alpha=0.3)
+            for y in grid_lines_y:
+                ax.axhline(y=y, color='gray', linestyle='-', alpha=0.3)
             
-            # Color each cell based on VC[ID] values
-            for i in range(VOLUMES_COUNT):
-                for j in range(VOLUMES_COUNT):
-                    cell_id = i % VOLUMES_COUNT + VOLUMES_COUNT * j + 1
-                    vc_value = row.get(f'VC[{cell_id}]', 0)
-                    
-                    # Color the cell based on VC value (red intensity)
-                    if vc_value > 0:
-                        # Create a rectangle for the cell
-                        rect = plt.Rectangle(
-                            (j * CELL_SIZE, i * CELL_SIZE), 
-                            CELL_SIZE, 
-                            CELL_SIZE, 
-                            facecolor='red', 
-                            alpha=min(1, vc_value*5),  # Normalize and cap alpha
-                            edgecolor='none'
-                        )
-                        plt.gca().add_patch(rect)
+            # Color each cell based on VC[ID] values efficiently
+            for i, (pos, cell_id) in enumerate(zip(cell_positions, cell_ids)):
+                vc_value = data['vc_values'][cell_id - 1]  # cell_id is 1-indexed
+                
+                if vc_value > 0:
+                    rect = plt.Rectangle(
+                        pos, 
+                        CELL_SIZE, 
+                        CELL_SIZE, 
+                        facecolor='red', 
+                        alpha=min(1, vc_value),
+                        edgecolor='none'
+                    )
+                    ax.add_patch(rect)
 
             # Plot wall segments
             for wall in walls:
-                plt.plot(
+                ax.plot(
                     [wall['from_x'], wall['to_x']], 
                     [wall['from_y'], wall['to_y']], 
                     'k-', linewidth=3, label='_nolegend_'
-                )  # 'k-' means black solid line
+                )
 
-            # Plot each particle
-            frame_positions_x = []
-            frame_positions_y = []
-            frame_positions_color = []
-            frame_velocities_x = []
-            frame_velocities_y = []
-            
-            # For legend
-            left_scatter = None
-            right_scatter = None
-            
-            for i in range(1, self.parameters.get('N', 300) + 1):  # 300 particles
-                if row.get(f'PX[{i}]') is None:
-                    continue
+            # Plot particles efficiently
+            if len(data['positions_x']) > 0:
+                scatter = ax.scatter(data['positions_x'], data['positions_y'], 
+                                   c=data['colors'], s=100)
+                
+                # Add velocity vectors if available
+                if data['velocities'] is not None and data['velocities']['valid'].any():
+                    valid_mask = data['velocities']['valid']
+                    valid_indices = np.where(valid_mask)[0]
+                    ax.quiver(data['positions_x'][valid_indices], 
+                            data['positions_y'][valid_indices],
+                            data['velocities']['normalized_vx'][valid_indices],
+                            data['velocities']['normalized_vy'][valid_indices],
+                            color='black', alpha=0.5, width=0.003)
 
-                x = row[f'PX[{i}]']
-                y = row[f'PY[{i}]']
-                state = row[f'PS[{i}]']
-                infected = row[f'infectionsCount']
-                recovered = row[f'recoveredCount']
-
-                # Calculate velocities from position changes if we have a previous frame
-                vx = 0
-                vy = 0
-                if prev_row is not None:
-                    dt = row['time'] - prev_row['time']
-                    if dt > 0:  # Avoid division by zero
-                        prev_x = prev_row[f'PX[{i}]']
-                        prev_y = prev_row[f'PY[{i}]']
-                        vx = (x - prev_x) / dt
-                        vy = (y - prev_y) / dt
-
-                color = state_color[state_id[state]]
-
-                frame_positions_x.append(x)
-                frame_positions_y.append(y)
-                frame_positions_color.append(color)
-                frame_velocities_x.append(vx)
-                frame_velocities_y.append(vy)
-
-            # Plot scatter points
-            scatter = plt.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=100)
-            
             # Create legend elements
             legend_elements = [
                 plt.scatter([], [], c=state_color[state_id[i]], s=300, label=state_id[i]) for i in range(7)
@@ -157,41 +210,18 @@ class FlowGraphInfections:
             # Add legend
             plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5),
                     title='Particles', fontsize=14, title_fontsize=16)
-            
-            # Add velocity vectors with quiver only if we have velocity data
-            if prev_row is not None:
-                # Scale factor for velocity vectors (adjust this value to make arrows more visible)
-                length_velocities = [
-                    sqrt(frame_velocities_x[i] ** 2 + frame_velocities_y[i] ** 2) for i in range(len(frame_velocities_x))
-                ]
-                normalize_velocities_x = [
-                    frame_velocities_x[i] / length_velocities[i] for i in range(len(frame_velocities_x))
-                ]
-                normalize_velocities_y = [
-                    frame_velocities_y[i] / length_velocities[i] for i in range(len(frame_velocities_y))
-                ]
-                plt.quiver(frame_positions_x, frame_positions_y, 
-                        np.array(normalize_velocities_x), 
-                        np.array(normalize_velocities_y),
-                        color='black', alpha=0.5, width=0.003)
 
             # Add main title and timestamp
-            plt.suptitle('Subway Simulation', fontsize=20)
-            plt.title(f'Time: {row["time"]:.2f} Infected: {infected} Recovered: {recovered}', fontsize=16)
+            fig.suptitle('Subway Simulation', fontsize=20)
+            ax.set_title(f'Time: {data["time"]:.2f} Infected: {data["infected"]} Recovered: {data["recovered"]}', fontsize=16)
             
             # Save the frame
-            plt.savefig(os.path.join(frames_dir, f'frame_{index:04d}.png'), dpi=50)
-            plt.close()
-            
-            # Update previous row for next iteration
-            prev_row = row.copy()
+            plt.savefig(os.path.join(frames_dir, f'frame_{frame_idx:04d}.png'), dpi=50)
+            plt.close(fig)
 
-        # Create GIF from frames
-        frames = []
+        # Create GIF from frames efficiently
         frame_files = sorted([f for f in os.listdir(frames_dir) if f.endswith('.png')])
-
-        for frame_file in frame_files:
-            frames.append(imageio.imread(os.path.join(frames_dir, frame_file)))
+        frames = [imageio.imread(os.path.join(frames_dir, frame_file)) for frame_file in frame_files]
 
         # Save as GIF
         imageio.mimsave(os.path.join(self.output_dir, 'particle_simulation.gif'), frames, fps=15)

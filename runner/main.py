@@ -3,6 +3,7 @@ import json
 import os
 
 from src.runner import run_experiment, compile_c_code, compile_model
+from src.config_manager import update_config_from_args, print_config_status
 from src.utils import load_config, create_output_dir, copy_results_to_latest
 from experiments.performance_n_pedestrians.performance_n_pedestrians import performance_n_pedestrians
 from experiments.performance_n_volumes.performance_n_volumes import performance_n_volumes
@@ -35,6 +36,9 @@ def main():
     run_parser.add_argument('--output-dir', type=str, default='results',
                             help='Base directory for experiment outputs (default: results)')
     run_parser.add_argument('--plot', action='store_true', help='Plot the results')
+    run_parser.add_argument('--verbose', action='store_true', help='Verbose output')
+    run_parser.add_argument('--skip-metrics', action='store_true', help='Skip metric calculations (clustering and density) to save time')
+    run_parser.add_argument('--fast-mode', action='store_true', help='Enable fast mode (skip all calculations)')
 
     plot_parser = subparsers.add_parser('plot', description='Plot results')
     plot_parser.add_argument('plot', type=str, help='plot type (gif, grouped_lanes)')
@@ -44,6 +48,9 @@ def main():
     plot_parser.add_argument('--config', type=str, default='config.json', help='Path to JSON configuration file')
     experiments_parser = subparsers.add_parser('experiments', description='Run experiments')
     experiments_parser.add_argument('experiment', type=str, help='Name of the experiment to run')
+    experiments_parser.add_argument('--verbose', action='store_true', help='Verbose output')
+    experiments_parser.add_argument('--skip-metrics', action='store_true', help='Skip metric calculations (clustering and density) to save time')
+    experiments_parser.add_argument('--fast-mode', action='store_true', help='Enable fast mode (skip all calculations)')
 
     args = parser.parse_args()
 
@@ -72,6 +79,9 @@ def main():
         if args.compile:
             compile_model(args.model)
 
+        # Update configuration from command line arguments
+        update_config_from_args(args)
+
         # Run experiment
         run_experiment(config, output_dir, args.model, plot=args.plot)
 
@@ -97,6 +107,9 @@ def main():
         elif args.plot == 'flow_graph_infections':
             plotter.flow_graph_infections(args.solution_file, args.output_dir, config)
     elif args.command == 'experiments':
+        # Update configuration from command line arguments
+        update_config_from_args(args)
+        
         if args.experiment == 'performance_n_pedestrians':
             performance_n_pedestrians()
         elif args.experiment == 'performance_n_volumes':
@@ -127,6 +140,8 @@ def main():
             subway_attack_rate()
         elif args.experiment == 'progress_update_dt':
             progress_update_dt()
+        elif args.experiment == 'flag_example':
+            flag_example()
         else:
             print(f"Experiment {args.experiment} not found")
     else:

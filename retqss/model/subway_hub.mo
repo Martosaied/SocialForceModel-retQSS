@@ -20,8 +20,10 @@ import retQSS_covid19_fsm;
 */
 
 constant Integer
-	N = 1,
-	GRID_DIVISIONS = 10;
+	N = 700,
+	PEDESTRIANS_COUNT = 680,
+	PASSENGERS_COUNT = 30,
+	GRID_DIVISIONS = 11;
 
 // Initial conditions parameters
 parameter Integer
@@ -33,7 +35,7 @@ parameter Integer
 	SOCIAL_FORCE_MODEL = getIntegerModelParameter("SOCIAL_FORCE_MODEL", 0),
 
 	INITIAL_EXPOSED = getIntegerModelParameter("INITIAL_EXPOSED", 0),
-	INITIAL_INFECTED = getIntegerModelParameter("INITIAL_INFECTED", 9);
+	INITIAL_INFECTED = getIntegerModelParameter("INITIAL_INFECTED", 40);
 
 // Output delta time parameter
 parameter Real
@@ -41,7 +43,6 @@ parameter Real
 	OUTPUT_UPDATE_DT = getRealModelParameter("OUTPUT_UPDATE_DT", 1), // 0.5 seconds
 	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.5), // 0.5 seconds
 	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1), // 0.5 seconds
-	DESTINATION_UPDATE_DT = getRealModelParameter("DESTINATION_UPDATE_DT", 600), // 10 minutes
 	OBJECTIVE_SUBWAY_HUB_DT = getRealModelParameter("OBJECTIVE_SUBWAY_HUB_DT", 600), // 10 minutes in each subway
 	SPEED_MU = getRealModelParameter("SPEED_MU", 1.34), // 1.34 m/s or 80.4 m/min
 	SPEED_SIGMA = getRealModelParameter("SPEED_SIGMA", 0.26), // 0.26 m/s or 15.6 m/min
@@ -76,14 +77,14 @@ parameter Real
 	PRESYMPTOMATIC_CONTAGION_PROB = getRealModelParameter("PRESYMPTOMATIC_CONTAGION_PROB", SYMPTOMATIC_CONTAGION_PROB), //same as symptomatic
 	ASYMPTOMATIC_CONTAGION_PROB = getRealModelParameter("ASYMPTOMATIC_CONTAGION_PROB", SYMPTOMATIC_CONTAGION_PROB), //same as symptomatic
 
-	VOLUME_CONCENTRATION_LAMBDA = getRealModelParameter("VOLUME_CONCENTRATION_LAMBDA", 3.36 / 60 / 60), // JLJ Table SI-4 (classroom / prepandemic scenario) = lambda (hourly to secondly conversion) 
+	VOLUME_CONCENTRATION_LAMBDA = getRealModelParameter("VOLUME_CONCENTRATION_LAMBDA", 0.92 / 3600), // JLJ Table SI-4 (classroom / prepandemic scenario) = lambda (hourly to secondly conversion) 
 
-	BREATHING_INTERVAL_TIME = getRealModelParameter("BREATHING_INTERVAL_TIME", 13.8 / 60), //~ 13.8 breaths per minute  https://my.clevelandclinic.org/health/articles/10881-vital-signs#:~:text=Respiratory%20rate%3A%20A%20person's%20respiratory,while%20resting%20is%20considered%20abnormal.
+	BREATHING_INTERVAL_TIME = getRealModelParameter("BREATHING_INTERVAL_TIME", 3.6), //~ 13.8 breaths per minute  https://my.clevelandclinic.org/health/articles/10881-vital-signs#:~:text=Respiratory%20rate%3A%20A%20person's%20respiratory,while%20resting%20is%20considered%20abnormal.
 
-	SYMPTOMATIC_EMISSION_RATE = getRealModelParameter("SYMPTOMATIC_EMISSION_RATE", (63.5 / 60 / 60) * (1 / 13.8 * 60) * 1.0 * 1.8), // JLJ Table SI-4 (classroom / prepandemic scenario) = E_P0 * (1/breaths per hour) * r_E * (fe x fi)
+	SYMPTOMATIC_EMISSION_RATE = getRealModelParameter("SYMPTOMATIC_EMISSION_RATE", (63.5 / 3600) * 3.6 * 1.0 * 1.0), // JLJ Table SI-4 (classroom / prepandemic scenario) = E_P0 * (1/breaths per hour) * r_E * (fe x fi)
 	ASYMPTOMATIC_EMISSION_RATE = getRealModelParameter("ASYMPTOMATIC_EMISSION_RATE", SYMPTOMATIC_EMISSION_RATE), //same as symptomatic
 
-	BREATHING_INHALATION_VOLUME = getRealModelParameter("BREATHING_INHALATION_VOLUME", 0.288 * (1 / 13.8 * 60) * 1.1 * 1.0); // JLJ Table SI-4 (classroom / prepandemic scenario) = B0 * (1/breaths per hour) * rB * fI
+	BREATHING_INHALATION_VOLUME = getRealModelParameter("BREATHING_INHALATION_VOLUME", (0.288 / 3600) * 3.6 * 1.1 * 1.0); // JLJ Table SI-4 (classroom / prepandemic scenario) = B0 * (1/breaths per hour) * rB * fI
 
 // Contact tracing parameters
 parameter Real
@@ -151,9 +152,6 @@ discrete Real nextProgressTick;
 // Variable used to control and trigger motivation update
 discrete Real nextMotivationTick;
 
-// Variable used to control destination update
-discrete Real nextDestinationTick;
-
 // This variable is used to simulate particles brething (they all breath at the same periodic time)
 discrete Real nextBreathingTick;
 
@@ -168,7 +166,7 @@ discrete Real symptomsStartTime[N];
 
 
 // local variables
-discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID, groupID, desiredX, desiredY, desiredZ;
+discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID, groupID, desiredX, desiredY, desiredZ, status;
 discrete Boolean isolate;
 
 
@@ -194,7 +192,11 @@ initial algorithm
 
 	for i in 1:VOLUMES_COUNT loop
 		_ := volume_setProperty(i, "isObstacle", isInArrayParameter("OBSTACLES", i));
-		_ := volume_setProperty(i, "isSubway", isInArrayParameter("SUBWAYS", i));
+		if (i == 2) or (i == 10) or (i == 105) then
+			_ := volume_setProperty(i, "isSubway", 1);
+		else
+			_ := volume_setProperty(i, "isSubway", 0);
+		end if;
 		volumeConcentration[i] := 0.0;
 		volumeEmissionRate[i] := 0.0;
 		volumeLambda[i] := VOLUME_CONCENTRATION_LAMBDA;
@@ -218,8 +220,19 @@ initial algorithm
 
 	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
-		_ := particle_setProperty(i, "isObjective", 1);
-        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := getInitialPosition(i);
+		if i == 1 then
+			_ := particle_setProperty(i, "isObjective", 1);
+			(x[i], y[i], z[i], dx[i], dy[i], dz[i]) := getInitialPosition(i);
+		elseif i <= PASSENGERS_COUNT then
+			_ := particle_setProperty(i, "isObjective", 0);
+        	(x[i], y[i], z[i], dx[i], dy[i], dz[i]) := getInitialPosition(i);
+		elseif i <= PEDESTRIANS_COUNT then
+			_ := particle_setProperty(i, "isObjective", 0);
+			(x[i], y[i], z[i], dx[i], dy[i], dz[i]) := getInitialRandomPosition(i);
+		else
+			_ := particle_setProperty(i, "isObjective", 0);
+			(x[i], y[i], z[i], dx[i], dy[i], dz[i]) := getInitialStationPosition(i);
+		end if;
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
 		_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
 		_ := debug(INFO(), time, "Particle %d setup ended", i,_,_,_);
@@ -242,7 +255,12 @@ initial algorithm
 		else
 			expositionTime[i] := INF;
 		end if;
-		if i <= INITIAL_INFECTED then
+		status := random(0.0, 1.0);
+		if i == 1 then
+			infectionStartTime[i] := INF;
+			expositionTime[i] := INF;
+			_ := particle_setProperty(i, "status", SUSCEPTIBLE());
+		elseif status <= 0.05 then
 			infectionStartTime[i] := EPS;
 			_ := particle_setProperty(i, "status", ASYMPTOMATIC());
 			infectedCount := infectedCount + 1;
@@ -282,8 +300,8 @@ initial algorithm
     nextProgressTick := EPS;
 	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
-	nextDestinationTick := DESTINATION_UPDATE_DT;
 	nextBreathingTick := EPS;
+	nextSubwayHubTick := OBJECTIVE_SUBWAY_HUB_DT;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
     _ := debug(INFO(), time, "Pedestrian implementation: %d", PEDESTRIAN_IMPLEMENTATION,_,_,_);
 	_ := debug(INFO(), time, "Border implementation: %d", BORDER_IMPLEMENTATION,_,_,_);
@@ -342,18 +360,6 @@ algorithm
 		when time > symptomsStartTime[i] then
 			(infectionFinishTime[i], _, _) := onSymptomsStart(time, i, SYMPTOMATIC_DETECTION_PROB, 0.0, 0.0, 0.0, 0.0);
 		end when;
-
-		//EVENT: particle infection finished (it may trigger the particle stop moving if died)
-		when time > infectionFinishTime[i] then
-			_ := onInfectionEnd(time, i);
-			recoveredCount := recoveredCount + 1;
-			infectionsCount := infectionsCount + particle_getProperty(i, "infectionsCount");
-			if not shouldMove(i) then
-				reinit(vx[i], 0.);
-				reinit(vy[i], 0.);
-				_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
-			end if;
-		end when;
 	end for;
 
 
@@ -385,25 +391,30 @@ algorithm
 
 	//EVENT: Terminate time is reached, calling native function terminate()
 	when time > terminateTime then
+		_ := debug(INFO(), time, "Terminating simulation",_,_,_,_);
 		terminate();
 	end when;
 
-	//EVENT: Next subway hub time: updates the particles destination
+	// EVENT: Next subway hub time: updates the particles destination
 	when time > nextSubwayHubTick then
 		nextSubwayHubTick := time + OBJECTIVE_SUBWAY_HUB_DT;
-		for i in 1:N loop
+		// _ := debug(INFO(), time, "Updating objective next stop",_,_,_,_);
+		for i in 1:PASSENGERS_COUNT loop
 			(dx[i], dy[i], dz[i]) := getNextPosition(i);
 		end for;
+		// _ := debug(INFO(), time, "Objective next stop destination updated",_,_,_,_);
 	end when;
 	
 	when time > nextMotivationTick then
+		// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
-		for i in 1:N loop
-			(dx[i], dy[i], dz[i]) := moveOutOfSubway(i, dx[i], dy[i], dz[i]);
+		for i in 1:PASSENGERS_COUNT loop
+			(dx[i], dy[i], dz[i]) := moveIfNotInSubway(i, dx[i], dy[i], dz[i]);
 		end for;
+		
+		// _ := debug(INFO(), time, "Particles motivation updated",_,_,_,_);
 
 		if SOCIAL_FORCE_MODEL == 1 then
-			// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
 			for i in 1:N loop
 				hx := dx[i];
 				hy := dy[i];
@@ -415,7 +426,6 @@ algorithm
 			end for;
 		end if;
 		if SOCIAL_FORCE_MODEL == 0 then
-			_ := debug(INFO(), time, "Updating particles fixed velocity",_,_,_,_);
 			// The desired direction is given by the difference between the current position and the target position
 			for i in 1:N loop
 				hx := dx[i];
@@ -439,11 +449,31 @@ algorithm
 				reinit(az[i], 0.0);
 			end for;
 		end if;
+
+		for i in 1:N loop
+			hx := x[i];
+			hy := y[i];
+			
+			if CONVEYOR_BELT_EFFECT == 1 then
+				if x[i] < 1.0 then
+					(_, hy, _, _, dy[i], _) := getInitialRandomPosition(i);
+					hx := GRID_SIZE - 1;
+				end if;
+				if x[i] > GRID_SIZE - 1 then
+					(_, hy, _, _, dy[i], _) := getInitialRandomPosition(i);
+					hx := 1.0;
+				end if;
+				
+				reinit(x[i], hx);
+				reinit(y[i], hy);
+				_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
+			end if;
+		end for;
 	end when;
 
 	//EVENT: Next progress output time: prints a new line in stdout and computes the next output time incrementing the variable
 	when time > nextProgressTick then
-		// _ := debug(INFO(), time, "Progress checkpoint",_,_,_,_);
+		_ := debug(INFO(), time, "Progress checkpoint",_,_,_,_);
         nextProgressTick := time + PROGRESS_UPDATE_DT;
 	end when;
 	
