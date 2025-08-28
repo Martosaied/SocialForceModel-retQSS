@@ -21,7 +21,7 @@ def average_velocity():
     print("Running experiments for different number of volumes...\n")
     for n in GRID_DIVISIONS:
         print(f"Running experiment for {n} volumes...")
-        # run(n)
+        run(n)
         print(f"Experiment for {n} volumes completed.\n")
 
     # Plot the results
@@ -41,8 +41,8 @@ def run(n):
     )
     print(f"Created output directory: {output_dir}")
 
-    config['parameters'][0]['value'] = 1000 # N
-    config['parameters'][1]['value'] = 1 # PEDESTRIAN_IMPLEMENTATION
+    config['parameters']['N']['value'] = 1000 # N
+    config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = 1 # PEDESTRIAN_IMPLEMENTATION
 
     # Save config copy in experiment directory
     config_copy_path = os.path.join(output_dir, 'config.json')

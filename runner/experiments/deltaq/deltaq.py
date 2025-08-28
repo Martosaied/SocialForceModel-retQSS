@@ -41,21 +41,13 @@ def run(deltaq):
     output_dir = create_output_dir(f'experiments/deltaq/results/deltaq_{deltaq}')
     print(f"Created output directory: {output_dir}")
 
-    config['parameters'][0]['value'] = PEDESTRIAN_COUNT
-    config['parameters'][1]['value'] = Constants.PEDESTRIAN_MMOC
-    config['parameters'][2]['value'] = Constants.BORDER_NONE
+    config['parameters']['N']['value'] = PEDESTRIAN_COUNT
+    config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = Constants.PEDESTRIAN_MMOC
+    config['parameters']['BORDER_IMPLEMENTATION']['value'] = Constants.BORDER_NONE
 
     # Add from where to where pedestrians are generated
-    config['parameters'].append({
-      "name": "FROM_Y",
-      "type": "value",
-      "value": (VOLUMES/ 2) - int(WIDTH / 2)
-    })
-    config['parameters'].append({
-      "name": "TO_Y",
-      "type": "value",
-      "value": (VOLUMES/ 2) + int(WIDTH / 2)
-    })
+    config['parameters']['FROM_Y']['value'] = (VOLUMES/ 2) - int(WIDTH / 2)
+    config['parameters']['TO_Y']['value'] = (VOLUMES/ 2) + int(WIDTH / 2)
 
     # Save config copy in experiment directory
     config_copy_path = os.path.join(output_dir, 'config.json')
