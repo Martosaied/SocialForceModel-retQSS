@@ -143,8 +143,14 @@ def run_parallel_model(
 
 
 
-def run_iterations(num_iterations: int, model_name: str, output_dir: str = "output", parameters: dict = {}, plot: bool = True, copy_results: bool = True):
+def run_iterations(num_iterations: int, model_name: str, output_dir: str = "output", parameters: dict = {}, plot: bool = True, copy_results: bool = True, max_concurrent_processes: int = None):
     """Run experiment iterations using the specified model."""
+    
+    # Set default max concurrent processes to CPU count if not specified
+    if max_concurrent_processes is None:
+        max_concurrent_processes = multiprocessing.cpu_count()
+    
+    print(f"Running {num_iterations} iterations with max {max_concurrent_processes} concurrent processes")
 
     metrics_file = os.path.join(output_dir, f'metrics.csv')
 
@@ -153,8 +159,15 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str = "outp
     metrics_file.flush()
     results = []
     processes = []
+    
     for iteration in range(num_iterations):
         print(f"\nStarting iteration {iteration + 1}/{num_iterations}")
+
+        # Wait if we've reached the maximum number of concurrent processes
+        while len([p for p in processes if p.is_alive()]) >= max_concurrent_processes:
+            time.sleep(0.1)  # Small delay to avoid busy waiting
+            # Clean up completed processes
+            processes = [p for p in processes if p.is_alive()]
 
         random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
         tmp_dir = f"../retqss/build/{model_name}_{random_str}"
@@ -174,9 +187,10 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str = "outp
         except Exception as e:
             print(f"Error copying ../retqss/build/{model_name} to {tmp_dir}: {e}")
 
+    # Wait for all remaining processes to complete
     for p in processes:
         p.join()
-        print(f"Iteration {p.name} completed")
+        print(f"Process {p.name} completed")
 
     metrics_file.close()
 
@@ -184,6 +198,7 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str = "outp
 def run_experiment(config: dict, output_dir: str, model_name: str, plot: bool = True, copy_results: bool = True):
     """Run experiment iterations using the specified model."""
     num_iterations = config.get('iterations', 1)
+    max_concurrent_processes = config.get('max_concurrent_processes', 10)
     print(f"Running {num_iterations} iterations for {model_name}...")
 
     parameters = process_parameters(config.get('parameters', {}))
@@ -191,7 +206,7 @@ def run_experiment(config: dict, output_dir: str, model_name: str, plot: bool = 
     grouped_parameters = get_parameter_combinations(parameters)
     for params in grouped_parameters:
         print(f"Running with parameters: {params}")
-        run_iterations(num_iterations, model_name, output_dir, params, plot, copy_results)
+        run_iterations(num_iterations, model_name, output_dir, params, plot, copy_results, max_concurrent_processes)
 
 
 def compile_c_code():

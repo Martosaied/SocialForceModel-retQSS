@@ -1,0 +1,209 @@
+{
+  "parameters": {
+    "RANDOM_SEED": {
+      "name": "RANDOM_SEED",
+      "type": "value",
+      "value": 42
+    },
+    "FORCE_TERMINATION_AT": {
+      "name": "FORCE_TERMINATION_AT",
+      "type": "value",
+      "value": 600.0
+    },
+    "PEDESTRIAN_IMPLEMENTATION": {
+      "name": "PEDESTRIAN_IMPLEMENTATION",
+      "type": "value",
+      "value": 1
+    },
+    "BORDER_IMPLEMENTATION": {
+      "name": "BORDER_IMPLEMENTATION",
+      "type": "value",
+      "value": 0
+    },
+    "CONVEYOR_BELT_EFFECT": {
+      "name": "CONVEYOR_BELT_EFFECT",
+      "type": "value",
+      "value": 0
+    },
+    "SOCIAL_FORCE_MODEL": {
+      "name": "SOCIAL_FORCE_MODEL",
+      "type": "value",
+      "value": 0
+    },
+    "INITIAL_EXPOSED": {
+      "name": "INITIAL_EXPOSED",
+      "type": "value",
+      "value": 0
+    },
+    "INITIAL_INFECTED": {
+      "name": "INITIAL_INFECTED",
+      "type": "value",
+      "value": 10
+    },
+    "DEFAULT_SPEED": {
+      "name": "DEFAULT_SPEED",
+      "type": "value",
+      "value": 1.34
+    },
+    "OUTPUT_UPDATE_DT": {
+      "name": "OUTPUT_UPDATE_DT",
+      "type": "value",
+      "value": 5.0
+    },
+    "PROGRESS_UPDATE_DT": {
+      "name": "PROGRESS_UPDATE_DT",
+      "type": "value",
+      "value": 1.0
+    },
+    "MOTIVATION_UPDATE_DT": {
+      "name": "MOTIVATION_UPDATE_DT",
+      "type": "value",
+      "value": 0.5
+    },
+    "OBJECTIVE_SUBWAY_HUB_DT": {
+      "name": "OBJECTIVE_SUBWAY_HUB_DT",
+      "type": "value",
+      "value": 400.0
+    },
+    "SPEED_MU": {
+      "name": "SPEED_MU",
+      "type": "value",
+      "value": 1.34
+    },
+    "SPEED_SIGMA": {
+      "name": "SPEED_SIGMA",
+      "type": "value",
+      "value": 0.26
+    },
+    "FROM_Y": {
+      "name": "FROM_Y",
+      "type": "value",
+      "value": 0.0
+    },
+    "TO_Y": {
+      "name": "TO_Y",
+      "type": "value",
+      "value": 20.0
+    },
+    "N": {
+      "name": "N",
+      "type": "value",
+      "value": 1000
+    },
+    "PEDESTRIANS_COUNT": {
+      "name": "PEDESTRIANS_COUNT",
+      "type": "value",
+      "value": 980
+    },
+    "GRID_DIVISIONS": {
+      "name": "GRID_DIVISIONS",
+      "type": "value",
+      "value": 11
+    },
+    "YOUNG_PROB": {
+      "name": "YOUNG_PROB",
+      "type": "value",
+      "value": 0.25
+    },
+    "ADULT_PROB": {
+      "name": "ADULT_PROB",
+      "type": "value",
+      "value": 0.5
+    },
+    "ELDERLY_PROB": {
+      "name": "ELDERLY_PROB",
+      "type": "value",
+      "value": 0.25
+    },
+    "ASYMPTOMATIC_PROB": {
+      "name": "ASYMPTOMATIC_PROB",
+      "type": "value",
+      "value": 0.4
+    },
+    "MILD_PROB": {
+      "name": "MILD_PROB",
+      "type": "value",
+      "value": 0.4
+    },
+    "SEVERE_PROB": {
+      "name": "SEVERE_PROB",
+      "type": "value",
+      "value": 0.15
+    },
+    "CRITICAL_PROB": {
+      "name": "CRITICAL_PROB",
+      "type": "value",
+      "value": 0.05
+    },
+    "INFECTION_RADIUS": {
+      "name": "INFECTION_RADIUS",
+      "type": "value",
+      "value": 2.0
+    },
+    "INFECTION_PROBABILITY": {
+      "name": "INFECTION_PROBABILITY",
+      "type": "value",
+      "value": 0.1
+    },
+    "INFECTION_DURATION": {
+      "name": "INFECTION_DURATION",
+      "type": "value",
+      "value": 14.0
+    },
+    "RECOVERY_DURATION": {
+      "name": "RECOVERY_DURATION",
+      "type": "value",
+      "value": 21.0
+    },
+    "MORTALITY_RATE": {
+      "name": "MORTALITY_RATE",
+      "type": "value",
+      "value": 0.02
+    },
+    "PEDESTRIAN_A_1": {
+      "name": "PEDESTRIAN_A_1",
+      "type": "value",
+      "value": 2.1
+    },
+    "PEDESTRIAN_B_1": {
+      "name": "PEDESTRIAN_B_1",
+      "type": "value",
+      "value": 0.3
+    },
+    "PEDESTRIAN_A_2": {
+      "name": "PEDESTRIAN_A_2",
+      "type": "value",
+      "value": 2.1
+    },
+    "PEDESTRIAN_B_2": {
+      "name": "PEDESTRIAN_B_2",
+      "type": "value",
+      "value": 0.3
+    },
+    "PEDESTRIAN_R": {
+      "name": "PEDESTRIAN_R",
+      "type": "value",
+      "value": 0.1
+    },
+    "PEDESTRIAN_LAMBDA": {
+      "name": "PEDESTRIAN_LAMBDA",
+      "type": "value",
+      "value": 0.3
+    },
+    "RELAXATION_TIME": {
+      "name": "RELAXATION_TIME",
+      "type": "value",
+      "value": 0.5
+    },
+    "BORDER_A": {
+      "name": "BORDER_A",
+      "type": "value",
+      "value": 10.0
+    },
+    "BORDER_B": {
+      "name": "BORDER_B",
+      "type": "value",
+      "value": 0.7
+    }
+  }
+}

@@ -116,18 +116,18 @@ algorithm
 	right := RIGHT();
 
 	if randomBoolean(0.5) == 0.0 then
-		// randomValue2 := random(0.1, size/3);
-		randomValue2 := 0.1 * size;
+		randomValue2 := random(0.1, size/3);
+		// randomValue2 := 0.1 * size;
 		// randomValue2 := random(0, size);
 		x := randomValue2;
-		dx := random(10, 12.5);
+		dx := 1.5 * size;
 		group := left;
 	else
-		// randomValue2 := random(size/3 * 2, size);
-		randomValue2 := 0.9 * size;
+		randomValue2 := random(size/3 * 2, size);
+		// randomValue2 := 0.9 * size;
 		// randomValue2 := random(0, size);
 		x := randomValue2;
-		dx := random(40, 42.5);
+		dx := -0.5 * size;
 		group := right;
 	end if;
 	randomValue := random(fromY, toY);

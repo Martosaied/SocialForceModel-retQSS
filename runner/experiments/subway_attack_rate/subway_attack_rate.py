@@ -21,8 +21,8 @@ def get_experiment_flags():
 def subway_attack_rate():
     """
     Run the subway_hub model experiment comparing social force model with/without
-    across different simulation durations (FORCE_TERMINATION_AT: 1800, 1200, 900).
-    Keeps OBJECTIVE_SUBWAY_HUB_DT at 600 for consistent station changes.
+    across different population sizes (N: 300, 500, 700).
+    Keeps OBJECTIVE_SUBWAY_HUB_DT at 400 for consistent station changes.
     """
     print("Running subway hub model with social force comparison across different durations...\n")
     
@@ -67,7 +67,7 @@ def run_population_size_experiment():
     
     # Define the different population sizes to test
     population_sizes = [300, 500, 700]  # N values
-    termination_time = 1800  # Fixed at 30 minutes
+    termination_time = 900  # Fixed at 15 minutes
     
     output_dirs = {}
     
@@ -117,10 +117,10 @@ def run_population_experiment(n, pedestrians_count, termination_time, social_for
         config['parameters']['OBJECTIVE_SUBWAY_HUB_DT'] = {
             "name": "OBJECTIVE_SUBWAY_HUB_DT",
             "type": "value",
-            "value": 600.0
+            "value": 400.0
         }
     else:
-        config['parameters']['OBJECTIVE_SUBWAY_HUB_DT']['value'] = 600.0
+        config['parameters']['OBJECTIVE_SUBWAY_HUB_DT']['value'] = 400.0
     
     # Create output directory
     output_dir = create_output_dir(
@@ -149,7 +149,6 @@ def run_population_experiment(n, pedestrians_count, termination_time, social_for
         plot=False,
         copy_results=True
     )
-    copy_results_to_latest(output_dir)
 
     # remove all other columns from the result_*.csv files.
     for result_file in glob.glob(os.path.join(output_dir, 'result_*.csv')):
@@ -187,10 +186,10 @@ def run_single_experiment(termination_time, social_force):
         config['parameters']['OBJECTIVE_SUBWAY_HUB_DT'] = {
             "name": "OBJECTIVE_SUBWAY_HUB_DT",
             "type": "value",
-            "value": 600.0
+            "value": 400.0
         }
     else:
-        config['parameters']['OBJECTIVE_SUBWAY_HUB_DT']['value'] = 600.0
+        config['parameters']['OBJECTIVE_SUBWAY_HUB_DT']['value'] = 400.0
     
     # Create output directory
     output_dir = create_output_dir(
@@ -214,7 +213,6 @@ def run_single_experiment(termination_time, social_force):
         plot=False,
         copy_results=True
     )
-    copy_results_to_latest(output_dir)
 
     # remove all other columns from the result_*.csv files.
     for result_file in glob.glob(os.path.join(output_dir, 'result_*.csv')):
