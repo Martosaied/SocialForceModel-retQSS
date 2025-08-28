@@ -15,7 +15,6 @@ class ExperimentConfig:
     # Performance flags
     verbose: bool = False
     skip_metrics: bool = False
-    fast_mode: bool = False
     
     # Output flags
     plot: bool = True
@@ -28,32 +27,17 @@ class ExperimentConfig:
     # Custom parameters
     custom_params: Dict[str, Any] = field(default_factory=dict)
     
-    def __post_init__(self):
-        """Post-initialization to handle fast mode logic."""
-        if self.fast_mode:
-            self.skip_metrics = True
-    
-    @property
-    def should_calculate_clustering(self) -> bool:
-        """Check if clustering should be calculated."""
-        return not (self.fast_mode or self.skip_metrics)
-    
-    @property
-    def should_calculate_density(self) -> bool:
-        """Check if density should be calculated."""
-        return not (self.fast_mode or self.skip_metrics)
+
     
     @property
     def should_calculate_metrics(self) -> bool:
         """Check if any metrics should be calculated."""
-        return not (self.fast_mode or self.skip_metrics)
+        return not self.skip_metrics
     
     @property
     def performance_mode(self) -> str:
         """Get the current performance mode as a string."""
-        if self.fast_mode:
-            return "fast"
-        elif self.skip_metrics:
+        if self.skip_metrics:
             return "no_metrics"
         else:
             return "full"
@@ -63,7 +47,6 @@ class ExperimentConfig:
         return {
             'verbose': self.verbose,
             'skip_metrics': self.skip_metrics,
-            'fast_mode': self.fast_mode,
             'plot': self.plot,
             'copy_results': self.copy_results,
             'output_dir': self.output_dir,
@@ -77,7 +60,6 @@ class ExperimentConfig:
         print("Experiment Configuration:")
         print(f"  Verbose: {self.verbose}")
         print(f"  Skip metrics: {self.skip_metrics}")
-        print(f"  Fast mode: {self.fast_mode}")
         print(f"  Plot: {self.plot}")
         print(f"  Copy results: {self.copy_results}")
         print(f"  Output directory: {self.output_dir}")
@@ -104,8 +86,6 @@ class ConfigManager:
             self._config.verbose = args.verbose
         if hasattr(args, 'skip_metrics'):
             self._config.skip_metrics = args.skip_metrics
-        if hasattr(args, 'fast_mode'):
-            self._config.fast_mode = args.fast_mode
         if hasattr(args, 'plot'):
             self._config.plot = args.plot
         if hasattr(args, 'copy_results'):
@@ -160,26 +140,6 @@ def is_verbose() -> bool:
 def should_skip_metrics() -> bool:
     """Check if metric calculations should be skipped."""
     return config_manager.config.skip_metrics
-
-
-def is_fast_mode() -> bool:
-    """Check if fast mode is enabled."""
-    return config_manager.config.fast_mode
-
-
-def should_calculate_metrics() -> bool:
-    """Check if any metrics should be calculated."""
-    return config_manager.config.should_calculate_metrics
-
-
-def should_calculate_clustering() -> bool:
-    """Check if clustering should be calculated."""
-    return config_manager.config.should_calculate_clustering
-
-
-def should_calculate_density() -> bool:
-    """Check if density should be calculated."""
-    return config_manager.config.should_calculate_density
 
 
 def get_performance_mode() -> str:

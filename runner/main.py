@@ -75,7 +75,6 @@ def setup_run_parser(subparsers):
     run_parser.add_argument('--plot', action='store_true', help='Plot the results')
     run_parser.add_argument('--verbose', action='store_true', help='Verbose output')
     run_parser.add_argument('--skip-metrics', action='store_true', help='Skip metric calculations (clustering and density) to save time')
-    run_parser.add_argument('--fast-mode', action='store_true', help='Enable fast mode (skip all calculations)')
 
 
 def setup_plot_parser(subparsers):
@@ -94,7 +93,6 @@ def setup_experiments_parser(subparsers):
     experiments_parser.add_argument('experiment', type=str, help='Name of the experiment to run')
     experiments_parser.add_argument('--verbose', action='store_true', help='Verbose output')
     experiments_parser.add_argument('--skip-metrics', action='store_true', help='Skip metric calculations (clustering and density) to save time')
-    experiments_parser.add_argument('--fast-mode', action='store_true', help='Enable fast mode (skip all calculations)')
 
 
 def handle_run_command(args):

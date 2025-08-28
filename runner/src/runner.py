@@ -49,18 +49,18 @@ def run_model(model_name: str, directory: str, parameters: dict):
             metrics['memory_usage'] = result.stderr.split('Maximum resident set size (kbytes): ')[1].split('\n')[0].strip()
 
             # Use config properties to determine what to calculate
-            if not config.skip_metrics:
+            if config.should_calculate_metrics:
                 df = pd.read_csv(solution_path)
                 particles = parameters.get('N', 300)
                 
                 # Calculate density-based groups if not skipped
-                # metrics['density_based_groups'] = Density(df, particles).calculate_groups()
+                metrics['density_based_groups'] = Density(df, particles).calculate_groups()
                 
                 # Calculate clustering-based groups if not skipped
                 metrics['clustering_based_groups'] = Clustering(df, particles).calculate_groups()
             else:
-                # In fast mode, skip all calculations
-                print("Fast mode enabled: skipping density and clustering calculations")
+                # Skip all calculations
+                print("Skipping density and clustering calculations")
 
         # Check if solution.csv was created
         if not os.path.exists(solution_path):
