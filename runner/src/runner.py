@@ -53,8 +53,9 @@ def run_model(model_name: str, directory: str, parameters: dict):
                 df = pd.read_csv(solution_path)
                 particles = parameters.get('N', 300)
                 
-                # Calculate density-based groups if not skipped
-                metrics['density_based_groups'] = Density(df, particles).calculate_groups()
+                # Calculate density-based groups if not skipped (disabled for now, no need to calculate)
+                # metrics['density_based_groups'] = Density(df, particles).calculate_groups()
+                metrics['density_based_groups'] = 0
                 
                 # Calculate clustering-based groups if not skipped
                 metrics['clustering_based_groups'] = Clustering(df, particles).calculate_groups()
