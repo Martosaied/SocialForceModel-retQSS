@@ -100,9 +100,9 @@ def process_parameter(param: dict) -> dict:
     elif param['type'] == 'value':
         return [param['value']]
     elif param['type'] == 'map':
-        return [f'{process_map(param['map'])}'.replace(' ', '').replace('[', '').replace(']', '')]
+        return [f'{process_map(param["map"])}'.replace(' ', '').replace('[', '').replace(']', '')]
     elif param['type'] == 'custom':
-        return custom_process_by_name(param['name'], param['value'])
+        return custom_process_by_name(param["name"], param["value"])
     else:
         raise ValueError(f"Invalid parameter type: {param['type']}")
 
