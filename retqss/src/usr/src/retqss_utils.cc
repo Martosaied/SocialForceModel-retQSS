@@ -104,6 +104,20 @@ Bool utils_isInArrayParameter(const char *name, int value) {
 	}
 }
 
+std::vector<int> utils_getArrayParameter(const char *name) {
+	std::string parameter = utils_getParameter(name);
+	std::vector<int> array;
+	if (parameter.empty()) {
+		return array;
+	}
+	std::stringstream ss(parameter);
+	std::string item;
+	while (std::getline(ss, item, ',')) {
+		array.push_back(std::stoi(item));
+	}
+	return array;
+}
+
 int utils_getIntegerModelParameter(const char *name, int defaultValue) {
 	std::string value = utils_getParameter(name);
 	return value == "" ? defaultValue : std::stoi(value);

@@ -38,6 +38,8 @@ Bool utils_isInArrayParameter(const char *name, int value);
 
 std::string utils_getParameter(const char *name);
 
+std::vector<int> utils_getArrayParameter(const char *name);
+
 }
 #endif
 

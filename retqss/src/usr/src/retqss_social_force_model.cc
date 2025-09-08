@@ -195,6 +195,43 @@ void social_force_model_nearestPoint(
 	*z = 0;
 }
 
+void social_force_model_onlyObstacleIterativeRepulsiveBorderEffect(
+	int particleID,
+	double cellEdgeLength,
+	double *x,
+	double *y,
+	double *z
+) {
+	*x = 0;
+	*y = 0;
+	*z = 0;
+
+	double pX, pY, pZ;
+	retQSS_particle_currentPosition(particleID, &pX, &pY, &pZ);
+
+	std::vector<int> volumes = utils_getArrayParameter("OBSTACLES");
+
+	double A = model_parameters.BORDER_A;
+	double B = model_parameters.BORDER_B;
+	double r = model_parameters.BORDER_R;
+
+	for (int volume : volumes) {
+		double borderX, borderY, borderZ;
+		social_force_model_squareNearestPoint(volume, pX, pY, cellEdgeLength/2, &borderX, &borderY, &borderZ);
+		double distanceab = retQSS_volume_distanceToPoint(volume, pX, pY, pZ);
+
+		double normalizedY = (pY - borderY) / distanceab;
+		double fy = A*exp((r-distanceab)/B)*normalizedY;
+
+		double normalizedX = (pX - borderX) / distanceab;
+		double fx = A*exp((r-distanceab)/B)*normalizedX;
+
+		*x += fx;
+		*y += fy;
+		*z = 0;
+	}
+}
+
 void social_force_model_neighborsRepulsiveBorderEffect(
 	double A,
 	double B,
@@ -237,25 +274,14 @@ void social_force_model_updateNeighboringVolumes(int particleID, int gridDivisio
 	int rightVolumeID = volumeID + 1;
 	int leftVolumeID = volumeID - 1;
 	int upperRightVolumeID = upperVolumeID + 1;
-	int upperRightVolumeID2 = upperVolumeID + 2;
-	int upperRightVolumeID3 = upperVolumeID + 3;
 	int upperLeftVolumeID = upperVolumeID - 1;
-	int upperLeftVolumeID2 = upperVolumeID - 2;
-	int upperLeftVolumeID3 = upperVolumeID - 3;
 	int lowerRightVolumeID = lowerVolumeID + 1;
-	int lowerRightVolumeID2 = lowerVolumeID + 2;
-	int lowerRightVolumeID3 = lowerVolumeID + 3;
 	int lowerLeftVolumeID = lowerVolumeID - 1;
-	int lowerLeftVolumeID2 = lowerVolumeID - 2;
-	int lowerLeftVolumeID3 = lowerVolumeID - 3;
 
 	std::vector<int> volumes = {
 		upperVolumeID, lowerVolumeID, 
 		rightVolumeID, leftVolumeID, 
 		upperRightVolumeID, upperLeftVolumeID, lowerRightVolumeID, lowerLeftVolumeID, 
-		upperRightVolumeID2, upperLeftVolumeID2, lowerRightVolumeID2, lowerLeftVolumeID2,
-		upperRightVolumeID3, upperLeftVolumeID3, lowerRightVolumeID3, lowerLeftVolumeID3,
-		upperRightVolumeID2, upperLeftVolumeID2, lowerRightVolumeID2, lowerLeftVolumeID2,
 	};
 
 	// Filter the ones that are not in the grid or not obstacles

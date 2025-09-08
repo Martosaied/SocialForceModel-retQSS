@@ -20,6 +20,7 @@ from experiments.lanes_by_A.lanes_by_A import lanes_by_A
 from experiments.lanes_heatmap.lanes_heatmap import lanes_heatmap
 from experiments.subway_attack_rate.subway_attack_rate import subway_attack_rate
 from experiments.progress_update_dt.progress_update_dt import progress_update_dt
+from experiments.performance_school_scenario.performance_school_scenario_hallways import performance_school_scenario_hallways
 from src.plotter import Plotter
 
 
@@ -40,6 +41,7 @@ EXPERIMENT_REGISTRY = {
     'breaking_obstacles': breaking_obstacles,
     'subway_attack_rate': subway_attack_rate,
     'progress_update_dt': progress_update_dt,
+    'performance_school_scenario_hallways': performance_school_scenario_hallways,
 }
 
 

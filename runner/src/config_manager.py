@@ -94,7 +94,12 @@ class ConfigManager:
             self._config.output_dir = args.output_dir
         if hasattr(args, 'experiment_name'):
             self._config.experiment_name = args.experiment_name
-    
+
+    def update_from_dict(self, config: dict):
+        """Update partial configuration from a dictionary."""
+        for key, value in config.items():
+            setattr(self._config, key, value)
+        
     def set_custom_param(self, key: str, value: Any):
         """Set a custom parameter."""
         self._config.custom_params[key] = value

@@ -31,6 +31,17 @@ function setParameters
 	    Include="#include \"retqss_social_force_model.h\"");
 end setParameters;
 
+function onlyObstacleIterativeRepulsiveBorderEffect
+	input Integer particleID;
+	input Real cellEdgeLength;
+	output Real x;
+	output Real y;
+	output Real z;
+external "C" social_force_model_onlyObstacleIterativeRepulsiveBorderEffect(particleID, cellEdgeLength, x, y, z) annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.h\"");
+end onlyObstacleIterativeRepulsiveBorderEffect;
+
 function internalRepulsiveBorderEffect
 	input Real A;
 	input Real B;
@@ -611,6 +622,10 @@ algorithm
 		B := BORDER_B();
 		R := BORDER_R();
 		(totalX, totalY, totalZ) := neighborsRepulsiveBorderEffect(A, B, R, particleID, cellEdgeLength);
+	end if;
+
+	if BORDER_IMPLEMENTATION() == 4 then
+		(totalX, totalY, totalZ) := onlyObstacleIterativeRepulsiveBorderEffect(particleID, cellEdgeLength);
 	end if;
 
 	x := totalX;

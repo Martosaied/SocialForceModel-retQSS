@@ -70,6 +70,14 @@ void social_force_model_neighborsRepulsiveBorderEffect(
 	double *z
 );
 
+void social_force_model_onlyObstacleIterativeRepulsiveBorderEffect(
+	int particleID,
+	double cellEdgeLength,
+	double *x,
+	double *y,
+	double *z
+);
+
 void social_force_model_volumeBasedRepulsivePedestrianEffect(
 	int particleID,
 	double targetX,
