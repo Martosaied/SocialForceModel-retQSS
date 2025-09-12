@@ -57,6 +57,11 @@ Bool social_force_model_outputCSV(double time,
 	int N,
 	double *x);
 
+Bool social_force_model_notQSS_outputCSV(double time,
+	int N,
+	int *groupIDs,
+	double *x);
+
 void social_force_model_updateNeighboringVolumes(int particleID, int gridDivisions);
 
 void social_force_model_neighborsRepulsiveBorderEffect(
