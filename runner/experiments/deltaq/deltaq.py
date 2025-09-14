@@ -10,164 +10,207 @@ import pandas as pd
 import numpy as np
 from src.math.Density import Density
 from src.math.Clustering import Clustering
-from src.plots.DensityHeatmap import DensityHeatmap
 from src.plots.DensityRowGraph import DensityRowGraph
 
-DELTAQ = [-12, -11, -10, -9, -8, -7, -6, -5, -4, -3.5, -3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2]
 
-PEDESTRIAN_COUNT = int(20 * 50 * 0.3)
-WIDTH = 20
-VOLUMES = 50
+DELTAQ = [-8, -7, -6, -5, -4,-3.5, -3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5] # , 1, 1.5, 2]
+
+WIDTH = 50
+PEDESTRIAN_COUNT = int(50 * (50 * 0.4) * 0.3)
+VOLUMES = 1
 
 
 def deltaq():
-    print("Running iterations for 300 pedestrians reducing Tolerance and plotting lanes...\n")
+    print(f"Ejecutando iteraciones para {PEDESTRIAN_COUNT} peatones reduciendo Tolerancia y graficando carriles...\n")
     for deltaq in DELTAQ:
-        print(f"Running experiment for deltaq: {deltaq}")
+        print(f"Ejecutando experimento para deltaq: {deltaq}")
         run(deltaq)
 
-    # Plot the results
-    print("Plotting results...")
-    # plot_heatmap_by_deltaq()
-    # plot_results()
+    # Graficar los resultados
+    print("Graficando resultados...")
+    plot_results()
 
 def run(deltaq):
     """
-    Run the experiment for a given number of pedestrians.
+    Ejecuta el experimento para un número dado de peatones.
     """
     config = load_config('experiments/deltaq/config.json')
 
-    # Create output directory with experiment name if provided
+    # Crear directorio de salida con el nombre del experimento si se proporciona
     output_dir = create_output_dir(f'experiments/deltaq/results/deltaq_{deltaq}')
-    print(f"Created output directory: {output_dir}")
+    print(f"Directorio de salida creado: {output_dir}")
 
+    config['iterations'] = 10
     config['parameters']['N']['value'] = PEDESTRIAN_COUNT
     config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = Constants.PEDESTRIAN_MMOC
     config['parameters']['BORDER_IMPLEMENTATION']['value'] = Constants.BORDER_NONE
 
-    # Add from where to where pedestrians are generated
-    config['parameters']['FROM_Y']['value'] = (VOLUMES/ 2) - int(WIDTH / 2)
-    config['parameters']['TO_Y']['value'] = (VOLUMES/ 2) + int(WIDTH / 2)
+    # Agregar desde dónde hasta dónde se generan los peatones
+    config['parameters']['FROM_Y']['value'] = WIDTH * 0.3
+    config['parameters']['TO_Y']['value'] = WIDTH * 0.7
 
-    # Save config copy in experiment directory
+    # Guardar copia de configuración en el directorio del experimento
     config_copy_path = os.path.join(output_dir, 'config.json')
     with open(config_copy_path, 'w') as f:
         json.dump(config, f, indent=2)
 
     formatted_tolerance = np.format_float_positional(1 * 10 ** deltaq)
-    formatted_abs_tolerance = np.format_float_positional(1 * 10 ** (deltaq + 3))
+    formatted_abs_tolerance = np.format_float_positional(1 * 10 ** (deltaq - 3))
 
-    # Replace the grid divisions in the model
-    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/social_force_model.mo'])
-    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model.mo'])
-    subprocess.run(['sed', '-i', r's/\bTolerance=[0-9]*[.]*[0-9]\+[.]*/Tolerance=' + formatted_tolerance + '/g', '../retqss/model/social_force_model.mo'])
-    subprocess.run(['sed', '-i', r's/\bAbsTolerance=[0-9]*[.]*[0-9]\+[.]*/AbsTolerance=' + formatted_abs_tolerance + '/g', '../retqss/model/social_force_model.mo'])
+    print(f"Tolerance={formatted_tolerance}")
+    print(f"AbsTolerance={formatted_abs_tolerance}")
 
-    # Compile the C++ code if requested
+    # Reemplazar las divisiones de la grilla en el modelo
+    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/social_force_model_deltaq.mo'])
+    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model_deltaq.mo'])
+    subprocess.run([
+        'sed', '-i',
+        f's/^[[:space:]]*Tolerance=[^,]*/       Tolerance={formatted_tolerance}/g',
+        '../retqss/model/social_force_model_deltaq.mo'
+    ])
+    subprocess.run([
+        'sed', '-i',
+        f's/^[[:space:]]*AbsTolerance=[^,]*/       AbsTolerance={formatted_abs_tolerance}/g',
+        '../retqss/model/social_force_model_deltaq.mo'
+    ])
+
+    # Compilar el código C++ si se solicita
     compile_c_code()
 
-    # Compile the model if requested
-    compile_model('social_force_model')
+    # Compilar el modelo si se solicita
+    compile_model('social_force_model_deltaq')
 
-    # Run experiment
+    # Ejecutar experimento
     run_experiment(
         config, 
         output_dir, 
-        'social_force_model', 
+        'social_force_model_deltaq', 
         plot=False, 
         copy_results=True
     )
 
-    # Copy results from output directory to latest directory
+    # Copiar resultados del directorio de salida al directorio latest
     copy_results_to_latest(output_dir)
 
-    print(f"\nExperiment completed. Results saved in {output_dir}")
-
-def plot_heatmap_by_deltaq():
-    for deltaq in DELTAQ:
-        # Get the results files
-        results_files = [f for f in os.listdir(os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest')) if f.endswith('.csv')]
-
-        # Read the results files
-        groups_per_time = {}
-        groups_per_time_averaged = {}
-        for result_file in results_files: # Only the first one
-            if 'result_0.csv' in result_file:
-                DensityHeatmap(
-                    os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest', result_file),
-                    os.path.join('experiments/deltaq')
-                ).plot(f'DeltaQ: {deltaq}')
-                DensityRowGraph(
-                    os.path.join('experiments/deltaq/results', f'deltaq_{deltaq}', 'latest', result_file),
-                    os.path.join('experiments/deltaq')
-                ).plot(f'DeltaQ: {deltaq}')
-
+    print(f"\nExperimento completado. Resultados guardados en {output_dir}")
 
 def plot_results():
     """
-    Plot the results of the experiments.
+    Grafica los resultados del experimento de DeltaQ.
     """
-    # Get all the results directories
+    # Obtener todos los directorios de resultados
     results_dirs = [d for d in os.listdir('experiments/deltaq/results') if os.path.isdir(os.path.join('experiments/deltaq/results', d))]
 
-    # Read the results directories
-    groups_per_deltaq = {
-        deltaq: []
-        for deltaq in DELTAQ
-    }
-    performance_per_deltaq = {
-        deltaq: []
-        for deltaq in DELTAQ
-    }
+    # Inicializar estructuras de datos
+    performance_data = {deltaq: [] for deltaq in DELTAQ}
+    groups_data = {deltaq: [] for deltaq in DELTAQ}
+    
+    # Leer los directorios de resultados
     for result_dir in results_dirs:
         deltaq = float(result_dir.split('_')[1])
-        for result_file in os.listdir(os.path.join('experiments/deltaq/results', result_dir, 'latest')):
-            if result_file.endswith('.txt'):
-                with open(os.path.join('experiments/deltaq/results', result_dir, 'latest', result_file), 'r') as f:
-                    lines = f.readlines()
-                    for line in lines:
-                        performance_per_deltaq[deltaq].append(float(line))
-            
-            if result_file.endswith('.csv') and 'result_0' in result_file:
-                df = pd.read_csv(os.path.join('experiments/deltaq/results', result_dir, 'latest', result_file))
-                particles = int((len(df.columns) - 1) / 5)
+        result_path = os.path.join('experiments/deltaq/results', result_dir, 'latest')
+        
+        # Leer métricas del archivo CSV
+        metrics_file = os.path.join(result_path, 'metrics.csv')
+        if os.path.exists(metrics_file):
+            df_metrics = pd.read_csv(metrics_file)
+            for _, row in df_metrics.iterrows():
+                performance_data[deltaq].append(float(row['time']))
+                groups_data[deltaq].append(int(row['clustering_based_groups']))
 
-                groups = Clustering(df, particles).calculate_groups(
-                    from_y=(VOLUMES/ 2) - int(WIDTH / 2),
-                    to_y=(VOLUMES/ 2) + int(WIDTH / 2)
-                )
-                groups_per_deltaq[deltaq].append(groups)
-
-    for deltaq in DELTAQ:
-        groups_per_deltaq[deltaq] = np.mean(groups_per_deltaq[deltaq])
+    # Calcular estadísticas para cada deltaq
+    performance_stats = {}
+    groups_stats = {}
     
     for deltaq in DELTAQ:
-        performance_per_deltaq[deltaq] = np.mean(performance_per_deltaq[deltaq])
+        if performance_data[deltaq]:
+            performance_stats[deltaq] = {
+                'mean': np.mean(performance_data[deltaq]),
+                'std': np.std(performance_data[deltaq])
+            }
+        else:
+            performance_stats[deltaq] = {'mean': 0, 'std': 0}
+            
+        if groups_data[deltaq]:
+            groups_stats[deltaq] = {
+                'mean': np.mean(groups_data[deltaq]),
+                'std': np.std(groups_data[deltaq])
+            }
+        else:
+            groups_stats[deltaq] = {'mean': 0, 'std': 0}
 
-    # Sort the groups per width_
-    groups_per_deltaq = dict(sorted(groups_per_deltaq.items(), key=lambda item: item[0]))
-    n_groups = np.array(list(groups_per_deltaq.values()))
-    performance_per_deltaq = dict(sorted(performance_per_deltaq.items(), key=lambda item: item[0]))
-    performance = np.array(list(performance_per_deltaq.values()))
-    deltas = np.array(list(map(str, groups_per_deltaq.keys())))
+    # Ordenar por valores de deltaq
+    sorted_deltaqs = sorted(DELTAQ)
+    
+    # Extraer datos para graficar
+    performance_means = [performance_stats[dq]['mean'] for dq in sorted_deltaqs]
+    performance_stds = [performance_stats[dq]['std'] for dq in sorted_deltaqs]
+    groups_means = [groups_stats[dq]['mean'] for dq in sorted_deltaqs]
+    groups_stds = [groups_stats[dq]['std'] for dq in sorted_deltaqs]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-    ax1.set_title('Performance per deltaq at 15sec')
-    ax1.set_xlabel('DeltaQ')
-    ax1.set_ylabel('Performance')
-
-    ax2.set_title('Number of groups per deltaq at 15sec')
-    ax2.set_xlabel('DeltaQ')
-    ax2.set_ylabel('Number of groups')
-
-    # X axis is the deltaq, historigram with only the deltaq values
-    ax1.bar(deltas, performance, label='Performance(ms)')
-    ax2.bar(deltas, n_groups, label='Number of groups')
-
-    plt.legend()
-    plt.savefig(f'experiments/deltaq/performance_by_deltaq.png')
+    # Crear los gráficos
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+    fig.suptitle('Análisis de DeltaQ - Rendimiento y Formación de Carriles', fontsize=16, fontweight='bold')
+    
+    # Crear etiquetas con notación científica
+    deltaq_labels = [f'1e{dq}' for dq in sorted_deltaqs]
+    
+    # Gráfico 1: Rendimiento por DeltaQ
+    x_pos = np.arange(len(sorted_deltaqs))
+    bars1 = ax1.bar(x_pos, performance_means, yerr=performance_stds, 
+                    capsize=5, alpha=0.7, color='skyblue', edgecolor='navy', width=0.6)
+    ax1.set_title('Rendimiento por DeltaQ', fontsize=14)
+    ax1.set_xlabel('DeltaQ (Tolerancia)', fontsize=12)
+    ax1.set_ylabel('Tiempo de Ejecución (segundos)', fontsize=12)
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels(deltaq_labels, rotation=45, ha='right', fontsize=10)
+    ax1.grid(True, alpha=0.3)
+    
+    # Agregar valores en las barras (solo si hay espacio suficiente)
+    for i, (bar, mean, std) in enumerate(zip(bars1, performance_means, performance_stds)):
+        height = bar.get_height()
+        if height + std > 0:  # Solo mostrar si la barra es visible
+            ax1.text(bar.get_x() + bar.get_width()/2., height + std + max(performance_means) * 0.02,
+                    f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontsize=8, rotation=90)
+    
+    # Gráfico 2: Cantidad de Carriles por DeltaQ
+    bars2 = ax2.bar(x_pos, groups_means, yerr=groups_stds, 
+                    capsize=5, alpha=0.7, color='lightgreen', edgecolor='darkgreen', width=0.6)
+    ax2.set_title('Cantidad de Carriles Detectados por DeltaQ', fontsize=14)
+    ax2.set_xlabel('DeltaQ (Tolerancia)', fontsize=12)
+    ax2.set_ylabel('Número de Carriles', fontsize=12)
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels(deltaq_labels, rotation=45, ha='right', fontsize=10)
+    ax2.grid(True, alpha=0.3)
+    
+    # Agregar valores en las barras (solo si hay espacio suficiente)
+    for i, (bar, mean, std) in enumerate(zip(bars2, groups_means, groups_stds)):
+        height = bar.get_height()
+        if height + std > 0:  # Solo mostrar si la barra es visible
+            ax2.text(bar.get_x() + bar.get_width()/2., height + std + max(groups_means) * 0.02,
+                    f'{mean:.1f}±{std:.1f}', ha='center', va='bottom', fontsize=8, rotation=90)
+    
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.15)  # Más espacio para las etiquetas rotadas
+    plt.savefig('experiments/deltaq/performance_by_deltaq.png', dpi=300, bbox_inches='tight')
     plt.close()
-
+    
+    # Imprimir resumen
+    print("\n" + "="*80)
+    print("RESUMEN DE RESULTADOS DELTAQ")
+    print("="*80)
+    print(f"{'DeltaQ':<8} {'Tolerancia':<12} {'Rendimiento (s)':<15} {'Carriles':<10}")
+    print("-" * 80)
+    
+    for dq in sorted_deltaqs:
+        perf_mean = performance_stats[dq]['mean']
+        perf_std = performance_stats[dq]['std']
+        groups_mean = groups_stats[dq]['mean']
+        groups_std = groups_stats[dq]['std']
+        tolerance = f"1e{dq}"
+        print(f"{dq:<8} {tolerance:<12} {perf_mean:.2f}±{perf_std:.2f}     {groups_mean:.1f}±{groups_std:.1f}")
+    
+    print("="*80)
 
 if __name__ == '__main__':
     deltaq()

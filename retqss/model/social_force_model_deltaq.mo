@@ -87,8 +87,7 @@ discrete Real nextProgressTick;
 discrete Real nextMotivationTick;
 
 // local variables
-discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID, groupID;
-discrete Boolean isolate;
+discrete Real _, hx, hy, hz, groupID;
 
 
 initial algorithm
@@ -165,16 +164,6 @@ equation
   Model's time events
 */
 algorithm	
-
-	//EVENT: particle enters a volume and update neighboring volumes that are obstacles
-	for i in 1:N loop
-		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
-			if BORDER_IMPLEMENTATION == 3 then
-				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
-			end if;
-		end when;
-	end for;
-
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
 		_ := social_force_model_outputCSV(time, N, x, y, vx, vy);
@@ -188,8 +177,7 @@ algorithm
 
 	
 	when time > nextMotivationTick then
-		nextMotivationTick := time + PROGRESS_UPDATE_DT;
-		// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
+		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
 		for i in 1:N loop
 			hx := dx[i];
 			hy := dy[i];
@@ -244,8 +232,8 @@ annotation(
 		Jacobian=Dense,
 		StartTime=0.0,
 		StopTime=1000.0,
-		Tolerance={1e-5},
-		AbsTolerance={1e-8}
+       Tolerance=3.1622776601683795,
+       AbsTolerance=0.0031622776601683794
 	));
 
 end social_force_model;

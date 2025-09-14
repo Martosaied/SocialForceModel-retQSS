@@ -12,7 +12,7 @@ import retQSS_helbing_not_qss;
 */
 
 constant Integer
-	N = 50;
+	N = 100;
 
 // Initial conditions parameters
 parameter Integer
@@ -42,15 +42,14 @@ parameter Real
   Model variables
 */
 
-// Particles position (continuous states)
+// Particles position
 Real x[N], y[N], z[N];
 
-// Particles velocity (continuous states)
+// Particles velocity
 Real vx[N], vy[N], vz[N];
 
-// --- accelerations are now DISCRETE (piecewise-constant inputs updated by events)
-//     This avoids making them continuous algebraic states and keeps the model ODE form.
-discrete Real axd[N], ayd[N], azd[N];
+// Particles acceleration
+Real ax[N], ay[N], az[N];
 
 // Particles desired destination variables
 discrete Real dx[N], dy[N], dz[N];
@@ -70,6 +69,7 @@ discrete Integer groupIDs[N];
 // Also it is used to set a maximum running time when developing or debugging
 discrete Real terminateTime;
 
+
 // Variable used to control and trigger periodic output
 discrete Real nextOutputTick;
 
@@ -78,9 +78,6 @@ discrete Real nextProgressTick;
 
 // Variable used to control and trigger motivation update
 discrete Real nextMotivationTick;
-
-// Previous time that motivates were computed
-discrete Real previousMotivationTick;
 
 // local variables
 discrete Real _, ux, uy, uz, hx, hy, hz;
@@ -104,18 +101,12 @@ initial algorithm
         (groupID, x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, FROM_Y, TO_Y);
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
 		groupIDs[i] := groupID;
-
-        // initialize discrete accelerations to zero
-        axd[i] := 0.0;
-        ayd[i] := 0.0;
-        azd[i] := 0.0;
     end for;
 
     terminateTime := FORCE_TERMINATION_AT;
     nextProgressTick := EPS;
 	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
-	previousMotivationTick := EPS;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
 
     
@@ -128,11 +119,12 @@ equation
         der(x[i])  = vx[i];
         der(y[i])  = vy[i];
         der(z[i])  = vz[i];
-
-        // velocities driven by the current (discrete) accelerations
-        der(vx[i]) = 0;
-        der(vy[i]) = 0;
-        der(vz[i]) = 0;
+        der(vx[i]) = ax[i];
+        der(vy[i]) = ay[i];
+        der(vz[i]) = az[i];
+		der(ax[i]) = 0.0;
+		der(ay[i]) = 0.0;
+		der(az[i]) = 0.0;
     end for;
 
 /*
@@ -161,12 +153,9 @@ algorithm
 			hy := dy[i];
 			hz := dz[i];
 			(hx, hy, hz) := pedestrianTotalMotivation(i, N, x, y, z, vx, vy, vz, hx, hy, hz);
-
-			// update discrete accelerations (use assignment, not reinit of continuous state)
-			// this makes accelerations piecewise-constant inputs between events
-			reinit(vx[i], vx[i] + hx*(time-previousMotivationTick));
-			reinit(vy[i], vy[i] + hy*(time-previousMotivationTick));
-			reinit(vz[i], vz[i] + hz*(time-previousMotivationTick));
+			reinit(ax[i], hx);
+			reinit(ay[i], hy);
+			reinit(az[i], hz);	
 		end for;
 
 		for i in 1:N loop
@@ -194,27 +183,28 @@ algorithm
 				end if;
 			end if;
 		end for;
-		previousMotivationTick := time;
 	end when;
 
 
 	//EVENT: Next progress output time: prints a new line in stdout and computes the next output time incrementing the variable
 	when time > nextProgressTick then
+		// _ := debug(INFO(), time, "Progress checkpoint",_,_,_,_);
         nextProgressTick := time + PROGRESS_UPDATE_DT;
 	end when;
 	
 
 annotation(
-  experiment(
-    MMO_Solver=DASSL,
-    StartTime=0.0,
-    StopTime=1000.0,
-    Tolerance={1e-8},
-    AbsTolerance={1e-10},
-    MMO_MinStep={1e-12},
-    MMO_SymDiff=true,
-    Jacobian="Dense"
-  )
-);
+	experiment(
+		MMO_Description="Indirect infection of particles interacting through volumes.",
+		MMO_Solver=QSS2,
+		MMO_SymDiff=false,
+		MMO_PartitionMethod=Metis,
+		MMO_Scheduler=ST_Binary,
+		Jacobian=Dense,
+		StartTime=0.0,
+		StopTime=1000.0,
+		Tolerance={1e-5},
+		AbsTolerance={1e-8}
+	));
 
 end helbing_not_qss;

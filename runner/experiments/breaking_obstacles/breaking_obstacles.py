@@ -18,10 +18,10 @@ GRID_SIZE = 50
 PEDESTRIAN_DENSITY = 0.3
 
 """
-Generate a matrix with 0s and 1s, where 0 is a free space and 1 is an obstacle.
-The matrix is a square matrix with the size volumes * volumes.
-The obstacles are placed in the center of the matrix as a wall that divides the matrix in two.
-The index start from the bottom left corner as 1. And is ascending up through the column.
+Generar una matriz con 0s y 1s, donde 0 es un espacio libre y 1 es un obstáculo.
+La matriz es una matriz cuadrada con el tamaño volúmenes * volúmenes.
+Los obstáculos se colocan en el centro de la matriz como una pared que divide la matriz en dos.
+El índice comienza desde la esquina inferior izquierda como 1. Y asciende hacia arriba a través de la columna.
 """
 def generate_obstacles(volumes):
     obstacles = np.zeros((volumes, volumes))
@@ -30,29 +30,29 @@ def generate_obstacles(volumes):
     
 
 def breaking_obstacles():
-    print("Running experiments for 300 pedestrians in different volumes to see if the lanes break...\n")
+    print("Ejecutando experimentos para 300 peatones en diferentes volúmenes para ver si los carriles se rompen...\n")
     for volume in VOLUMES:
         for implementation in PEDESTRIANS_IMPLEMENTATION:
-            print(f"Running experiment for {volume} volumes with implementation {implementation}...")
+            print(f"Ejecutando experimento para {volume} volúmenes con implementación {implementation}...")
             run(volume, implementation)
-            print(f"Experiment for {volume} volumes with implementation {implementation} completed.\n")
+            print(f"Experimento para {volume} volúmenes con implementación {implementation} completado.\n")
 
-    # Plot the results
-    print("Plotting results...")
+    # Graficar los resultados
+    print("Graficando resultados...")
     # plot_results()
 
 def run(volume, implementation):
     """
-    Run the experiment for a given number of pedestrians.
+    Ejecuta el experimento para un número dado de peatones.
     """
     config = load_config('./experiments/breaking_obstacles/config.json')
 
-    # Create output directory with experiment name if provided
+    # Crear directorio de salida con el nombre del experimento si se proporciona
     output_dir = create_output_dir(
         'experiments/breaking_obstacles/results', 
         f'volume_{volume}_implementation_{PEDESTRIANS_IMPLEMENTATION[implementation]}'
     )
-    print(f"Created output directory: {output_dir}")
+    print(f"Directorio de salida creado: {output_dir}")
 
     pedestrians = int(PEDESTRIAN_DENSITY * WIDTH * GRID_SIZE)
     config['iterations'] = 1
@@ -65,7 +65,7 @@ def run(volume, implementation):
         'type': 'map'
     }
 
-    # Add from where to where pedestrians are generated
+    # Agregar desde dónde hasta dónde se generan los peatones
     config['parameters']['FROM_Y'] = {
       "name": "FROM_Y",
       "type": "value",
@@ -78,7 +78,7 @@ def run(volume, implementation):
     }
 
 
-    # Save config copy in experiment directory
+    # Guardar copia de configuración en el directorio del experimento
     config_copy_path = os.path.join(output_dir, 'config.json')
     with open(config_copy_path, 'w') as f:
         json.dump(config, f, indent=2)
@@ -86,13 +86,13 @@ def run(volume, implementation):
     subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(volume) + '/', '../retqss/model/social_force_model.mo'])
     subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(pedestrians) + '/', '../retqss/model/social_force_model.mo'])
 
-    # Compile the C++ code if requested
+    # Compilar el código C++ si se solicita
     compile_c_code()
 
-    # Compile the model if requested
+    # Compilar el modelo si se solicita
     compile_model('social_force_model')
 
-    # Run experiment
+    # Ejecutar experimento
     run_experiment(
         config, 
         output_dir, 
@@ -101,10 +101,10 @@ def run(volume, implementation):
         copy_results=True
     )
 
-    # Copy results from output directory to latest directory
+    # Copiar resultados del directorio de salida al directorio latest
     copy_results_to_latest(output_dir)
 
-    print(f"\nExperiment completed. Results saved in {output_dir}")
+    print(f"\nExperimento completado. Resultados guardados en {output_dir}")
 
 
 def plot_results():

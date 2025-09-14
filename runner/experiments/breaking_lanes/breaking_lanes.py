@@ -46,16 +46,16 @@ PEDESTRIAN_DENSITY = 0.3
 CONFIDENCE_LEVEL = 0.95  # 95% confidence interval
 
 def breaking_lanes():
-    print("Running experiments for 300 pedestrians with different cell sizes to see if the lanes break...\n")
+    print("Ejecutando experimentos para 300 peatones con diferentes tamaños de celda para ver si los carriles se rompen...\n")
     # run(1.0, Constants.NO_PEDESTRIANS)
     for cell_size in CELL_SIZES:
         for implementation in PEDESTRIANS_IMPLEMENTATION:
-            print(f"Running experiment for cell size {cell_size}m with implementation {implementation}...")
+            print(f"Ejecutando experimento para tamaño de celda {cell_size}m con implementación {implementation}...")
             # run(cell_size, implementation)
-            print(f"Experiment for cell size {cell_size}m with implementation {implementation} completed.\n")
+            print(f"Experimento para tamaño de celda {cell_size}m con implementación {implementation} completado.\n")
 
-    # Plot the results
-    print("Plotting results...")
+    # Graficar los resultados
+    print("Graficando resultados...")
     plot_results()
 
 def run(cell_size, implementation):

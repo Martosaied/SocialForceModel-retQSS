@@ -85,4 +85,22 @@ algorithm
 	borderR := getRealModelParameter("BORDER_R", 0.1);
 end BORDER_R;
 
+function FROM_Y
+	output Real fromY;
+algorithm
+	fromY := getRealModelParameter("FROM_Y", 0.0);
+end FROM_Y;
+
+function TO_Y
+	output Real toY;
+algorithm
+	toY := getRealModelParameter("TO_Y", 20.0);
+end TO_Y;
+
+function GRID_SIZE
+	output Real gridSize;
+algorithm
+	gridSize := getRealModelParameter("GRID_SIZE", 20.0);
+end GRID_SIZE;
+
 end retQSS_social_force_model_params;

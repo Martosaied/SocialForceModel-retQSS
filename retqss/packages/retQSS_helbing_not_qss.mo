@@ -16,11 +16,11 @@ end setParameters;
 function outputCSV
 	input Real time;
 	input Integer N;
-	input Integer groupIDs[1];
 	input Real x[1];
 	input Real y[1];
 	input Real vx[1];
 	input Real vy[1];
+	input Integer groupIDs[1];
 	output Boolean status;
 	external "C" status=social_force_model_notQSS_outputCSV(time, N, groupIDs, x) annotation(
 	    Library="social_force_model",
@@ -295,6 +295,114 @@ algorithm
 	z := totalRepulsiveZ;	
 end totalRepulsivePedestrianEffect;
 
+function repulsiveBorderEffect
+	input Integer particleID;
+	input Real X[1];
+	input Real Y[1];
+	input Real Z[1];
+	input Real VX[1];
+	input Real VY[1];
+	input Real VZ[1];
+	input Real corridorWidth;
+	input Real gridSize;
+	output Real x;
+	output Real y;
+	output Real z;
+protected
+	Real A;
+	Real B;
+	Real R;
+	Real pX;
+	Real pY;
+	Real pZ;
+	Real vX;
+	Real vY;
+	Real vZ;
+	Real corridorTopY;
+	Real corridorBottomY;
+	Real distanceToTop;
+	Real distanceToBottom;
+	Real nearestWallY;
+	Real distanceToWall;
+	Real normalizedY;
+	Real fy;
+algorithm
+	A := BORDER_A();
+	B := BORDER_B();
+	R := BORDER_R();
+
+	pX := equationArrayGet(X, particleID);
+	pY := equationArrayGet(Y, particleID);
+	pZ := equationArrayGet(Z, particleID);
+	vX := equationArrayGet(VX, particleID);
+	vY := equationArrayGet(VY, particleID);
+	vZ := equationArrayGet(VZ, particleID);
+
+	// Calculate the Y positions of the two horizontal corridor walls
+	corridorTopY := (gridSize / 2.0) + (corridorWidth / 2.0);
+	corridorBottomY := (gridSize / 2.0) - (corridorWidth / 2.0);
+
+	// Calculate distances to both walls
+	distanceToTop := abs(pY - corridorTopY);
+	distanceToBottom := abs(pY - corridorBottomY);
+
+	// Find the nearest wall
+	nearestWallY := 0.0;
+	distanceToWall := 0.0;
+	if distanceToTop < distanceToBottom then
+		nearestWallY := corridorTopY;
+		distanceToWall := distanceToTop;
+	else
+		nearestWallY := corridorBottomY;
+		distanceToWall := distanceToBottom;
+	end if;
+
+	// Calculate normalized direction to the nearest wall (only Y component)
+	normalizedY := (pY - nearestWallY) / distanceToWall;
+	
+	// Apply repulsive force only in Y direction
+	fy := A*exp((R-distanceToWall)/B)*normalizedY;
+
+	x := 0;  // No force in X direction
+	y := fy; // Only force in Y direction
+	z := 0;  // No force in Z direction
+end repulsiveBorderEffect;
+
+function totalRepulsiveBorderEffect
+	input Integer particleID;
+	input Real X[1];
+	input Real Y[1];
+	input Real Z[1];
+	input Real VX[1];
+	input Real VY[1];
+	input Real VZ[1];
+	output Real x;
+	output Real y;
+	output Real z;
+protected
+	Real repulsiveX;
+	Real repulsiveY;
+	Real repulsiveZ;
+	Real gridSize;
+	Real corridorWidth;
+	Real fromY;
+	Real toY;
+algorithm
+	// Get parameters from the model
+	gridSize := GRID_SIZE();
+	fromY := FROM_Y();
+	toY := TO_Y();
+	
+	// Calculate corridor width from FROM_Y and TO_Y parameters
+	corridorWidth := toY - fromY;
+
+	(repulsiveX, repulsiveY, repulsiveZ) := repulsiveBorderEffect(particleID, X, Y, Z, VX, VY, VZ, corridorWidth, gridSize);
+
+	x := repulsiveX;
+	y := repulsiveY;
+	z := repulsiveZ;
+end totalRepulsiveBorderEffect;
+
 
 function pedestrianTotalMotivation
 	input Integer particleID;
@@ -319,6 +427,9 @@ protected
 	Real repulsiveX;
 	Real repulsiveY;
 	Real repulsiveZ;
+	Real wallX;
+	Real wallY;
+	Real wallZ;
 	Real accelerationX;
 	Real accelerationY;
 	Real accelerationZ;
@@ -328,10 +439,11 @@ protected
 algorithm
 	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
 	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(totalNumberOfParticles, particleID, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
+	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(particleID, pX, pY, pZ, vX, vY, vZ);
 
-	resultX := accelerationX + repulsiveX;
-	resultY := accelerationY + repulsiveY;
-	resultZ := accelerationZ + repulsiveZ;
+	resultX := accelerationX + repulsiveX + wallX;
+	resultY := accelerationY + repulsiveY + wallY;
+	resultZ := accelerationZ + repulsiveZ + wallZ;
 
 	x := resultX;
 	y := resultY;

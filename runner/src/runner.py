@@ -79,7 +79,7 @@ def run_model(model_name: str, directory: str, parameters: dict):
 def setup_parameters(model_name: str, parameters: dict, iteration: int, directory: str):
     """Setup parameters for the model."""
 
-    random.seed(iteration)
+    # random.seed(iteration)
     seed = random.randint(0, 1000000)
     # Create a parameters.config file
     f = open(f"{directory}/parameters.config", "w")
