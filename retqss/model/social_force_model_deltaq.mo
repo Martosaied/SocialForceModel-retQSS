@@ -232,8 +232,8 @@ annotation(
 		Jacobian=Dense,
 		StartTime=0.0,
 		StopTime=1000.0,
-       Tolerance=3.1622776601683795,
-       AbsTolerance=0.0031622776601683794
+       Tolerance=0.00000001,
+       AbsTolerance=0.00000000001
 	));
 
 end social_force_model;

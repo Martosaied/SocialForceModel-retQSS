@@ -32,12 +32,12 @@ IMPLEMENTATION_CONFIGS = {
     'mmoc_border4': {
         'PEDESTRIAN_IMPLEMENTATION': 0,
         'BORDER_IMPLEMENTATION': 4,
-        'name': 'MMOC'
+        'name': 'RETQSS'
     },
     'retqss_border3': {
         'PEDESTRIAN_IMPLEMENTATION': 1,
         'BORDER_IMPLEMENTATION': 3,
-        'name': 'RETQSS'
+        'name': 'RETQSS Optimizado'
     }
 }
 
@@ -183,18 +183,18 @@ def run_single_experiment(base_config, scenario_params, impl_config, config_name
     subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(scenario_params['pedestrian_count']) + '/', model_path])
     subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(scenario_params['grid_divisions']) + '/', model_path])
     
-    # Compile the C++ code and model
-    compile_c_code()
-    compile_model('helbing_school_hallway')
+    # # Compile the C++ code and model
+    # compile_c_code()
+    # compile_model('helbing_school_hallway')
     
-    # Run experiment
-    run_experiment(
-        config, 
-        output_dir, 
-        'helbing_school_hallway', 
-        plot=False, 
-        copy_results=False
-    )
+    # # Run experiment
+    # run_experiment(
+    #     config, 
+    #     output_dir, 
+    #     'helbing_school_hallway', 
+    #     plot=False, 
+    #     copy_results=False
+    # )
     
     # Copy results from output directory to latest directory
     copy_results_to_latest(output_dir)
@@ -412,8 +412,8 @@ def plot_performance_comparison(results):
     
     for i, config_type in enumerate(df['config_type'].unique()):
         config_data = df[df['config_type'] == config_type]
-        mmoc_data = config_data[config_data['implementation'] == 'MMOC'].sort_values('grid_divisions')
-        retqss_data = config_data[config_data['implementation'] == 'RETQSS'].sort_values('grid_divisions')
+        mmoc_data = config_data[config_data['implementation'] == 'RETQSS'].sort_values('grid_divisions')
+        retqss_data = config_data[config_data['implementation'] == 'RETQSS Optimizado'].sort_values('grid_divisions')
         
         if not mmoc_data.empty and not retqss_data.empty:
             # Merge data to calculate speedup
@@ -429,8 +429,8 @@ def plot_performance_comparison(results):
     
     plt.axhline(y=1, color='black', linestyle='--', alpha=0.5, label='Rendimiento Igual')
     plt.xlabel('Divisiones de Grilla')
-    plt.ylabel('Mejora de Rendimiento (Tiempo MMOC / Tiempo RETQSS)')
-    plt.title('Mejora de Rendimiento: MMOC vs RETQSS')
+    plt.ylabel('Mejora de Rendimiento (Tiempo RETQSS / Tiempo RETQSS Optimizado)')
+    plt.title('Mejora de Rendimiento: RETQSS vs RETQSS Optimizado')
     plt.legend()
     plt.grid(True, alpha=0.3)
     
@@ -613,7 +613,7 @@ def generate_single_flowgraph(config_type, config_name_spanish, scenario_params,
     obstacles = np.array(school_config['OBSTACLES'])
     hallways = np.array(school_config['HALLWAYS'])
     classrooms = np.array(school_config['CLASSROOMS'])
-    
+
     # Color each cell based on its type
     for i in range(grid_divisions):
         for j in range(grid_divisions):
@@ -631,8 +631,8 @@ def generate_single_flowgraph(config_type, config_name_spanish, scenario_params,
                 cell_type = 'hallway'
                 alpha = 0.4
             else:
-                cell_type = 'empty'
-                alpha = 0.0
+                cell_type = 'hallway' # Default to hallway because i can't fix the issue with the empty cells
+                alpha = 0.4
             
             if cell_type != 'empty':
                 color = cell_colors[cell_type]

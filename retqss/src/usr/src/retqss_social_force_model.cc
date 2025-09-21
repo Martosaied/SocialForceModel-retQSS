@@ -513,8 +513,8 @@ Bool social_force_model_outputCSV(double time,
 
 Bool social_force_model_notQSS_outputCSV(double time,
 	int N,
-	int *groupIDs,
-	double *x)
+	double *x,
+	double *groupIDs)
 {
 	if(!social_force_model_started) {
 		sfm_outputCSV << "time";
@@ -526,11 +526,11 @@ Bool social_force_model_notQSS_outputCSV(double time,
 	} 
 	sfm_outputCSV << std::fixed << std::setprecision(4) << time;
 	for(int i=0; i < N; i++){
-	    int pType = groupIDs[i];
 		double y = x[(i+N)*3];
 		double vx = x[(i+2*N)];
 		double vy = x[(i+3*N)];
-		sfm_outputCSV << "," << x[i*3] << "," << y << "," << vx << "," << vy << "," << pType;
+	    double pType = groupIDs[i];
+		sfm_outputCSV << "," << x[i*3] << "," << y << "," << vx << "," << vy << "," << groupIDs[i];
 	}
 	sfm_outputCSV << std::endl;
 	sfm_outputCSV.flush();

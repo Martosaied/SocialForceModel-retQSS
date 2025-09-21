@@ -9,30 +9,24 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from scipy import stats
-
+from src.math.Clustering import Clustering
 from src.runner import run_experiment, compile_c_code, compile_model
 from src.utils import load_config, create_output_dir, copy_results_to_latest, generate_map
 from src.constants import Constants
 
+
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
-# Publication-quality plotting settings
-plt.rcParams.update({
-    'font.size': 12,
-    'font.family': 'serif',
-    'font.serif': ['Times New Roman', 'DejaVu Serif'],
-    'axes.linewidth': 1.2,
-    'axes.spines.top': False,
-    'axes.spines.right': False,
-    'figure.dpi': 300,
-    'savefig.dpi': 300,
-    'savefig.bbox': 'tight',
-    'savefig.pad_inches': 0.1,
-})
+# Reset to default font
+plt.rcdefaults()
+
+# Use metrics.csv file to get the data
+use_metrics_csv = True
+run_experiments = True
 
 # Experiment parameters
-WIDTHS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+WIDTHS = [10]
 PEDESTRIAN_DENSITY = 0.3
 VOLUMES = 50
 GRID_SIZE = 50
@@ -100,23 +94,23 @@ class LanesByWidthExperiment:
         config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = Constants.PEDESTRIAN_MMOC
         
         # Generate map
-        generated_map = generate_map(VOLUMES, width)
-        config['parameters']['OBSTACLES'] = {
-            "name": "OBSTACLES",
-            "type": "map",
-            "map": generated_map
-        }
+        # generated_map = generate_map(VOLUMES, width)
+        # config['parameters']['OBSTACLES'] = {
+        #     "name": "OBSTACLES",
+        #     "type": "map",
+        #     "map": generated_map
+        # }
         
         # Set pedestrian generation boundaries
         config['parameters']['FROM_Y'] = {
             "name": "FROM_Y",
             "type": "value",
-            "value": (GRID_SIZE / 2) - int(width / 2)
+            "value": (GRID_SIZE / 2) - (width / 2)
         }
         config['parameters']['TO_Y'] = {
             "name": "TO_Y",
             "type": "value",
-            "value": (GRID_SIZE / 2) + int(width / 2)
+            "value": (GRID_SIZE / 2) + (width / 2)
         }
         
         # Save configuration
@@ -129,12 +123,12 @@ class LanesByWidthExperiment:
         
         # Compile and run
         compile_c_code()
-        compile_model('social_force_model')
+        compile_model('helbing_not_qss')
         
         run_experiment(
             config, 
             output_dir, 
-            'social_force_model', 
+            'helbing_not_qss', 
             plot=False, 
             copy_results=True
         )
@@ -146,12 +140,12 @@ class LanesByWidthExperiment:
         subprocess.run([
             'sed', '-i', 
             r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(volumes) + '/', 
-            '../retqss/model/social_force_model.mo'
+            '../retqss/model/helbing_not_qss.mo'
         ])
         subprocess.run([
             'sed', '-i', 
             r's/\bN\s*=\s*[0-9]\+/N = ' + str(pedestrians) + '/', 
-            '../retqss/model/social_force_model.mo'
+            '../retqss/model/helbing_not_qss.mo'
         ])
     
     def _create_lanes_plot(self) -> None:
@@ -174,8 +168,8 @@ class LanesByWidthExperiment:
             if width not in WIDTHS:
                 continue
                 
-            metrics_path = os.path.join('experiments/lanes_by_width/results', result_dir, 'metrics.csv')
-            if os.path.exists(metrics_path):
+            metrics_path = os.path.join('experiments/lanes_by_width/results', result_dir, 'latest', 'metrics.csv')
+            if os.path.exists(metrics_path) and use_metrics_csv:
                 try:
                     metrics_df = pd.read_csv(metrics_path)
                     if 'clustering_based_groups' in metrics_df.columns:
@@ -184,6 +178,16 @@ class LanesByWidthExperiment:
                         print(f"  Using metrics.csv for width {width}: {len(groups_data)} data points")
                 except Exception as e:
                     print(f"Warning: Could not read metrics.csv for width {width}: {e}")
+            else:
+                groups_data = []
+                for result_file in os.listdir(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest')):
+                    if result_file.endswith('.csv') and result_file != 'metrics.csv':
+                        df = pd.read_csv(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest', result_file))
+                        particles = (len(df.columns) - 1) / 5
+                        groups = Clustering(df, int(particles)).calculate_groups(start_index=100, sample_rate=5)
+                        groups_data.append(groups)
+                lanes_data[width].extend(groups_data)
+                print(f"Using solution.csv for width {width}: {len(groups_data)} data points")
         
         # Calculate statistics
         widths = []
@@ -208,38 +212,52 @@ class LanesByWidthExperiment:
         means = np.array(means)
         stds = np.array(stds)
         
-        # Plot with error bars
-        ax.errorbar(widths, means, yerr=stds, fmt='o-', 
-                   markersize=10, capsize=6, capthick=2.5, elinewidth=2.5,
-                   label='Experimental Data (±1σ)', color='#2E86AB', alpha=0.9, zorder=3)
+        # Plot with error bars (no connecting lines)
+        ax.errorbar(widths, means, yerr=stds, fmt='o', 
+                   markersize=10, capsize=6, capthick=2.5, elinewidth=2.5, color='steelblue', alpha=0.9, zorder=3,
+                   markeredgecolor='navy', markeredgewidth=2)
         
         # Fit linear line
         if len(widths) > 1:
             slope, intercept, r_value, p_value, std_err = stats.linregress(widths, means)
             line_x = np.array([min(widths), max(widths)])
             line_y = slope * line_x + intercept
-            ax.plot(line_x, line_y, '--', linewidth=3, color='#F18F01', 
-                   label=f'Linear fit (R² = {r_value**2:.3f})', zorder=2)
+            ax.plot(line_x, line_y, '--', linewidth=3, color='lightcoral', 
+                   label=f'Ajuste Lineal (R² = {r_value**2:.3f})', zorder=2)
         
         # Customize plot
-        ax.set_xlabel('Corridor Width (cells)', fontsize=16, fontweight='bold')
-        ax.set_ylabel('Number of Lane Groups', fontsize=16, fontweight='bold')
-        ax.set_title('Lane Formation vs. Corridor Width', fontsize=18, fontweight='bold', pad=25)
+        ax.set_xlabel('Ancho del Corredor (Metros)', fontsize=16, fontweight='bold')
+        ax.set_ylabel('Número de Carriles (Promedio)', fontsize=16, fontweight='bold')
+        ax.set_title('Formación de Carriles vs. Ancho del Corredor', fontsize=18, fontweight='bold', pad=25)
         
         ax.grid(True, alpha=0.4, linestyle='--', zorder=1)
         ax.legend(fontsize=14, framealpha=0.95, loc='upper left')
-        
-        # Add statistical information
-        stats_text = f'Data points: {len(widths)}\nPedestrian density: {PEDESTRIAN_DENSITY}\nGrid size: {GRID_SIZE}'
-        ax.text(0.02, 0.95, stats_text, transform=ax.transAxes,
-               verticalalignment='top', fontsize=11,
-               bbox=dict(boxstyle='round,pad=0.5', facecolor='lightblue', alpha=0.9))
         
         # Set axis limits
         ax.set_xlim(min(widths) - 0.5, max(widths) + 0.5)
         y_min = max(0, min(means - stds) - 0.5)
         y_max = max(means + stds) + 0.5
         ax.set_ylim(y_min, y_max)
+        
+        # Add parameter note in the top-right corner
+        param_text = (
+            f"Parámetros de Simulación:\n"
+            f"Duración: 60.0 s\n"
+            f"Densidad peatones: {PEDESTRIAN_DENSITY}\n"
+            f"Parámetros Helbing:\n"
+            f"A = 2.1m/s²\n"
+            f"B = 0.7 m\n"
+            f"r = 0.3 m\n"
+            f"λ (relaxation) = 0.5\n"
+            f"μ (velocidad) = 1.34 m/s\n"
+            f"σ (desv. vel.) = 0.26 m/s"
+        )
+        
+        # Add text box with parameters
+        ax.text(0.27, 0.90, param_text, transform=ax.transAxes, 
+                fontsize=14, verticalalignment='top', horizontalalignment='right',
+                bbox=dict(boxstyle='round,pad=0.5', facecolor='lightgray', alpha=0.8),
+                zorder=10)
         
         plt.tight_layout()
         plt.savefig(self.figures_dir / 'lanes_by_width.png', dpi=300, bbox_inches='tight')
@@ -248,7 +266,7 @@ class LanesByWidthExperiment:
         print(f"Plot saved to: {self.figures_dir / 'lanes_by_width.png'}")
 
 
-def lanes_by_width(run_experiments: bool = False):
+def lanes_by_width():
     """
     Main function to run the lanes by width experiment.
     
@@ -271,4 +289,4 @@ def plot_results():
 
 if __name__ == '__main__':
     # Set to True to run all experiments, False to only analyze existing results
-    lanes_by_width(run_experiments=False)
+    lanes_by_width(run_experiments=run_experiments)

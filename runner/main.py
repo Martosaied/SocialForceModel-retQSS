@@ -19,8 +19,9 @@ from experiments.lanes_by_R.lanes_by_R import lanes_by_R
 from experiments.lanes_by_A.lanes_by_A import lanes_by_A
 from experiments.lanes_heatmap.lanes_heatmap import lanes_heatmap
 from experiments.subway_attack_rate.subway_attack_rate import subway_attack_rate
-from experiments.progress_update_dt.progress_update_dt import progress_update_dt
 from experiments.performance_school_scenario.performance_school_scenario_hallways import performance_school_scenario_hallways
+from experiments.motivation_update_dt.motivation_update_dt import motivation_update_dt
+from experiments.motivation_tick_deltaq_heatmap.motivation_tick_deltaq_heatmap import motivation_tick_deltaq_heatmap
 from src.plotter import Plotter
 
 
@@ -40,8 +41,9 @@ EXPERIMENT_REGISTRY = {
     'lanes_heatmap': lanes_heatmap,
     'breaking_obstacles': breaking_obstacles,
     'subway_attack_rate': subway_attack_rate,
-    'progress_update_dt': progress_update_dt,
     'performance_school_scenario_hallways': performance_school_scenario_hallways,
+    'motivation_update_dt': motivation_update_dt,
+    'motivation_tick_deltaq_heatmap': motivation_tick_deltaq_heatmap,
 }
 
 
@@ -135,7 +137,8 @@ def handle_plot_command(args):
             plotter.density_heatmap(args.solution_file, args.output_dir),
             plotter.density_row_graph(args.solution_file, args.output_dir)
         ),
-        'flow_graph_infections': lambda: plotter.flow_graph_infections(args.solution_file, args.output_dir, config)
+        'flow_graph_infections': lambda: plotter.flow_graph_infections(args.solution_file, args.output_dir, config),
+        'flow_graph_single_frame': lambda: plotter.flow_graph_single_frame(args.solution_file, args.output_dir, config)
     }
     
     if args.plot in plot_handlers:

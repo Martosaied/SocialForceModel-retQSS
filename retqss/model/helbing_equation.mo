@@ -1,4 +1,4 @@
-model helbing_not_qss
+model helbing_equation
 
 import retQSS;
 import retQSS_utils;
@@ -34,9 +34,16 @@ parameter Real
 	INF = 1e20,
 	EPS = 1e-5,
 	PI = 3.1415926,
-	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.5),
+	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.1),
     MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1),
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0);
+
+// Helbing model parameters (simplified - only first term)
+parameter Real
+	PEDESTRIAN_A1 = getRealModelParameter("PEDESTRIAN_A1", 2000.0),
+	PEDESTRIAN_B1 = getRealModelParameter("PEDESTRIAN_B1", 0.08),
+	PEDESTRIAN_R = getRealModelParameter("PEDESTRIAN_R", 0.2),
+	RELAXATION_TIME = getRealModelParameter("RELAXATION_TIME", 0.5);
 
 /*
   Model variables
@@ -60,6 +67,12 @@ discrete Real desiredSpeed[N];
 // Particles group IDs
 discrete Integer groupIDs[N];
 
+// Desired velocities for Helbing model
+Real desiredVx[N], desiredVy[N], desiredVz[N];
+
+// Repulsive forces from other pedestrians
+Real repulsiveFx[N], repulsiveFy[N], repulsiveFz[N];
+
 
 /*
   Time array variables used on triggering events with "when" statements
@@ -79,8 +92,9 @@ discrete Real nextProgressTick;
 // Variable used to control and trigger motivation update
 discrete Real nextMotivationTick;
 
+
 // local variables
-discrete Real _, ux, uy, uz, hx, hy, hz, randomY;
+discrete Real _, ux, uy, uz, hx, hy, hz;
 discrete Integer groupID;
 
 
@@ -111,7 +125,7 @@ initial algorithm
 
     
 /*
-  Model's diferential equations: for particles movements and volumes concentration
+  Model's diferential equations: Helbing social force model
 */
 equation
     // newtonian position/velocity equations for each particle
@@ -126,6 +140,27 @@ equation
 		der(ay[i]) = 0.0;
 		der(az[i]) = 0.0;
     end for;
+    
+    // Helbing social force model equations
+	for i in 1:N loop
+        // Desired velocity calculation
+        desiredVx[i] = (dx[i] - x[i]) / sqrt((dx[i] - x[i])^2 + (dy[i] - y[i])^2) * desiredSpeed[i];
+        desiredVy[i] = (dy[i] - y[i]) / sqrt((dx[i] - x[i])^2 + (dy[i] - y[i])^2) * desiredSpeed[i];
+        desiredVz[i] = 0.0;
+        
+        // Repulsive forces from other pedestrians
+		for j in 1:N loop
+			auxRepulsiveFx[] = PEDESTRIAN_A1 * exp((2 * PEDESTRIAN_R - sqrt((x[j] - x[i])^2 + (y[j] - y[i])^2)) / PEDESTRIAN_B1) * (x[i] - x[j]) / sqrt((x[j] - x[i])^2 + (y[j] - y[i])^2) * (1 - (i == j));
+			auxRepulsiveFy[i] = PEDESTRIAN_A1 * exp((2 * PEDESTRIAN_R - sqrt((x[j] - x[i])^2 + (y[j] - y[i])^2)) / PEDESTRIAN_B1) * (y[i] - y[j]) / sqrt((x[j] - x[i])^2 + (y[j] - y[i])^2) * (1 - (i == j));
+		end for;
+        repulsiveFz[i] = 0.0;
+        
+        // Total acceleration from Helbing model (desired velocity + repulsive forces)
+        ax[i] = (desiredVx[i] - vx[i]) / 0.5 + sum(auxRepulsiveFx[i]);
+        ay[i] = (desiredVy[i] - vy[i]) / 0.5 + sum(auxRepulsiveFy[i]);
+        az[i] = 0.0;
+    end for;
+
 
 /*
   Model's time events
@@ -144,24 +179,14 @@ algorithm
 		terminate();
 	end when;
 	
-	//EVENT: Next motivation update time: updates the particles motivation and computes the next motivation update time incrementing the variable
+	//EVENT: Next motivation update time: updates the particles destination and computes the next motivation update time incrementing the variable
 	when time > nextMotivationTick then
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
-		_ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
-		for i in 1:N loop
-			hx := dx[i];
-			hy := dy[i];
-			hz := dz[i];
-			(hx, hy, hz) := pedestrianTotalMotivation(i, N, x, y, z, vx, vy, vz, hx, hy, hz);
-			reinit(ax[i], hx);
-			reinit(ay[i], hy);
-			reinit(az[i], hz);	
-		end for;
-
+		_ := debug(INFO(), time, "Updating particles destination",_,_,_,_);
+		// Conveyor belt effect for periodic boundaries
 		for i in 1:N loop
 			hx := x[i];
 			hy := y[i];
-			randomY := random(FROM_Y, TO_Y);
 			if CONVEYOR_BELT_EFFECT == 1 then
 				if y[i] < 0.0 then
 					hy := GRID_SIZE;
@@ -178,8 +203,6 @@ algorithm
 				
 				if hx <> x[i] then
 					reinit(x[i], hx);
-					reinit(y[i], randomY);
-					dy[i] := randomY;
 				end if;
 				if hy <> y[i] then
 					reinit(y[i], hy);
@@ -198,7 +221,7 @@ algorithm
 
 annotation(
 	experiment(
-		MMO_Description="Indirect infection of particles interacting through volumes.",
+		MMO_Description="Helbing social force model for pedestrian dynamics with continuous equations.",
 		MMO_Solver=QSS2,
 		MMO_SymDiff=false,
 		MMO_PartitionMethod=Metis,
@@ -206,8 +229,8 @@ annotation(
 		Jacobian=Dense,
 		StartTime=0.0,
 		StopTime=1000.0,
-       Tolerance=0.00001,
-       AbsTolerance=0.00000001
+		Tolerance={1e-5},
+		AbsTolerance={1e-8}
 	));
 
-end helbing_not_qss;
+end helbing_equation;

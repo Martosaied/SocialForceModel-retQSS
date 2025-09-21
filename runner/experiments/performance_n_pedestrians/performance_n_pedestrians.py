@@ -113,6 +113,14 @@ def performance_n_pedestrians():
     print("\n5. Generating comprehensive plots...")
     plot_comprehensive_results(results, optimal_configs)
     
+    # Phase 6: Generate RETQSS Opt cell sizes comparison
+    print("\n6. Generating RETQSS Opt cell sizes comparison...")
+    plot_retqss_opt_cell_sizes(results)
+    
+    # Phase 7: Generate RETQSS Opt best cell sizes comparison (excluding worst performers)
+    print("\n7. Generating RETQSS Opt best cell sizes comparison...")
+    plot_retqss_opt_best_cell_sizes(results)
+    
     print("\n" + "="*60)
     print("All experiments completed successfully!")
     print("Results saved to CSV and plots generated.")
@@ -302,15 +310,15 @@ def plot_comprehensive_results(results, optimal_configs=None):
     qss_times = qss_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
     qss_stds = qss_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
     plt.errorbar(qss_data['n_pedestrians'], qss_times, yerr=qss_stds,
-                fmt='o-', label='QSS', linewidth=4, markersize=10, color='blue', 
-                capsize=6, capthick=3, elinewidth=3, alpha=0.8)
+                fmt='o-', label='QSS', linewidth=4, markersize=10, color='skyblue', 
+                capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='navy', markeredgewidth=2)
     
     # Plot RETQSS without optimizations
     retqss_times = retqss_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
     retqss_stds = retqss_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
     plt.errorbar(retqss_data['n_pedestrians'], retqss_times, yerr=retqss_stds,
-                fmt='s-', label='RETQSS', linewidth=4, markersize=10, color='orange', 
-                capsize=6, capthick=3, elinewidth=3, alpha=0.8)
+                fmt='s-', label='RETQSS', linewidth=4, markersize=10, color='lightgreen', 
+                capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='darkgreen', markeredgewidth=2)
     
     # Plot RETQSS optimized (best configuration for each N)
     if optimal_configs:
@@ -327,8 +335,8 @@ def plot_comprehensive_results(results, optimal_configs=None):
             retqss_opt_times = retqss_opt_best_df['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
             retqss_opt_stds = retqss_opt_best_df['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
             plt.errorbar(retqss_opt_best_df['n_pedestrians'], retqss_opt_times, yerr=retqss_opt_stds,
-                        fmt='^-', label='RETQSS Opt', linewidth=4, markersize=10, color='red', 
-                        capsize=6, capthick=3, elinewidth=3, alpha=0.8)
+                        fmt='^-', label='RETQSS Opt', linewidth=4, markersize=10, color='lightcoral', 
+                        capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='darkred', markeredgewidth=2)
     
     plt.xlabel('Número de Peatones (N)', fontsize=14)
     plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14)
@@ -352,7 +360,7 @@ def plot_comprehensive_results(results, optimal_configs=None):
     merged_retqss['speedup'] = qss_times_merged / retqss_times_merged
     
     plt.plot(merged_retqss['n_pedestrians'], merged_retqss['speedup'], 
-            's-', label='RETQSS vs QSS', linewidth=4, markersize=10, color='orange', alpha=0.8)
+            's-', label='RETQSS vs QSS', linewidth=4, markersize=10, color='lightgreen', alpha=0.8, markeredgecolor='darkgreen', markeredgewidth=2)
     
     # Calculate speedup for RETQSS optimized vs QSS
     if optimal_configs:
@@ -372,7 +380,7 @@ def plot_comprehensive_results(results, optimal_configs=None):
             merged_opt['speedup'] = qss_times_opt / retqss_opt_times_opt
             
             plt.plot(merged_opt['n_pedestrians'], merged_opt['speedup'], 
-                    '^-', label='RETQSS Opt vs QSS', linewidth=4, markersize=10, color='red', alpha=0.8)
+                    '^-', label='RETQSS Opt vs QSS', linewidth=4, markersize=10, color='lightcoral', alpha=0.8, markeredgecolor='darkred', markeredgewidth=2)
     
     plt.axhline(y=1, color='black', linestyle='--', alpha=0.5, label='Rendimiento Igual', linewidth=2)
     plt.xlabel('Número de Peatones (N)', fontsize=14)
@@ -446,7 +454,8 @@ def plot_comprehensive_results(results, optimal_configs=None):
     plt.figure(figsize=(12, 8))
     
     selected_n_values = [500, 1000, 2000, 5000]  # Show a few representative N values
-    colors = plt.cm.viridis(np.linspace(0, 1, len(selected_n_values)))
+    # Use deltaq-style color palette
+    colors = ['skyblue', 'lightgreen', 'lightcoral', 'lightsteelblue']
     
     for i, n in enumerate(selected_n_values):
         n_data = retqss_opt_data[retqss_opt_data['n_pedestrians'] == n].sort_values('cell_size')
@@ -473,7 +482,8 @@ def plot_comprehensive_results(results, optimal_configs=None):
     plt.figure(figsize=(12, 8))
     
     # Show performance vs density for different cell sizes
-    cell_size_colors = plt.cm.viridis(np.linspace(0, 1, len(CELL_SIZES)))
+    # Use deltaq-style color palette
+    cell_size_colors = ['skyblue', 'lightgreen', 'lightcoral', 'lightsteelblue', 'lightpink', 'lightyellow', 'lightcyan', 'lightgray']
     
     for i, cell_size in enumerate(CELL_SIZES):
         cell_data = retqss_opt_data[retqss_opt_data['cell_size'] == cell_size]
@@ -507,15 +517,15 @@ def plot_comprehensive_results(results, optimal_configs=None):
     qss_times = qss_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
     qss_stds = qss_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
     plt.errorbar(qss_data['n_pedestrians'], qss_times, yerr=qss_stds,
-                fmt='o-', label='QSS', linewidth=4, markersize=10, color='blue', 
-                capsize=6, capthick=3, elinewidth=3, alpha=0.8)
+                fmt='o-', label='QSS', linewidth=4, markersize=10, color='skyblue', 
+                capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='navy', markeredgewidth=2)
     
     # Plot RETQSS performance
     retqss_times = retqss_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
     retqss_stds = retqss_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
     plt.errorbar(retqss_data['n_pedestrians'], retqss_times, yerr=retqss_stds,
-                fmt='s-', label='RETQSS', linewidth=4, markersize=10, color='orange', 
-                capsize=6, capthick=3, elinewidth=3, alpha=0.8)
+                fmt='s-', label='RETQSS', linewidth=4, markersize=10, color='lightgreen', 
+                capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='darkgreen', markeredgewidth=2)
     
     plt.xlabel('Número de Peatones (N)', fontsize=14)
     plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14)
@@ -523,7 +533,6 @@ def plot_comprehensive_results(results, optimal_configs=None):
     plt.legend(fontsize=12)
     plt.grid(True, alpha=0.3)
     plt.tick_params(axis='both', which='major', labelsize=12)
-    plt.yscale('log')
     
     # Subplot 2: Memory usage comparison
     plt.subplot(1, 2, 2)
@@ -532,15 +541,15 @@ def plot_comprehensive_results(results, optimal_configs=None):
     qss_memory = qss_data['detailed_metrics'].apply(lambda x: x['avg_memory_usage'] if x and x['avg_memory_usage'] else 0)
     qss_memory_stds = qss_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)  # Using std_iteration_time as proxy for memory std
     plt.errorbar(qss_data['n_pedestrians'], qss_memory, yerr=qss_memory_stds,
-                fmt='o-', label='QSS', linewidth=4, markersize=10, color='blue', 
-                capsize=6, capthick=3, elinewidth=3, alpha=0.8)
+                fmt='o-', label='QSS', linewidth=4, markersize=10, color='skyblue', 
+                capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='navy', markeredgewidth=2)
     
     # Plot RETQSS memory usage
     retqss_memory = retqss_data['detailed_metrics'].apply(lambda x: x['avg_memory_usage'] if x and x['avg_memory_usage'] else 0)
     retqss_memory_stds = retqss_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)  # Using std_iteration_time as proxy for memory std
     plt.errorbar(retqss_data['n_pedestrians'], retqss_memory, yerr=retqss_memory_stds,
-                fmt='s-', label='RETQSS', linewidth=4, markersize=10, color='orange', 
-                capsize=6, capthick=3, elinewidth=3, alpha=0.8)
+                fmt='s-', label='RETQSS', linewidth=4, markersize=10, color='lightgreen', 
+                capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='darkgreen', markeredgewidth=2)
     
     plt.xlabel('Número de Peatones (N)', fontsize=14)
     plt.ylabel('Uso Promedio de Memoria (MB)', fontsize=14)
@@ -548,14 +557,203 @@ def plot_comprehensive_results(results, optimal_configs=None):
     plt.legend(fontsize=12)
     plt.grid(True, alpha=0.3)
     plt.tick_params(axis='both', which='major', labelsize=12)
-    plt.yscale('log')
     
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, '07_qss_vs_retqss_comparison.png'), dpi=300, bbox_inches='tight')
     plt.show()
 
+def plot_retqss_opt_cell_sizes(results):
+    """
+    Generate a focused plot comparing RETQSS Opt performance across all cell sizes.
+    This plot shows how different cell sizes affect RETQSS Opt performance for different N values.
+    """
+    df = pd.DataFrame(results)
+    
+    # Create results directory if it doesn't exist
+    results_dir = 'experiments/performance_n_pedestrians/results'
+    os.makedirs(results_dir, exist_ok=True)
+    
+    # Filter only RETQSS optimized results
+    retqss_opt_data = df[df['implementation'] == 'retqss_opt'].copy()
+    
+    if retqss_opt_data.empty:
+        print("Warning: No RETQSS optimized results found for cell size comparison")
+        return
+    
+    # Create the plot
+    plt.figure(figsize=(14, 10))
+    
+    # Define colors for different cell sizes
+    cell_size_colors = {
+        0.5: 'red',
+        1.0: 'blue', 
+        2.0: 'green',
+        3.0: 'orange',
+        4.0: 'purple',
+        5.0: 'brown',
+        7.5: 'pink',
+        10.0: 'gray'
+    }
+    
+    # Plot each cell size as a separate line
+    for cell_size in sorted(CELL_SIZES):
+        cell_data = retqss_opt_data[retqss_opt_data['cell_size'] == cell_size].sort_values('n_pedestrians')
+        
+        if not cell_data.empty:
+            times = cell_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
+            stds = cell_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
+            
+            plt.errorbar(cell_data['n_pedestrians'], times, yerr=stds,
+                        fmt='o-', label=f'Cell size {cell_size}m', 
+                        linewidth=3, markersize=8, 
+                        color=cell_size_colors[cell_size], 
+                        capsize=4, capthick=2, elinewidth=2, 
+                        alpha=0.8, markeredgecolor='black', markeredgewidth=1)
+    
+    plt.xlabel('Número de Peatones (N)', fontsize=16)
+    plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=16)
+    plt.title('RETQSS Opt: Rendimiento vs Número de Peatones por Tamaño de Celda', fontsize=18)
+    plt.legend(fontsize=12, loc='upper left', bbox_to_anchor=(0.02, 0.98))
+    plt.grid(True, alpha=0.3)
+    plt.yscale('log')
+    plt.tick_params(axis='both', which='major', labelsize=14)
+    
+    # Add some styling
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '08_retqss_opt_cell_sizes_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Create a second plot showing the same data but with linear scale for better visibility of trends
+    plt.figure(figsize=(14, 10))
+    
+    for cell_size in sorted(CELL_SIZES):
+        cell_data = retqss_opt_data[retqss_opt_data['cell_size'] == cell_size].sort_values('n_pedestrians')
+        
+        if not cell_data.empty:
+            times = cell_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
+            stds = cell_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
+            
+            plt.errorbar(cell_data['n_pedestrians'], times, yerr=stds,
+                        fmt='o-', label=f'Cell size {cell_size}m', 
+                        linewidth=3, markersize=8, 
+                        color=cell_size_colors[cell_size], 
+                        capsize=4, capthick=2, elinewidth=2, 
+                        alpha=0.8, markeredgecolor='black', markeredgewidth=1)
+    
+    plt.xlabel('Número de Peatones (N)', fontsize=16)
+    plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=16)
+    plt.title('RETQSS Opt: Rendimiento vs Número de Peatones por Tamaño de Celda (Escala Lineal)', fontsize=18)
+    plt.legend(fontsize=12, loc='upper left', bbox_to_anchor=(0.02, 0.98))
+    plt.grid(True, alpha=0.3)
+    plt.tick_params(axis='both', which='major', labelsize=14)
+    
+    # Add some styling
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '09_retqss_opt_cell_sizes_linear.png'), dpi=300, bbox_inches='tight')
+    plt.show()
 
-
+def plot_retqss_opt_best_cell_sizes(results):
+    """
+    Generate a focused plot comparing RETQSS Opt performance for the best cell sizes only.
+    Excludes the two worst performing cell sizes (10m and 7.5m) for better visualization.
+    """
+    df = pd.DataFrame(results)
+    
+    # Create results directory if it doesn't exist
+    results_dir = 'experiments/performance_n_pedestrians/results'
+    os.makedirs(results_dir, exist_ok=True)
+    
+    # Filter only RETQSS optimized results
+    retqss_opt_data = df[df['implementation'] == 'retqss_opt'].copy()
+    
+    if retqss_opt_data.empty:
+        print("Warning: No RETQSS optimized results found for cell size comparison")
+        return
+    
+    # Define the best cell sizes (excluding 10m and 7.5m)
+    best_cell_sizes = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
+    
+    # Create the plot
+    plt.figure(figsize=(14, 10))
+    
+    # Define colors for the best cell sizes
+    cell_size_colors = {
+        0.5: 'red',
+        1.0: 'blue', 
+        2.0: 'green',
+        3.0: 'orange',
+        4.0: 'purple',
+        5.0: 'brown'
+    }
+    
+    # Plot each best cell size as a separate line
+    for cell_size in sorted(best_cell_sizes):
+        cell_data = retqss_opt_data[retqss_opt_data['cell_size'] == cell_size].sort_values('n_pedestrians')
+        
+        if not cell_data.empty:
+            times = cell_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
+            stds = cell_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
+            
+            plt.errorbar(cell_data['n_pedestrians'], times, yerr=stds,
+                        fmt='o-', label=f'Cell size {cell_size}m', 
+                        linewidth=4, markersize=10, 
+                        color=cell_size_colors[cell_size], 
+                        capsize=5, capthick=3, elinewidth=3, 
+                        alpha=0.8, markeredgecolor='black', markeredgewidth=2)
+    
+    plt.xlabel('Número de Peatones (N)', fontsize=16)
+    plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=16)
+    plt.title('RETQSS Opt: Mejores Tamaños de Celda (Excluyendo 7.5m y 10m)', fontsize=18)
+    plt.legend(fontsize=14, loc='upper left', bbox_to_anchor=(0.02, 0.98))
+    plt.grid(True, alpha=0.3)
+    plt.yscale('log')
+    plt.tick_params(axis='both', which='major', labelsize=14)
+    
+    # Add some styling
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '10_retqss_opt_best_cell_sizes.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Create a second plot with linear scale for better trend visibility
+    plt.figure(figsize=(14, 10))
+    
+    for cell_size in sorted(best_cell_sizes):
+        cell_data = retqss_opt_data[retqss_opt_data['cell_size'] == cell_size].sort_values('n_pedestrians')
+        
+        if not cell_data.empty:
+            times = cell_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
+            stds = cell_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
+            
+            plt.errorbar(cell_data['n_pedestrians'], times, yerr=stds,
+                        fmt='o-', label=f'Cell size {cell_size}m', 
+                        linewidth=4, markersize=10, 
+                        color=cell_size_colors[cell_size], 
+                        capsize=5, capthick=3, elinewidth=3, 
+                        alpha=0.8, markeredgecolor='black', markeredgewidth=2)
+    
+    plt.xlabel('Número de Peatones (N)', fontsize=16)
+    plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=16)
+    plt.title('RETQSS Opt: Mejores Tamaños de Celda - Escala Lineal (Excluyendo 7.5m y 10m)', fontsize=18)
+    plt.legend(fontsize=14, loc='upper left', bbox_to_anchor=(0.02, 0.98))
+    plt.grid(True, alpha=0.3)
+    plt.tick_params(axis='both', which='major', labelsize=14)
+    
+    # Add some styling
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '11_retqss_opt_best_cell_sizes_linear.png'), dpi=300, bbox_inches='tight')
+    plt.show()
 
 if __name__ == '__main__':
     performance_n_pedestrians()

@@ -104,8 +104,8 @@ class FlowGraph:
             if index % 10 != 0:
                 continue
 
-            # Create a new figure for each frame
-            fig, ax = plt.subplots(figsize=(20, 20))
+            # Create a new figure for each frame with better proportions
+            fig, ax = plt.subplots(figsize=(16, 12))
 
             # Set up the plot area
             ax.set_xlim(0, GRID_SIZE)
@@ -113,9 +113,9 @@ class FlowGraph:
 
             # Add grid lines efficiently - ensure they align with cell boundaries
             for x in grid_lines_x:
-                ax.axvline(x=x, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
+                ax.axvline(x=x, color='lightgray', linestyle='-', alpha=0.4, linewidth=0.8)
             for y in grid_lines_y:
-                ax.axhline(y=y, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
+                ax.axhline(y=y, color='lightgray', linestyle='-', alpha=0.4, linewidth=0.8)
             
             # Color each cell based on volume type (similar to FlowGraphInfections VC coloring)
             for i, (pos, cell_id) in enumerate(zip(cell_positions, cell_ids)):
@@ -139,7 +139,7 @@ class FlowGraph:
                 ax.plot(
                     [wall['from_x'], wall['to_x']], 
                     [wall['from_y'], wall['to_y']], 
-                    'k-', linewidth=3, label='_nolegend_'
+                    'k-', linewidth=4, label='_nolegend_'
                 )
 
             # Plot each particle
@@ -169,9 +169,9 @@ class FlowGraph:
                         vy = (y - prev_y) / dt
 
                 if state == 1:  # Right
-                    color = 'red'
+                    color = '#FF4444'  # Brighter red
                 else:  # Left
-                    color = 'blue'
+                    color = '#4444FF'  # Brighter blue
 
                 frame_positions_x.append(x)
                 frame_positions_y.append(y)
@@ -181,20 +181,22 @@ class FlowGraph:
 
             # Plot scatter points
             if len(frame_positions_x) > 0:
-                scatter = ax.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=300)
+                scatter = ax.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=200)
             
-            # Create legend elements
+            # Create legend elements with updated colors
             legend_elements = [
-                plt.scatter([], [], c='blue', s=300, label='Left'),
-                plt.scatter([], [], c='red', s=300, label='Right'),
-                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['obstacle'], alpha=0.7, label='Obstacles'),
-                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['hallway'], alpha=0.5, label='Hallways'),
-                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['classroom'], alpha=0.5, label='Classrooms')
+                plt.scatter([], [], c='#4444FF', s=200, label='Left'),
+                plt.scatter([], [], c='#FF4444', s=200, label='Right'),
+                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['obstacle'], alpha=0.7, label='Obstacles') if self.parameters.get('OBSTACLES', '') else None,
+                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['hallway'], alpha=0.5, label='Hallways') if self.parameters.get('HALLWAYS', '') else None,
+                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['classroom'], alpha=0.5, label='Classrooms') if self.parameters.get('CLASSROOMS', '') else None,
             ]
             
-            # Add legend
-            plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5),
-                    title='Legend', fontsize=14, title_fontsize=16)
+            # Add legend with better styling
+            plt.legend(handles=[elem for elem in legend_elements if elem is not None], 
+                      loc='center left', bbox_to_anchor=(1, 0.5),
+                      title='Legend', fontsize=16, title_fontsize=18,
+                      frameon=True, fancybox=True, shadow=True)
             
             # Add velocity vectors with quiver only if we have velocity data
             if prev_row is not None and len(frame_velocities_x) > 0:
@@ -213,12 +215,20 @@ class FlowGraph:
                         np.array(normalize_velocities_y),
                         color='black', alpha=0.5, width=0.003)
 
-            # Add main title and timestamp
-            fig.suptitle('Pedestrian Movement Simulation', fontsize=20)
-            ax.set_title(f'Time: {row["time"]:.2f}', fontsize=16)
+            # Add main title and timestamp with better styling
+            fig.suptitle('Pedestrian Movement Simulation', fontsize=24, fontweight='bold', y=0.95)
+            ax.set_title(f'Time: {row["time"]:.2f} seconds', fontsize=18, fontweight='bold', pad=20)
             
-            # Save the frame
-            plt.savefig(os.path.join(frames_dir, f'frame_{index:04d}.png'), dpi=50)
+            # Add axis labels
+            ax.set_xlabel('X Position', fontsize=16, fontweight='bold')
+            ax.set_ylabel('Y Position', fontsize=16, fontweight='bold')
+            
+            # Improve tick labels
+            ax.tick_params(axis='both', which='major', labelsize=12)
+            
+            # Save the frame with optimized size
+            plt.savefig(os.path.join(frames_dir, f'frame_{index:04d}.png'), 
+                       dpi=60, bbox_inches='tight', facecolor='white', edgecolor='none')
             plt.close(fig)
             
             # Update previous row for next iteration
@@ -231,7 +241,7 @@ class FlowGraph:
         for frame_file in frame_files:
             frames.append(imageio.imread(os.path.join(frames_dir, frame_file)))
 
-        # Save as GIF
+        # Save as GIF with optimized size
         imageio.mimsave(os.path.join(self.output_dir, 'particle_simulation.gif'), frames, fps=15)
 
         # Clean up frames directory

@@ -1,5 +1,5 @@
 {
-  "iterations": 1,
+  "iterations": 10,
   "parameters": {
     "N": {
       "name": "N",
@@ -96,15 +96,25 @@
       "type": "value",
       "value": 0.26
     },
+    "MOTIVATION_UPDATE_DT": {
+      "name": "MOTIVATION_UPDATE_DT",
+      "type": "value",
+      "value": 0.001
+    },
+    "FROM_Y": {
+      "name": "FROM_Y",
+      "type": "value",
+      "value": 0.0
+    },
+    "TO_Y": {
+      "name": "TO_Y",
+      "type": "value",
+      "value": 50.0
+    },
     "GROUPS_START_INDEX": {
       "name": "GROUPS_START_INDEX",
       "type": "value",
       "value": 900
-    },
-    "MOTIVATION_UPDATE_DT": {
-      "name": "MOTIVATION_UPDATE_DT",
-      "type": "value",
-      "value": 0.1
     }
   }
 }

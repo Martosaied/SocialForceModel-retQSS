@@ -13,6 +13,7 @@ from src.plots.GroupedLanesGraph import GroupedLanesGraph
 from src.plots.DensityHeatmap import DensityHeatmap
 from src.plots.DensityRowGraph import DensityRowGraph
 from src.plots.FlowGraphInfections import FlowGraphInfections
+from src.plots.FlowGraphSingleFrame import FlowGraphSingleFrame
 
 
 def benchmark_graph():
@@ -61,3 +62,7 @@ class Plotter:
     def flow_graph_infections(self, solution_file, output_dir, parameters):
         flow_graph_infections = FlowGraphInfections(solution_file, output_dir, parameters)
         flow_graph_infections.plot()
+
+    def flow_graph_single_frame(self, solution_file, output_dir, parameters):
+        flow_graph_single_frame = FlowGraphSingleFrame(solution_file, output_dir, parameters)
+        flow_graph_single_frame.plot()

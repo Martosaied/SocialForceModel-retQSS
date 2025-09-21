@@ -29,7 +29,7 @@
     "FORCE_TERMINATION_AT": {
       "name": "FORCE_TERMINATION_AT",
       "type": "value",
-      "value": 100.0
+      "value": 150.0
     },
     "GRID_SIZE": {
       "name": "GRID_SIZE",
@@ -105,6 +105,16 @@
       "name": "TO_Y",
       "type": "value",
       "value": 15
+    },
+    "GROUPS_START_INDEX": {
+      "name": "GROUPS_START_INDEX",
+      "type": "value",
+      "value": 900
+    },
+    "MOTIVATION_UPDATE_DT": {
+      "name": "MOTIVATION_UPDATE_DT",
+      "type": "value",
+      "value": 0.1
     }
   }
 }

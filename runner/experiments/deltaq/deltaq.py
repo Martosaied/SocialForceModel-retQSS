@@ -61,30 +61,30 @@ def run(deltaq):
     print(f"AbsTolerance={formatted_abs_tolerance}")
 
     # Reemplazar las divisiones de la grilla en el modelo
-    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/social_force_model_deltaq.mo'])
-    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model_deltaq.mo'])
+    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/helbing_not_qss.mo'])
+    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/helbing_not_qss.mo'])
     subprocess.run([
         'sed', '-i',
         f's/^[[:space:]]*Tolerance=[^,]*/       Tolerance={formatted_tolerance}/g',
-        '../retqss/model/social_force_model_deltaq.mo'
+        '../retqss/model/helbing_not_qss.mo'
     ])
     subprocess.run([
         'sed', '-i',
         f's/^[[:space:]]*AbsTolerance=[^,]*/       AbsTolerance={formatted_abs_tolerance}/g',
-        '../retqss/model/social_force_model_deltaq.mo'
+        '../retqss/model/helbing_not_qss.mo'
     ])
 
     # Compilar el código C++ si se solicita
     compile_c_code()
 
     # Compilar el modelo si se solicita
-    compile_model('social_force_model_deltaq')
+    compile_model('helbing_not_qss')
 
     # Ejecutar experimento
     run_experiment(
         config, 
         output_dir, 
-        'social_force_model_deltaq', 
+        'helbing_not_qss', 
         plot=False, 
         copy_results=True
     )
@@ -117,6 +117,18 @@ def plot_results():
             for _, row in df_metrics.iterrows():
                 performance_data[deltaq].append(float(row['time']))
                 groups_data[deltaq].append(int(row['clustering_based_groups']))
+
+       
+        # groups_data_file = []
+        # for result_file in os.listdir(os.path.join('experiments/deltaq/results', result_dir, 'latest'))[:2]:
+        #     print(f"Using solution.csv for deltaq {deltaq}: {result_file}")
+        #     if result_file.endswith('.csv') and result_file != 'metrics.csv':
+        #         df = pd.read_csv(os.path.join('experiments/deltaq/results', result_dir, 'latest', result_file))
+        #         particles = (len(df.columns) - 1) / 5
+        #         groups = Clustering(df, int(particles)).calculate_groups(start_index=100, sample_rate=5)
+        #         groups_data_file.append(groups)
+        #         print(f"Using solution.csv for deltaq {deltaq}: {groups} data points")
+        # groups_data[deltaq].extend(groups_data_file)
 
     # Calcular estadísticas para cada deltaq
     performance_stats = {}
@@ -164,6 +176,7 @@ def plot_results():
     ax1.set_ylabel('Tiempo de Ejecución (segundos)', fontsize=12)
     ax1.set_xticks(x_pos)
     ax1.set_xticklabels(deltaq_labels, rotation=45, ha='right', fontsize=10)
+    ax1.set_ylim(0, max(performance_means) * 1.3)
     ax1.grid(True, alpha=0.3)
     
     # Agregar valores en las barras (solo si hay espacio suficiente)
@@ -181,6 +194,7 @@ def plot_results():
     ax2.set_ylabel('Número de Carriles', fontsize=12)
     ax2.set_xticks(x_pos)
     ax2.set_xticklabels(deltaq_labels, rotation=45, ha='right', fontsize=10)
+    ax2.set_ylim(0, max(groups_means) * 1.3)
     ax2.grid(True, alpha=0.3)
     
     # Agregar valores en las barras (solo si hay espacio suficiente)
@@ -190,7 +204,6 @@ def plot_results():
             ax2.text(bar.get_x() + bar.get_width()/2., height + std + max(groups_means) * 0.02,
                     f'{mean:.1f}±{std:.1f}', ha='center', va='bottom', fontsize=8, rotation=90)
     
-    plt.tight_layout()
     plt.subplots_adjust(bottom=0.15)  # Más espacio para las etiquetas rotadas
     plt.savefig('experiments/deltaq/performance_by_deltaq.png', dpi=300, bbox_inches='tight')
     plt.close()

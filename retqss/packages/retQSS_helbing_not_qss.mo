@@ -22,7 +22,7 @@ function outputCSV
 	input Real vy[1];
 	input Integer groupIDs[1];
 	output Boolean status;
-	external "C" status=social_force_model_notQSS_outputCSV(time, N, groupIDs, x) annotation(
+	external "C" status=social_force_model_notQSS_outputCSV(time, N, x, groupIDs) annotation(
 	    Library="social_force_model",
 	    Include="#include \"retqss_social_force_model.h\"");
 end outputCSV;

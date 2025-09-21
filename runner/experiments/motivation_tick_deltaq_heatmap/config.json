@@ -1,5 +1,5 @@
 {
-  "iterations": 5,
+  "iterations": 1,
   "parameters": {
     "N": {
       "name": "N",
@@ -14,7 +14,7 @@
     "BORDER_IMPLEMENTATION": {
       "name": "BORDER_IMPLEMENTATION",
       "type": "value",
-      "value": 3
+      "value": 0
     },
     "PEDESTRIAN_DESTINATION": {
       "name": "PEDESTRIAN_DESTINATION",
@@ -29,7 +29,7 @@
     "FORCE_TERMINATION_AT": {
       "name": "FORCE_TERMINATION_AT",
       "type": "value",
-      "value": 60.0
+      "value": 100.0
     },
     "GRID_SIZE": {
       "name": "GRID_SIZE",
@@ -96,10 +96,25 @@
       "type": "value",
       "value": 0.26
     },
-    "PROGRESS_UPDATE_DT": {
-      "name": "PROGRESS_UPDATE_DT",
+    "MOTIVATION_UPDATE_DT": {
+      "name": "MOTIVATION_UPDATE_DT",
       "type": "value",
       "value": 0.01
+    },
+    "FROM_Y": {
+      "name": "FROM_Y",
+      "type": "value",
+      "value": 15
+    },
+    "TO_Y": {
+      "name": "TO_Y",
+      "type": "value",
+      "value": 35
+    },
+    "GROUPS_START_INDEX": {
+      "name": "GROUPS_START_INDEX",
+      "type": "value",
+      "value": 900
     }
   }
 }

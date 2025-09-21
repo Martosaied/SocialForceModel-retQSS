@@ -1,23 +1,27 @@
-model helbing_not_qss
+model social_force_model_motivation_dt
 
 import retQSS;
+import retQSS_social_force_model;
 import retQSS_utils;
 import retQSS_social_force_model_utils;
 import retQSS_social_force_model_params;
 import retQSS_social_force_model_types;
-import retQSS_helbing_not_qss;
 
 /*
   This section loads parameters and constants from the parameters.config file
 */
 
 constant Integer
-	N = 300;
+	N = 300,
+	GRID_DIVISIONS = 1,
+	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
 parameter Integer
 	RANDOM_SEED = getIntegerModelParameter("RANDOM_SEED", 0),
 	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 40),
+	PEDESTRIAN_IMPLEMENTATION = getIntegerModelParameter("PEDESTRIAN_IMPLEMENTATION", 0),
+	BORDER_IMPLEMENTATION = getIntegerModelParameter("BORDER_IMPLEMENTATION", 0),
 	CONVEYOR_BELT_EFFECT = getIntegerModelParameter("CONVEYOR_BELT_EFFECT", 0);
 
 // Output delta time parameter
@@ -30,13 +34,20 @@ parameter Real
 	TO_Y = getRealModelParameter("TO_Y", 20.0);
 
 
+// Grid constant
+constant Integer
+    VOLUMES_COUNT = GRID_DIVISIONS * GRID_DIVISIONS;
+
+
 parameter Real
 	INF = 1e20,
 	EPS = 1e-5,
 	PI = 3.1415926,
-	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.5),
-    MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1),
-	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0);
+	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.1),
+    MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.01),
+	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0),
+	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
+	Z_COORD = CELL_EDGE_LENGTH / 2.0;
 
 /*
   Model variables
@@ -57,10 +68,6 @@ discrete Real dx[N], dy[N], dz[N];
 // Particles desired speed
 discrete Real desiredSpeed[N];
 
-// Particles group IDs
-discrete Integer groupIDs[N];
-
-
 /*
   Time array variables used on triggering events with "when" statements
 */
@@ -80,8 +87,7 @@ discrete Real nextProgressTick;
 discrete Real nextMotivationTick;
 
 // local variables
-discrete Real _, ux, uy, uz, hx, hy, hz, randomY;
-discrete Integer groupID;
+discrete Real _, hx, hy, hz, groupID;
 
 
 initial algorithm
@@ -96,22 +102,49 @@ initial algorithm
 	// sets the parameters from the config file
 	_ := setParameters();
 
+    _ := debug(INFO(), time, "Grid setup. Divisions = %d", GRID_DIVISIONS, _, _, _);
+
+	// setup the grid in RETQSS as a simple grid using the constants from config file
+    _ := geometry_gridSetUp(GRID_DIVISIONS, GRID_DIVISIONS, 1, CELL_EDGE_LENGTH);
+
+	for i in 1:VOLUMES_COUNT loop
+		_ := volume_setProperty(i, "isObstacle", isInArrayParameter("OBSTACLES", i));
+    end for;
+
+	// setup the particles in RETQSS
+    _ := debug(INFO(), time, "Particles setup. N = %d", N,_,_,_);	
+	_ := setUpParticles(N, CELL_EDGE_LENGTH, GRID_DIVISIONS, x);
+    _ := debug(INFO(), time, "Particles setup ended. N = %d", N,_,_,_);
+
 	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
-        (groupID, x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, FROM_Y, TO_Y);
+        (groupID, x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
+		_ := particle_setProperty(i, "type", groupID);
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
-		groupIDs[i] := groupID;
+		_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
     end for;
+
+	// setup the walls in RETQSS
+	_ := setUpWalls();
+
+	if BORDER_IMPLEMENTATION == 3 then
+		// update the neighboring volumes for each particle
+		for i in 1:N loop
+			_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
+		end for;
+	end if;
 
     terminateTime := FORCE_TERMINATION_AT;
     nextProgressTick := EPS;
 	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
+    _ := debug(INFO(), time, "Pedestrian implementation: %d", PEDESTRIAN_IMPLEMENTATION,_,_,_);
+	_ := debug(INFO(), time, "Border implementation: %d", BORDER_IMPLEMENTATION,_,_,_);
 
     
 /*
-  Model's diferential equations: for particles movements and volumes concentration
+  Model's diferential equations: for particles movements
 */
 equation
     // newtonian position/velocity equations for each particle
@@ -131,11 +164,9 @@ equation
   Model's time events
 */
 algorithm	
-
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
-		_ := debug(INFO(), time, "Updating particles output",_,_,_,_);
-		_ := outputCSV(time, N, x, y, vx, vy, groupIDs);
+		_ := social_force_model_outputCSV(time, N, x, y, vx, vy);
 		nextOutputTick := time + OUTPUT_UPDATE_DT;
 	end when;
 
@@ -143,25 +174,24 @@ algorithm
 	when time > terminateTime then
 		terminate();
 	end when;
+
 	
-	//EVENT: Next motivation update time: updates the particles motivation and computes the next motivation update time incrementing the variable
 	when time > nextMotivationTick then
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
-		_ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
 		for i in 1:N loop
 			hx := dx[i];
 			hy := dy[i];
 			hz := dz[i];
-			(hx, hy, hz) := pedestrianTotalMotivation(i, N, x, y, z, vx, vy, vz, hx, hy, hz);
+			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, x, y, z, vx, vy, vz, hx, hy, hz, CELL_EDGE_LENGTH, VOLUMES_COUNT, N);
 			reinit(ax[i], hx);
 			reinit(ay[i], hy);
 			reinit(az[i], hz);	
 		end for;
 
+		_ := debug(INFO(), time, "Updating particles position",_,_,_,_);
 		for i in 1:N loop
 			hx := x[i];
 			hy := y[i];
-			randomY := random(FROM_Y, TO_Y);
 			if CONVEYOR_BELT_EFFECT == 1 then
 				if y[i] < 0.0 then
 					hy := GRID_SIZE;
@@ -178,11 +208,7 @@ algorithm
 				
 				if hx <> x[i] then
 					reinit(x[i], hx);
-					reinit(y[i], randomY);
-					dy[i] := randomY;
-				end if;
-				if hy <> y[i] then
-					reinit(y[i], hy);
+					_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
 				end if;
 			end if;
 		end for;
@@ -206,8 +232,8 @@ annotation(
 		Jacobian=Dense,
 		StartTime=0.0,
 		StopTime=1000.0,
-       Tolerance=0.00001,
-       AbsTolerance=0.00000001
+       Tolerance={1e-5},
+       AbsTolerance={1e-8}
 	));
 
-end helbing_not_qss;
+end social_force_model_motivation_dt;

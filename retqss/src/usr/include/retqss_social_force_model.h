@@ -59,8 +59,8 @@ Bool social_force_model_outputCSV(double time,
 
 Bool social_force_model_notQSS_outputCSV(double time,
 	int N,
-	int *groupIDs,
-	double *x);
+	double *x,
+	double *groupIDs);
 
 void social_force_model_updateNeighboringVolumes(int particleID, int gridDivisions);
 

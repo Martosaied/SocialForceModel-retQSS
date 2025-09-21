@@ -52,6 +52,7 @@ def run_model(model_name: str, directory: str, parameters: dict):
             if config.should_calculate_metrics:
                 df = pd.read_csv(solution_path)
                 particles = parameters.get('N', 300)
+                groups_start_index = parameters.get('GROUPS_START_INDEX', 900)
                 
                 # Calculate density-based groups if not skipped (disabled for now, no need to calculate)
                 # metrics['density_based_groups'] = Density(df, particles).calculate_groups()
@@ -59,7 +60,7 @@ def run_model(model_name: str, directory: str, parameters: dict):
                 
                 # Calculate clustering-based groups if not skipped
                 print("Calculating clustering-based groups")
-                metrics['clustering_based_groups'] = Clustering(df, particles).calculate_groups()
+                metrics['clustering_based_groups'] = Clustering(df, particles).calculate_groups(start_index=groups_start_index)
             else:
                 # Skip all calculations
                 print("Skipping density and clustering calculations")

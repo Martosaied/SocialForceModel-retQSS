@@ -150,8 +150,9 @@ def find_deltaq_directories(results_dir):
     # Ordenar por valor de deltaq
     deltaq_dirs.sort(key=lambda x: x[0])
 
-    # Only return deltaq_-1, deltaq_-2, deltaq_-3, deltaq_-8
-    return [x for x in deltaq_dirs if x[0] in [-1, -2, -3, -4, -5, -6, -7, -8]]
+    # Reamove last one deltaq_dir
+    deltaq_dirs.pop()
+    return deltaq_dirs
 
 def load_multiple_deltaq_data(results_dir):
     """
@@ -164,7 +165,7 @@ def load_multiple_deltaq_data(results_dir):
     
     for deltaq_value, deltaq_dir in deltaq_dirs:
         result_file = os.path.join(results_dir, deltaq_dir, 'latest', 'result_0.csv')
-        
+
         if os.path.exists(result_file):
             print(f"  - Cargando ΔQ={deltaq_value}...")
             df = load_result_file(result_file)
@@ -240,7 +241,7 @@ def plot_y_functions_multi(deltaq_data, output_dir):
             if len(ped_data) > 0:
                 alpha = 0.8 if j == 0 else 0.5
                 linewidth = 2 if j == 0 else 1
-                label = f'ΔQ={deltaq}' if j == 0 else ""
+                label = f'ΔQ=1e{int(deltaq)}' if j == 0 else ""
                 plt.plot(ped_data['time'], ped_data['y'], color=colors[i], 
                         alpha=alpha, linewidth=linewidth, label=label)
     
@@ -267,7 +268,7 @@ def plot_smoothness_distribution_multi(deltaq_data, output_dir):
         
         if scores:
             plt.hist(scores, bins=15, alpha=0.6, color=colors[i], 
-                    label=f'ΔQ={deltaq} (n={len(scores)})', density=True)
+                    label=f'ΔQ=1e{int(deltaq)} (n={len(scores)})', density=True)
     
     plt.xlabel('Puntuación de Suavidad (0=Zigzag, 1=Suave)')
     plt.ylabel('Densidad')
@@ -290,8 +291,6 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
         'Variación Total': [],
         'Cambios Velocidad': [],
         'Cambios Aceleración': [],
-        'Desv. Est. Velocidad': [],
-        'Desv. Est. Aceleración': [],
     }
     
     for deltaq, data in deltaq_data.items():
@@ -301,8 +300,6 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
             components_data['Variación Total'].append(np.mean([d['total_variation'] for d in smoothness.values()]))
             components_data['Cambios Velocidad'].append(np.mean([d['velocity_sign_changes'] for d in smoothness.values()]))
             components_data['Cambios Aceleración'].append(np.mean([d['accel_sign_changes'] for d in smoothness.values()]))
-            components_data['Desv. Est. Velocidad'].append(np.mean([d['velocity_std'] for d in smoothness.values()]))
-            components_data['Desv. Est. Aceleración'].append(np.mean([d['acceleration_std'] for d in smoothness.values()]))
         
     if deltaq_values:
         x = np.arange(len(deltaq_values))
@@ -313,7 +310,9 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
         
         plt.xlabel('DeltaQ')
         plt.ylabel('Valor Promedio')
-        plt.xticks(x + width, deltaq_values, rotation=45)
+        # Format deltaq values as scientific notation (1e{deltaq})
+        deltaq_labels = [f'1e{float(deltaq)}' for deltaq in deltaq_values]
+        plt.xticks(x + width, deltaq_labels, rotation=45)
         plt.legend()
         plt.grid(True, alpha=0.3)
     
@@ -350,6 +349,11 @@ def plot_smoothness_summary_multi(deltaq_data, output_dir):
         ax1.grid(True, alpha=0.3)
         ax1.set_ylim(0, 1)
         
+        # Format X-axis labels as scientific notation (1e{deltaq})
+        deltaq_labels = [f'1e{int(deltaq)}' for deltaq in deltaq_values]
+        ax1.set_xticks(deltaq_values)
+        ax1.set_xticklabels(deltaq_labels, rotation=45)
+        
         # Colorear puntos según suavidad
         colors = plt.cm.RdYlGn([s for s in avg_smoothness])
         for i, (x, y) in enumerate(zip(deltaq_values, avg_smoothness)):
@@ -364,7 +368,7 @@ def plot_smoothness_summary_multi(deltaq_data, output_dir):
     for i, deltaq in enumerate(deltaq_values):
         scores = [d['smoothness_score'] for d in deltaq_data[deltaq]['smoothness'].values()]
         table_data.append([
-            f'ΔQ={deltaq}',
+            f'ΔQ=1e{int(deltaq)}',
             f'{avg_smoothness[i]:.3f}',
             f'{std_smoothness[i]:.3f}',
             f'{len(scores)}'
@@ -510,7 +514,7 @@ def main():
             scores = [d['smoothness_score'] for d in smoothness.values()]
             avg_smooth = np.mean(scores)
             std_smooth = np.std(scores)
-            print(f"ΔQ={deltaq:>6}: Suavidad={avg_smooth:.3f}±{std_smooth:.3f} (n={len(scores)})")
+            print(f"ΔQ=1e{int(deltaq):>2}: Suavidad={avg_smooth:.3f}±{std_smooth:.3f} (n={len(scores)})")
     
     # Encontrar el mejor y peor DeltaQ
     best_deltaq = max(deltaq_data.keys(), 
@@ -520,8 +524,8 @@ def main():
                       key=lambda x: np.mean([d['smoothness_score'] for d in deltaq_data[x]['smoothness'].values()]) 
                       if deltaq_data[x]['smoothness'] else 1)
     
-    print(f"\n🏆 MEJOR DeltaQ: {best_deltaq} (más suave)")
-    print(f"⚠️  PEOR DeltaQ: {worst_deltaq} (más zigzag)")
+    print(f"\n🏆 MEJOR DeltaQ: 1e{int(best_deltaq)} (más suave)")
+    print(f"⚠️  PEOR DeltaQ: 1e{int(worst_deltaq)} (más zigzag)")
     
     print(f"\n✅ Análisis completado. Gráficos guardados en: {args.output}")
     print("📁 Archivos generados:")
