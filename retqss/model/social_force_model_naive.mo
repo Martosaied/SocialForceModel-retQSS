@@ -1,4 +1,4 @@
-model helbing_school_hallway
+model social_force_model
 
 import retQSS;
 import retQSS_social_force_model;
@@ -6,15 +6,14 @@ import retQSS_utils;
 import retQSS_social_force_model_utils;
 import retQSS_social_force_model_params;
 import retQSS_social_force_model_types;
-import retQSS_classrooms;
 
 /*
   This section loads parameters and constants from the parameters.config file
 */
 
 constant Integer
-	N = 500,
-	GRID_DIVISIONS = 11,
+	N = 5000,
+	GRID_DIVISIONS = 1,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -45,21 +44,14 @@ parameter Real
 	EPS = 1e-5,
 	PI = 3.1415926,
 	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.1),
-    MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1),
-	CLASSROOM_UPDATE_DT = getRealModelParameter("CLASSROOM_UPDATE_DT", 0.1),
+	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.5),
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0),
-	TIME_BEFORE_BREAK = getRealModelParameter("TIME_BEFORE_BREAK", 100),
-	BREAK_MOVEMENT_DURATION = getRealModelParameter("BREAK_MOVEMENT_DURATION", 20),
-	BREAK_DURATION = getRealModelParameter("BREAK_DURATION", 100),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;
 
 /*
   Model variables
 */
-
-// Particles classroom ID
-discrete Integer classroomIDs[N];
 
 // Particles position
 Real x[N], y[N], z[N];
@@ -75,8 +67,6 @@ discrete Real dx[N], dy[N], dz[N];
 
 // Particles desired speed
 discrete Real desiredSpeed[N];
-
-Real volumeConcentration[VOLUMES_COUNT];
 
 /*
   Time array variables used on triggering events with "when" statements
@@ -96,13 +86,9 @@ discrete Real nextProgressTick;
 // Variable used to control and trigger motivation update
 discrete Real nextMotivationTick;
 
-// Variable used to control and trigger class breaks in the school scenario
-discrete Real nextBreakTime;
-
 // local variables
-discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz;
+discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID, groupID, randomY;
 discrete Boolean isolate;
-discrete Integer classroomID;
 
 
 initial algorithm
@@ -124,9 +110,6 @@ initial algorithm
 
 	for i in 1:VOLUMES_COUNT loop
 		_ := volume_setProperty(i, "isObstacle", isInArrayParameter("OBSTACLES", i));
-		_ := volume_setProperty(i, "isHallway", isInArrayParameter("HALLWAYS", i));
-		_ := volume_setProperty(i, "isClassroom", isInArrayParameter("CLASSROOMS", i));
-		volumeConcentration[i] := 0.0;
     end for;
 
 	// setup the particles in RETQSS
@@ -136,19 +119,14 @@ initial algorithm
 
 	// setup the particles half in the left side and half in the right side of the grid
 	for i in 1:N loop
-        (x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomInitialClassroomPosition(i);
+        (groupID, x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
+		_ := particle_setProperty(i, "type", groupID);
 		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
 		_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
-		_ := particle_setProperty(i, "type", LEFT());
     end for;
 
-	// setup the particles initial state
-	for i in 1:N loop
-		_ := particle_setProperty(i, "initialX", x[i]);
-		_ := particle_setProperty(i, "initialY", y[i]);
-		_ := particle_setProperty(i, "initialVX", vx[i]);
-		_ := particle_setProperty(i, "initialVY", vy[i]);
-    end for;
+	// setup the walls in RETQSS
+	_ := setUpWalls();
 
 	if BORDER_IMPLEMENTATION == 3 then
 		// update the neighboring volumes for each particle
@@ -161,14 +139,13 @@ initial algorithm
     nextProgressTick := EPS;
 	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
-	nextBreakTime := TIME_BEFORE_BREAK;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
     _ := debug(INFO(), time, "Pedestrian implementation: %d", PEDESTRIAN_IMPLEMENTATION,_,_,_);
 	_ := debug(INFO(), time, "Border implementation: %d", BORDER_IMPLEMENTATION,_,_,_);
 
     
 /*
-  Model's diferential equations: for particles movements and volumes concentration
+  Model's diferential equations: for particles movements
 */
 equation
     // newtonian position/velocity equations for each particle
@@ -184,67 +161,25 @@ equation
 		der(az[i]) = 0.0;
     end for;
 
-	for i in 1:VOLUMES_COUNT loop
-        der(volumeConcentration[i]) = 0.;
-    end for;
-
 /*
   Model's time events
 */
 algorithm	
-
-	// //EVENT: particle enters a volume and update neighboring volumes that are obstacles
-	for i in 1:N loop
-		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
-			if BORDER_IMPLEMENTATION == 3 then
-				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
-			end if;
-		end when;
-	end for;
-
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
 		_ := social_force_model_outputCSV(time, N, x, y, vx, vy);
 		nextOutputTick := time + OUTPUT_UPDATE_DT;
 	end when;
 
-	// //EVENT: Terminate time is reached, calling native function terminate()
+	//EVENT: Terminate time is reached, calling native function terminate()
 	when time > terminateTime then
 		terminate();
 	end when;
 
-	when time > nextBreakTime then
-			_ := debug(INFO(), time, "On break, going to the door", _,_,_,_);
-		    for i in 1:N loop
-		    	(dx[i], dy[i], dz[i]) := nearestHallwayPosition(i, dx[i], dy[i], dz[i]);
-		    end for;
-	end when;
-
-	//EVENT: Next break starts / part 2. All particles arrived the classroom door and will start moving randomly in the hallway
-	when time > nextBreakTime + BREAK_MOVEMENT_DURATION then
-		_ := debug(INFO(), time, "All in the hallway", _,_,_,_);
-		for i in 1:N loop
-			(dx[i], dy[i], dz[i]) := randomConnectedHallway(i, dx[i], dy[i], dz[i]);
-		end for;
-	end when;
-	
-	//EVENT: Current break finishes / part 1. All particles starts moving their corresponding classroom door
-	when time > nextBreakTime + BREAK_DURATION + BREAK_MOVEMENT_DURATION then
-		_ := debug(INFO(), time, "Finished break, reroute to door", _,_,_,_);
-		for i in 1:N loop
-			classroomID := particle_getProperty(i, "classroomID");
-			(hx, hy, hz) := volume_randomPoint(classroomID);
-			dx[i] := hx;
-			dy[i] := hy;
-			dz[i] := hz;
-		end for;
-		_ := debug(INFO(), time, "Finished break, reroute to door 2", _,_,_,_);
-		nextBreakTime := nextBreakTime + TIME_BEFORE_BREAK + BREAK_DURATION;
-	end when;
-
 	
 	when time > nextMotivationTick then
-		nextMotivationTick := time + PROGRESS_UPDATE_DT;
+		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
+		
 		for i in 1:N loop
 			hx := dx[i];
 			hy := dy[i];
@@ -255,39 +190,39 @@ algorithm
 			reinit(az[i], hz);	
 		end for;
 
-		// _ := debug(INFO(), time, "Updating particles position",_,_,_,_);
-		// for i in 1:N loop
-		// 	hx := x[i];
-		// 	hy := y[i];
-		// 	if CONVEYOR_BELT_EFFECT == 1 then
-		// 		if y[i] < 0.0 then
-		// 			hy := GRID_SIZE;
-		// 		end if;
-		// 		if y[i] > GRID_SIZE then
-		// 			hy := 0.0;
-		// 		end if;
-		// 		if x[i] < 0.0 then
-		// 			hx := GRID_SIZE;
-		// 		end if;
-		// 		if x[i] > GRID_SIZE then
-		// 			hx := 0.0;
-		// 		end if;
+		_ := debug(INFO(), time, "Updating particles position",_,_,_,_);
+		for i in 1:N loop
+			hx := x[i];
+			hy := y[i];
+			randomY := random(FROM_Y, TO_Y);
+			if CONVEYOR_BELT_EFFECT == 1 then
+				if y[i] < 0.0 then
+					hy := GRID_SIZE;
+				end if;
+				if y[i] > GRID_SIZE then
+					hy := 0.0;
+				end if;
+				if x[i] < 0.0 then
+					hx := GRID_SIZE;
+				end if;
+				if x[i] > GRID_SIZE then
+					hx := 0.0;
+				end if;
 				
-		// 		if hx <> x[i] then
-		// 			reinit(x[i], hx);
-		// 			_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
-		// 		end if;
-		// 	end if;
-		// end for;
+				if hx <> x[i] then
+					reinit(x[i], hx);
+					reinit(y[i], randomY);
+					dy[i] := randomY;
+					_ := particle_relocate(i, hx, randomY, z[i], vx[i], vy[i], vz[i]);
+				end if;
+				if hy <> y[i] then
+					reinit(y[i], hy);
+					_ := particle_relocate(i, x[i], hy, z[i], vx[i], vy[i], vz[i]);
+				end if;
+			end if;
+		end for;
 	end when;
 
-
-	//EVENT: Next progress output time: prints a new line in stdout and computes the next output time incrementing the variable
-	when time > nextProgressTick then
-		// _ := debug(INFO(), time, "Progress checkpoint",_,_,_,_);
-        nextProgressTick := time + PROGRESS_UPDATE_DT;
-	end when;
-	
 
 annotation(
 	experiment(
@@ -303,4 +238,4 @@ annotation(
 		AbsTolerance={1e-8}
 	));
 
-end helbing_school_hallway;
+end social_force_model;

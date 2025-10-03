@@ -22,7 +22,7 @@ warnings.filterwarnings('ignore')
 PEDESTRIAN_COUNT = int(20 * 50 * 0.3)
 WIDTH = 20
 VOLUMES = 50
-RUN_SIMULATION = True
+RUN_SIMULATION = False
 
 class LanesByIterationsExperiment:
     """
@@ -112,50 +112,87 @@ class LanesByIterationsExperiment:
         """
         print("Creating plots...")
         
-        # Create the original simple plot
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-        ax1.set_title('Number of groups per time(all iterations)')
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Number of groups')
+        # Create the enhanced plot with better styling
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 12))
+        
+        # Left plot - All iterations
+        ax1.set_title('Número de Grupos por Tiempo (Todas las Iteraciones)', 
+                     fontsize=20, fontweight='bold', pad=20)
+        ax1.set_xlabel('Tiempo (segundos)', fontsize=16, fontweight='bold')
+        ax1.set_ylabel('Número de Grupos', fontsize=16, fontweight='bold')
+        ax1.tick_params(axis='both', which='major', labelsize=12)
+        ax1.grid(True, alpha=0.3)
 
-        ax2.set_title('Number of groups per time(averaged)')
-        ax2.set_xlabel('Time')
-        ax2.set_ylabel('Number of groups')
+        # Right plot - Averaged
+        ax2.set_title('Número de Grupos por Tiempo (Promediado)', 
+                     fontsize=20, fontweight='bold', pad=20)
+        ax2.set_xlabel('Tiempo (segundos)', fontsize=16, fontweight='bold')
+        ax2.set_ylabel('Número de Grupos', fontsize=16, fontweight='bold')
+        ax2.tick_params(axis='both', which='major', labelsize=12)
+        ax2.grid(True, alpha=0.3)
 
         # Get the results files
         results_files = [f for f in os.listdir(os.path.join(self.results_dir, 'latest')) if f.endswith('.csv')]
 
+        # Define a color palette for different iterations
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', 
+                 '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9']
+
         # Read the results files
         groups_per_time = {}
         groups_per_time_averaged = {}
-        for result_file in results_files:
+        for i, result_file in enumerate(results_files):
             df = pd.read_csv(os.path.join(self.results_dir, 'latest', result_file))
             particles = (len(df.columns) - 1) / 5
+            iteration_groups = {}
+            
             for _, row in df.iterrows():
                 if row['time'] % 10 != 0:
                     continue
 
                 groups = Clustering(df, int(particles)).calculate_groups_by_time(row)
-                groups_per_time[row['time']] = len(groups)
+                iteration_groups[row['time']] = len(groups)
 
                 if row['time'] not in groups_per_time_averaged:
                     groups_per_time_averaged[row['time']] = [len(groups)]
                 else:
                     groups_per_time_averaged[row['time']].append(len(groups))
 
-            ax1.plot(groups_per_time.keys(), groups_per_time.values())
+            # Plot each iteration with a different color
+            color = colors[i % len(colors)]
+            ax1.plot(iteration_groups.keys(), iteration_groups.values(), 
+                    linewidth=2, alpha=0.8, color=color, 
+                    label=f'Iteración {i+1}')
+        
+        # Add legend to the first plot
+        ax1.legend(fontsize=12, frameon=True, fancybox=True, shadow=True, loc='upper right')
         
         mean_groups_per_time = {k: np.mean(v) for k, v in groups_per_time_averaged.items()}
         std_groups_per_time = {k: np.std(v) for k, v in groups_per_time_averaged.items()}
-        ax2.plot(mean_groups_per_time.keys(), mean_groups_per_time.values(), label='all iterations')
+        
+        # Plot mean line with enhanced styling and friendly color
+        ax2.plot(mean_groups_per_time.keys(), mean_groups_per_time.values(), 
+                linewidth=3, color='#2ECC71', label='Promedio de Grupos')
+        
+        # Plot standard deviation fill with enhanced styling and friendly color
         ax2.fill_between(
             list(mean_groups_per_time.keys()), 
             (np.array(list(mean_groups_per_time.values())) - np.array(list(std_groups_per_time.values()))), 
             (np.array(list(mean_groups_per_time.values())) + np.array(list(std_groups_per_time.values()))), 
-            alpha=0.2
+            alpha=0.3, color='#2ECC71', label='Desviación Estándar'
         )
+        
+        # Add enhanced legend
+        ax2.legend(fontsize=14, frameon=True, fancybox=True, shadow=True, loc='upper right')
 
-        fig.savefig(os.path.join(self.figures_dir, 'groups_by_iterations.png'))
+        # Add main title for the entire figure
+        fig.suptitle('Análisis de Formación de Carriles por Iteraciones', 
+                    fontsize=24, fontweight='bold', y=0.95)
+        
+        # Adjust layout and save with high quality
+        plt.tight_layout()
+        fig.savefig(os.path.join(self.figures_dir, 'groups_by_iterations.png'), 
+                   dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
         plt.close()
         
         print("Plots saved!")

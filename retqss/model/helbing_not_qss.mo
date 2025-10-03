@@ -36,6 +36,7 @@ parameter Real
 	PI = 3.1415926,
 	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.5),
     MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1),
+	CONVEYOR_BELT_UPDATE_DT = getRealModelParameter("CONVEYOR_BELT_UPDATE_DT", 0.1),
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0);
 
 /*
@@ -79,6 +80,9 @@ discrete Real nextProgressTick;
 // Variable used to control and trigger motivation update
 discrete Real nextMotivationTick;
 
+// Variable used to control and trigger conveyor belt update
+discrete Real nextConveyorBeltTick;
+
 // local variables
 discrete Real _, ux, uy, uz, hx, hy, hz, randomY;
 discrete Integer groupID;
@@ -107,6 +111,7 @@ initial algorithm
     nextProgressTick := EPS;
 	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
+	nextConveyorBeltTick := EPS;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
 
     
@@ -152,12 +157,16 @@ algorithm
 			hx := dx[i];
 			hy := dy[i];
 			hz := dz[i];
-			(hx, hy, hz) := pedestrianTotalMotivation(i, N, x, y, z, vx, vy, vz, hx, hy, hz);
+			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, N, x, y, z, vx, vy, vz, hx, hy, hz);
 			reinit(ax[i], hx);
 			reinit(ay[i], hy);
 			reinit(az[i], hz);	
 		end for;
+	end when;
 
+	when time > nextConveyorBeltTick then
+		nextConveyorBeltTick := time + CONVEYOR_BELT_UPDATE_DT;
+		_ := debug(INFO(), time, "Updating particles conveyor belt",_,_,_,_);
 		for i in 1:N loop
 			hx := x[i];
 			hy := y[i];

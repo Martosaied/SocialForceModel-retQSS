@@ -94,7 +94,7 @@ def run_school_scenario_experiment():
     config = load_config('./experiments/performance_school_scenario/config.json')
     
     # Test both school configuration types
-    for config_type, config_name_spanish in SCHOOL_CONFIG_TYPES.items():
+    for config_type, config_name_spanish in SCHOOL_CONFIG_TYPES.items()[:-1]:
         print(f"\n{'='*60}")
         print(f"Probando configuración escolar: {config_name_spanish}")
         print(f"{'='*60}")
@@ -164,7 +164,7 @@ def run_single_experiment(base_config, scenario_params, impl_config, config_name
     
     # Update config parameters
     config = base_config.copy()
-    config['iterations'] = 20  # Reduced iterations for faster testing
+    config['iterations'] = 1  # Reduced iterations for faster testing
     config['parameters']['N']['value'] = scenario_params['pedestrian_count']
     config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = impl_config['PEDESTRIAN_IMPLEMENTATION']
     config['parameters']['BORDER_IMPLEMENTATION']['value'] = impl_config['BORDER_IMPLEMENTATION']
@@ -184,17 +184,17 @@ def run_single_experiment(base_config, scenario_params, impl_config, config_name
     subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(scenario_params['grid_divisions']) + '/', model_path])
     
     # # Compile the C++ code and model
-    # compile_c_code()
-    # compile_model('helbing_school_hallway')
+    compile_c_code()
+    compile_model('helbing_school_hallway')
     
-    # # Run experiment
-    # run_experiment(
-    #     config, 
-    #     output_dir, 
-    #     'helbing_school_hallway', 
-    #     plot=False, 
-    #     copy_results=False
-    # )
+    # Run experiment
+    run_experiment(
+        config, 
+        output_dir, 
+        'helbing_school_hallway', 
+        plot=False, 
+        copy_results=True
+    )
     
     # Copy results from output directory to latest directory
     copy_results_to_latest(output_dir)
@@ -283,35 +283,28 @@ def generate_single_scenario_plot(config_data, config_type, config_name_spanish,
     colors = ['blue', 'red']
     markers = ['o', 's']
     
-    # Plot 1: Execution time vs Number of Obstacles
+    # Plot 1: Execution time vs Grid Size
     ax1 = axes[0]
     
     for i, impl_name in enumerate(config_data['implementation'].unique()):
         impl_data = config_data[config_data['implementation'] == impl_name].sort_values('grid_divisions')
         if not impl_data.empty:
-            # Calculate number of obstacles for each grid size
-            obstacle_counts = []
+            # Use grid size instead of obstacle count
+            grid_sizes = impl_data['grid_size'].values
             times = []
             stds = []
             
             for _, row in impl_data.iterrows():
-                # Load the school config for this grid size
-                school_configs = load_school_configs(config_type)
-                school_config = school_configs[str(int(row['grid_divisions']))]
-                obstacles = np.array(school_config['OBSTACLES'])
-                obstacle_count = np.sum(obstacles)
-                
-                obstacle_counts.append(obstacle_count)
                 times.append(row['detailed_metrics']['avg_iteration_time'] if row['detailed_metrics'] else 0)
                 stds.append(row['detailed_metrics']['std_iteration_time'] if row['detailed_metrics'] else 0)
             
-            ax1.errorbar(obstacle_counts, times, yerr=stds,
+            ax1.errorbar(grid_sizes, times, yerr=stds,
                         fmt=f'{markers[i]}-', label=impl_name, linewidth=2, markersize=8, 
                         capsize=4, color=colors[i])
     
-    ax1.set_xlabel('Número de Obstáculos')
+    ax1.set_xlabel('Tamaño del escenario (metros)')
     ax1.set_ylabel('Tiempo Promedio de Ejecución (s)')
-    ax1.set_title('Rendimiento vs Número de Obstáculos')
+    ax1.set_title('Rendimiento vs Tamaño del escenario')
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
@@ -323,13 +316,13 @@ def generate_single_scenario_plot(config_data, config_type, config_name_spanish,
         if not impl_data.empty:
             memory_usage = impl_data['detailed_metrics'].apply(lambda x: x['avg_memory_usage'] if x and x['avg_memory_usage'] else None)
             if not memory_usage.isna().all():
-                ax2.plot(impl_data['grid_divisions'], memory_usage,
+                ax2.plot(impl_data['grid_size'], memory_usage,
                         f'{markers[i]}-', label=impl_name, linewidth=2, markersize=8, 
                         color=colors[i])
     
-    ax2.set_xlabel('Divisiones de Grilla')
+    ax2.set_xlabel('Tamaño del escenario (metros)')
     ax2.set_ylabel('Uso Promedio de Memoria (MB)')
-    ax2.set_title('Uso de Memoria vs Tamaño de Grilla')
+    ax2.set_title('Uso de Memoria vs Tamaño del escenario')
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
@@ -371,18 +364,18 @@ def plot_performance_comparison(results):
     for i, config_type in enumerate(df['config_type'].unique()):
         config_data = df[df['config_type'] == config_type]
         for j, impl_name in enumerate(config_data['implementation'].unique()):
-            impl_data = config_data[config_data['implementation'] == impl_name].sort_values('grid_divisions')
+            impl_data = config_data[config_data['implementation'] == impl_name].sort_values('grid_size')
             if not impl_data.empty:
                 times = impl_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
                 stds = impl_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
                 label = f"{impl_name} ({impl_data['config_name_spanish'].iloc[0]})"
-                plt.errorbar(impl_data['grid_divisions'], times, yerr=stds,
+                plt.errorbar(impl_data['grid_size'], times, yerr=stds,
                             fmt=f'{markers[j]}-', label=label, linewidth=2, markersize=6, 
                             capsize=3, color=colors[i], alpha=0.8)
     
-    plt.xlabel('Divisiones de Grilla (Tamaño de Grilla)')
+    plt.xlabel('Tamaño del escenario (metros)')
     plt.ylabel('Tiempo Promedio de Ejecución (s)')
-    plt.title('Rendimiento vs Tamaño de Grilla: Escenarios Escolares')
+    plt.title('Rendimiento vs Tamaño del escenario: Escenarios Escolares')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     
@@ -412,23 +405,23 @@ def plot_performance_comparison(results):
     
     for i, config_type in enumerate(df['config_type'].unique()):
         config_data = df[df['config_type'] == config_type]
-        mmoc_data = config_data[config_data['implementation'] == 'RETQSS'].sort_values('grid_divisions')
-        retqss_data = config_data[config_data['implementation'] == 'RETQSS Optimizado'].sort_values('grid_divisions')
+        mmoc_data = config_data[config_data['implementation'] == 'RETQSS'].sort_values('grid_size')
+        retqss_data = config_data[config_data['implementation'] == 'RETQSS Optimizado'].sort_values('grid_size')
         
         if not mmoc_data.empty and not retqss_data.empty:
             # Merge data to calculate speedup
-            merged_data = pd.merge(mmoc_data, retqss_data, on='grid_divisions', suffixes=('_mmoc', '_retqss'))
+            merged_data = pd.merge(mmoc_data, retqss_data, on='grid_size', suffixes=('_mmoc', '_retqss'))
             mmoc_times = merged_data['detailed_metrics_mmoc'].apply(lambda x: x['avg_iteration_time'] if x else 0)
             retqss_times = merged_data['detailed_metrics_retqss'].apply(lambda x: x['avg_iteration_time'] if x else 0)
             merged_data['speedup'] = mmoc_times / retqss_times
             
             config_name = merged_data['config_name_spanish_mmoc'].iloc[0]
-            plt.plot(merged_data['grid_divisions'], merged_data['speedup'], 
+            plt.plot(merged_data['grid_size'], merged_data['speedup'], 
                     'o-', color=colors[i], linewidth=2, markersize=6, 
                     label=f'Mejora de Rendimiento ({config_name})', alpha=0.8)
     
     plt.axhline(y=1, color='black', linestyle='--', alpha=0.5, label='Rendimiento Igual')
-    plt.xlabel('Divisiones de Grilla')
+    plt.xlabel('Tamaño del escenario (metros)')
     plt.ylabel('Mejora de Rendimiento (Tiempo RETQSS / Tiempo RETQSS Optimizado)')
     plt.title('Mejora de Rendimiento: RETQSS vs RETQSS Optimizado')
     plt.legend()
@@ -440,16 +433,16 @@ def plot_performance_comparison(results):
     for i, config_type in enumerate(df['config_type'].unique()):
         config_data = df[df['config_type'] == config_type]
         for j, impl_name in enumerate(config_data['implementation'].unique()):
-            impl_data = config_data[config_data['implementation'] == impl_name].sort_values('grid_divisions')
+            impl_data = config_data[config_data['implementation'] == impl_name].sort_values('grid_size')
             if not impl_data.empty:
                 memory_usage = impl_data['detailed_metrics'].apply(lambda x: x['avg_memory_usage'] if x and x['avg_memory_usage'] else None)
                 if not memory_usage.isna().all():
                     label = f"{impl_name} ({impl_data['config_name_spanish'].iloc[0]})"
-                    plt.plot(impl_data['grid_divisions'], memory_usage,
+                    plt.plot(impl_data['grid_size'], memory_usage,
                             f'{markers[j]}-', label=label, linewidth=2, markersize=6, 
                             color=colors[i], alpha=0.8)
     
-    plt.xlabel('Divisiones de Grilla')
+    plt.xlabel('Tamaño del escenario (metros)')
     plt.ylabel('Uso Promedio de Memoria (MB)')
     plt.title('Uso de Memoria vs Tamaño de Grilla: Escenarios Escolares')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -489,24 +482,24 @@ def plot_performance_comparison(results):
         plt.legend()
         plt.grid(True, alpha=0.3)
     
-    # Plot 6: Classroom count vs Performance
+    # Plot 6: Grid size vs Performance (alternative view)
     plt.subplot(2, 3, 6)
     
     for i, config_type in enumerate(df['config_type'].unique()):
         config_data = df[df['config_type'] == config_type]
         for j, impl_name in enumerate(config_data['implementation'].unique()):
-            impl_data = config_data[config_data['implementation'] == impl_name].sort_values('classroom_count')
+            impl_data = config_data[config_data['implementation'] == impl_name].sort_values('grid_size')
             if not impl_data.empty:
                 times = impl_data['detailed_metrics'].apply(lambda x: x['avg_iteration_time'] if x else 0)
                 stds = impl_data['detailed_metrics'].apply(lambda x: x['std_iteration_time'] if x else 0)
                 label = f"{impl_name} ({impl_data['config_name_spanish'].iloc[0]})"
-                plt.errorbar(impl_data['classroom_count'], times, yerr=stds,
+                plt.errorbar(impl_data['grid_size'], times, yerr=stds,
                             fmt=f'{markers[j]}-', label=label, linewidth=2, markersize=6, 
                             capsize=3, color=colors[i], alpha=0.8)
     
-    plt.xlabel('Número de Aulas')
+    plt.xlabel('Tamaño del escenario (metros)')
     plt.ylabel('Tiempo Promedio de Ejecución (s)')
-    plt.title('Rendimiento vs Número de Aulas: Escenarios Escolares')
+    plt.title('Rendimiento vs Tamaño del escenario: Escenarios Escolares')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     

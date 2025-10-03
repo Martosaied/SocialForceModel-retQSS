@@ -1,5 +1,5 @@
 {
-  "iterations": 1,
+  "iterations": 10,
   "parameters": {
     "N": {
       "name": "N",
@@ -9,37 +9,37 @@
     "PEDESTRIAN_IMPLEMENTATION": {
       "name": "PEDESTRIAN_IMPLEMENTATION",
       "type": "value",
-      "value": 1
+      "value": 0
     },
     "BORDER_IMPLEMENTATION": {
       "name": "BORDER_IMPLEMENTATION",
+      "type": "value",
+      "value": 5
+    },
+    "PEDESTRIAN_DESTINATION": {
+      "name": "PEDESTRIAN_DESTINATION",
+      "type": "value",
+      "value": 0
+    },
+    "CONVEYOR_BELT_EFFECT": {
+      "name": "CONVEYOR_BELT_EFFECT",
       "type": "value",
       "value": 1
     },
     "FORCE_TERMINATION_AT": {
       "name": "FORCE_TERMINATION_AT",
       "type": "value",
-      "value": 150.0
+      "value": 60.0
     },
     "GRID_SIZE": {
       "name": "GRID_SIZE",
       "type": "value",
       "value": 50.0
     },
-    "FROM_Y": {
-      "name": "FROM_Y",
-      "type": "value",
-      "value": 15.0
-    },
-    "TO_Y": {
-      "name": "TO_Y",
-      "type": "value",
-      "value": 35.0
-    },
-    "CONVEYOR_BELT_EFFECT": {
-      "name": "CONVEYOR_BELT_EFFECT",
-      "type": "value",
-      "value": 1
+    "WALLS": {
+      "name": "WALLS",
+      "type": "custom",
+      "value": []
     },
     "PEDESTRIAN_A_1": {
       "name": "PEDESTRIAN_A_1",
@@ -74,7 +74,7 @@
     "BORDER_A": {
       "name": "BORDER_A",
       "type": "value",
-      "value": 10.0
+      "value": 5.0
     },
     "BORDER_B": {
       "name": "BORDER_B",
@@ -84,7 +84,7 @@
     "BORDER_R": {
       "name": "BORDER_R",
       "type": "value",
-      "value": 0.6
+      "value": 0.3
     },
     "SPEED_MU": {
       "name": "SPEED_MU",
@@ -96,10 +96,10 @@
       "type": "value",
       "value": 0.26
     },
-    "MOTIVATION_UPDATE_DT": {
-      "name": "MOTIVATION_UPDATE_DT",
+    "GROUPS_START_INDEX": {
+      "name": "GROUPS_START_INDEX",
       "type": "value",
-      "value": 0.1
+      "value": 900
     }
   }
 }

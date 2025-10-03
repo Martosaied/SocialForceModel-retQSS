@@ -177,7 +177,7 @@ def load_multiple_motivation_dt_data(results_dir):
                 latest_dir = os.path.join(item_path, 'latest')
                 
                 if os.path.exists(latest_dir):
-                    result_file = os.path.join(latest_dir, 'result_0.csv')
+                    result_file = os.path.join(latest_dir, 'result_1.csv')
                     if os.path.exists(result_file):
                         df = load_result_file(result_file)
                         if df is not None:
@@ -202,7 +202,7 @@ def plot_y_functions_multi(motivation_dt_data, output_dir):
     
     colors = plt.cm.tab10(np.linspace(0, 1, len(motivation_dt_data)))
     
-    for i, (motivation_dt, data) in enumerate(motivation_dt_data.items()):
+    for i, (motivation_dt, data) in enumerate(sorted(motivation_dt_data.items())):
         df = data['data']
         smoothness = data['smoothness']
         
@@ -240,7 +240,7 @@ def plot_smoothness_distribution_multi(motivation_dt_data, output_dir):
     
     colors = plt.cm.tab10(np.linspace(0, 1, len(motivation_dt_data)))
     
-    for i, (motivation_dt, data) in enumerate(motivation_dt_data.items()):
+    for i, (motivation_dt, data) in enumerate(sorted(motivation_dt_data.items())):
         smoothness = data['smoothness']
         scores = [data['smoothness_score'] for data in smoothness.values()] if smoothness else []
         
@@ -269,19 +269,15 @@ def plot_smoothness_components_multi(motivation_dt_data, output_dir):
         'Variación Total': [],
         'Cambios Velocidad': [],
         'Cambios Aceleración': [],
-        'Desv. Est. Velocidad': [],
-        'Desv. Est. Aceleración': [],
     }
     
-    for motivation_dt, data in motivation_dt_data.items():
+    for motivation_dt, data in sorted(motivation_dt_data.items()):
         smoothness = data['smoothness']
         if smoothness:
             motivation_dt_values.append(motivation_dt)
             components_data['Variación Total'].append(np.mean([d['total_variation'] for d in smoothness.values()]))
             components_data['Cambios Velocidad'].append(np.mean([d['velocity_sign_changes'] for d in smoothness.values()]))
             components_data['Cambios Aceleración'].append(np.mean([d['accel_sign_changes'] for d in smoothness.values()]))
-            components_data['Desv. Est. Velocidad'].append(np.mean([d['velocity_std'] for d in smoothness.values()]))
-            components_data['Desv. Est. Aceleración'].append(np.mean([d['acceleration_std'] for d in smoothness.values()]))
         
     if motivation_dt_values:
         x = np.arange(len(motivation_dt_values))
@@ -314,7 +310,7 @@ def plot_smoothness_summary_multi(motivation_dt_data, output_dir):
     avg_smoothness = []
     std_smoothness = []
     
-    for motivation_dt, data in motivation_dt_data.items():
+    for motivation_dt, data in sorted(motivation_dt_data.items()):
         smoothness = data['smoothness']
         if smoothness:
             scores = [d['smoothness_score'] for d in smoothness.values()]
@@ -334,7 +330,7 @@ def plot_smoothness_summary_multi(motivation_dt_data, output_dir):
         all_scores = []
         all_labels = []
         
-        for motivation_dt, data in motivation_dt_data.items():
+        for motivation_dt, data in sorted(motivation_dt_data.items()):
             smoothness = data['smoothness']
             if smoothness:
                 scores = [d['smoothness_score'] for d in smoothness.values()]

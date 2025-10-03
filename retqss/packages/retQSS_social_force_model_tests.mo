@@ -78,6 +78,18 @@ external "C" social_force_model_updateNeighboringVolumes(particleID, gridDivisio
 	    Include="#include \"retqss_social_force_model.h\"");
 end updateNeighboringVolumes;
 
+function volumeBasedRepulsivePedestrianEffect
+	input Integer particleID;
+	input Real targetX;
+	input Real targetY;
+	output Real x;
+	output Real y;
+	output Real z;
+external "C" social_force_model_volumeBasedRepulsivePedestrianEffect(particleID, targetX, targetY, x, y, z) annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.h\"");
+end volumeBasedRepulsivePedestrianEffect;
+
 function randomBoolean
 	input Real trueProbability;
 	output Real result;
@@ -242,6 +254,7 @@ function repulsivePedestrianEffect
 	input Real bX;
 	input Real bY;
 	input Real bZ;
+	input Real bSpeed;
 	input Real targetX;
 	input Real targetY;
 	output Real x;
@@ -297,9 +310,13 @@ end repulsivePedestrianEffect;
 function totalRepulsivePedestrianEffect
 	input Integer totalNumberOfParticles;
 	input Integer particleID;
+	input Real desiredSpeed[1];
 	input Real pX[1];
 	input Real pY[1];
 	input Real pZ[1];
+	input Real vX[1];
+	input Real vY[1];
+	input Real vZ[1];
 	input Real targetX;
 	input Real targetY;
 	output Real x;
@@ -322,6 +339,18 @@ protected
 	Real repulsiveZ;
 	Integer i0;
 algorithm
+	if PEDESTRIAN_IMPLEMENTATION() == 2 then
+		totalRepulsiveX := 0;
+		totalRepulsiveY := 0;
+		totalRepulsiveZ := 0;
+
+		(totalRepulsiveX, totalRepulsiveY, totalRepulsiveZ) := volumeBasedRepulsivePedestrianEffect(
+			particleID,
+			targetX,
+			targetY
+		);
+	end if;
+
 	if PEDESTRIAN_IMPLEMENTATION() == 1 then
 		totalRepulsiveX := 0;
 		totalRepulsiveY := 0;
@@ -351,7 +380,7 @@ algorithm
 					pedestrianA1, pedestrianB1, pedestrianA2, pedestrianB2, pedestrianR, pedestrianLambda,
 					equationArrayGet(pX, particleID), equationArrayGet(pY, particleID), equationArrayGet(pZ, particleID), 
 					equationArrayGet(pX, i0), equationArrayGet(pY, i0), equationArrayGet(pZ, i0), 
-					targetX, targetY
+					equationArrayGet(desiredSpeed, i0), targetX, targetY
 				);
 				totalRepulsiveX := totalRepulsiveX + repulsiveX;
 				totalRepulsiveY := totalRepulsiveY + repulsiveY;
@@ -532,102 +561,6 @@ algorithm
 	z := 0;
 end repulsiveBorderEffect;
 
-function corridorBorderEffect
-	input Integer particleID;
-	input Real X[1];
-	input Real Y[1];
-	input Real Z[1];
-	input Real corridorWidth;
-	input Real gridSize;
-	output Real x;
-	output Real y;
-	output Real z;
-protected
-	Real A;
-	Real B;
-	Real R;
-	Real pX;
-	Real pY;
-	Real pZ;
-	Real corridorTopY;
-	Real corridorBottomY;
-	Real distanceToTop;
-	Real distanceToBottom;
-	Real nearestWallY;
-	Real distanceToWall;
-	Real normalizedY;
-	Real fy;
-algorithm
-	A := BORDER_A();
-	B := BORDER_B();
-	R := BORDER_R();
-
-	pX := equationArrayGet(X, particleID);
-	pY := equationArrayGet(Y, particleID);
-	pZ := equationArrayGet(Z, particleID);
-
-	// Calculate the Y positions of the two horizontal corridor walls
-	corridorTopY := (gridSize / 2.0) + (corridorWidth / 2.0);
-	corridorBottomY := (gridSize / 2.0) - (corridorWidth / 2.0);
-
-	// Calculate distances to both walls
-	distanceToTop := abs(pY - corridorTopY);
-	distanceToBottom := abs(pY - corridorBottomY);
-
-	// Find the nearest wall
-	nearestWallY := 0.0;
-	distanceToWall := 0.0;
-	if distanceToTop < distanceToBottom then
-		nearestWallY := corridorTopY;
-		distanceToWall := distanceToTop;
-	else
-		nearestWallY := corridorBottomY;
-		distanceToWall := distanceToBottom;
-	end if;
-
-	// Calculate normalized direction to the nearest wall (only Y component)
-	normalizedY := (pY - nearestWallY) / distanceToWall;
-	
-	// Apply repulsive force only in Y direction
-	fy := A*exp((R-distanceToWall)/B)*normalizedY;
-
-	x := 0;  // No force in X direction
-	y := fy; // Only force in Y direction
-	z := 0;  // No force in Z direction
-end corridorBorderEffect;
-
-function corridorOnlyRepulsiveBorderEffect
-	input Integer particleID;
-	input Real X[1];
-	input Real Y[1];
-	input Real Z[1];
-	output Real x;
-	output Real y;
-	output Real z;
-protected
-	Real repulsiveX;
-	Real repulsiveY;
-	Real repulsiveZ;
-	Real gridSize;
-	Real corridorWidth;
-	Real fromY;
-	Real toY;
-algorithm
-	// Get parameters from the model
-	gridSize := GRID_SIZE();
-	fromY := FROM_Y();
-	toY := TO_Y();
-	
-	// Calculate corridor width from FROM_Y and TO_Y parameters
-	corridorWidth := toY - fromY;
-
-	(repulsiveX, repulsiveY, repulsiveZ) := corridorBorderEffect(particleID, X, Y, Z, corridorWidth, gridSize);
-
-	x := repulsiveX;
-	y := repulsiveY;
-	z := repulsiveZ;
-end totalRepulsiveBorderEffect;
-
 function totalRepulsiveBorderEffect
 	input Integer totalNumberOfVolumes;
 	input Integer particleID;
@@ -667,12 +600,15 @@ algorithm
 	end if;
 
 	if BORDER_IMPLEMENTATION() == 1 then
-		(repulsiveX, repulsiveY, repulsiveZ) := corridorOnlyRepulsiveBorderEffect(particleID, pX, pY, pZ);
-		totalX := repulsiveX;
-		totalY := repulsiveY;
-		totalZ := repulsiveZ;
+		nextObstacle := particle_nextVolumeID(particleID);
+		if nextObstacle <> 0 then
+			(repulsiveX, repulsiveY, repulsiveZ) := repulsiveBorderEffect(particleID, cellEdgeLength, nextObstacle, pX, pY, pZ);
+			totalX := repulsiveX;
+			totalY := repulsiveY;
+			totalZ := repulsiveZ;
+		end if;
 	end if;
-	
+
 
 	if BORDER_IMPLEMENTATION() == 2 then
 		A := BORDER_A();
@@ -735,7 +671,7 @@ protected
 	Real resultZ;
 algorithm
 	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
-	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(totalNumberOfParticles, particleID, pX, pY, pZ, targetX, targetY);
+	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(totalNumberOfParticles, particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY);
 	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(totalNumberOfVolumes, particleID, cellEdgeLength, pX, pY, pZ);
 
 	resultX := accelerationX + repulsiveX + wallX;

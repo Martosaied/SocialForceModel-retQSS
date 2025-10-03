@@ -14,7 +14,7 @@ from src.plots.DensityHeatmap import DensityHeatmap
 from src.plots.DensityRowGraph import DensityRowGraph
 from src.plots.FlowGraphInfections import FlowGraphInfections
 from src.plots.FlowGraphSingleFrame import FlowGraphSingleFrame
-
+from src.plots.FlowGraphSchool import FlowGraphSchool
 
 def benchmark_graph():
     results = {
@@ -66,3 +66,7 @@ class Plotter:
     def flow_graph_single_frame(self, solution_file, output_dir, parameters):
         flow_graph_single_frame = FlowGraphSingleFrame(solution_file, output_dir, parameters)
         flow_graph_single_frame.plot()
+
+    def flow_graph_school(self, solution_file, output_dir, parameters):
+        flow_graph_school = FlowGraphSchool(solution_file, output_dir, parameters)
+        flow_graph_school.plot()

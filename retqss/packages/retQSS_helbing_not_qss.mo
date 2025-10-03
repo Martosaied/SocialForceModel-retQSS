@@ -110,6 +110,7 @@ end desiredDirection;
 
 function acceleration
 	input Integer particleID;
+	input Real desiredSpeed[1];
 	input Real pX[1];
 	input Real pY[1];
 	input Real pZ[1];
@@ -141,7 +142,7 @@ algorithm
 	currentZ := equationArrayGet(pZ, particleID);
 
 	// The desired speed is gaussian distributed with mean 1.34 m/s and standard deviation 0.26 m/s
-    desiredSpeedValue := 1.34;
+    desiredSpeedValue := arrayGet(desiredSpeed, particleID);
 
 	// The desired direction is given by the difference between the current position and the target position
 	(desiredX, desiredY, desiredZ) := desiredDirection(
@@ -283,7 +284,7 @@ algorithm
                 equationArrayGet(pX, particleID), equationArrayGet(pY, particleID), equationArrayGet(pZ, particleID), 
                 equationArrayGet(pX, i0), equationArrayGet(pY, i0), equationArrayGet(pZ, i0), 
                 targetX, targetY, targetZ
-            );
+			);
             totalRepulsiveX := totalRepulsiveX + repulsiveX;
             totalRepulsiveY := totalRepulsiveY + repulsiveY;
             totalRepulsiveZ := totalRepulsiveZ + repulsiveZ;
@@ -406,6 +407,7 @@ end totalRepulsiveBorderEffect;
 
 function pedestrianTotalMotivation
 	input Integer particleID;
+	input Real desiredSpeed[1];
 	input Integer totalNumberOfParticles;
 	input Real pX[1];
 	input Real pY[1];
@@ -437,7 +439,7 @@ protected
 	Real resultY;
 	Real resultZ;
 algorithm
-	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
+	(accelerationX, accelerationY, accelerationZ) := acceleration(particleID, desiredSpeed, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
 	(repulsiveX, repulsiveY, repulsiveZ) := totalRepulsivePedestrianEffect(totalNumberOfParticles, particleID, pX, pY, pZ, vX, vY, vZ, targetX, targetY, targetZ);
 	(wallX, wallY, wallZ) := totalRepulsiveBorderEffect(particleID, pX, pY, pZ, vX, vY, vZ);
 

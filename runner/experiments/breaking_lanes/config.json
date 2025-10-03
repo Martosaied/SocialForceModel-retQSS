@@ -1,5 +1,5 @@
 {
-  "iterations": 10,
+  "iterations": 1,
   "parameters": {
     "N": {
       "name": "N",
@@ -9,12 +9,12 @@
     "PEDESTRIAN_IMPLEMENTATION": {
       "name": "PEDESTRIAN_IMPLEMENTATION",
       "type": "value",
-      "value": 0
+      "value": 1
     },
     "BORDER_IMPLEMENTATION": {
       "name": "BORDER_IMPLEMENTATION",
       "type": "value",
-      "value": 5
+      "value": 1
     },
     "PEDESTRIAN_DESTINATION": {
       "name": "PEDESTRIAN_DESTINATION",
@@ -29,7 +29,7 @@
     "FORCE_TERMINATION_AT": {
       "name": "FORCE_TERMINATION_AT",
       "type": "value",
-      "value": 60.0
+      "value": 150.0
     },
     "GRID_SIZE": {
       "name": "GRID_SIZE",
@@ -95,6 +95,21 @@
       "name": "SPEED_SIGMA",
       "type": "value",
       "value": 0.26
+    },
+    "FROM_Y": {
+      "name": "FROM_Y",
+      "type": "value",
+      "value": 15.0
+    },
+    "TO_Y": {
+      "name": "TO_Y",
+      "type": "value",
+      "value": 35.0
+    },
+    "MOTIVATION_UPDATE_DT": {
+      "name": "MOTIVATION_UPDATE_DT",
+      "type": "value",
+      "value": 0.5
     },
     "GROUPS_START_INDEX": {
       "name": "GROUPS_START_INDEX",

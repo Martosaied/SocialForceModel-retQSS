@@ -13,7 +13,7 @@ from src.math.Clustering import Clustering
 from src.plots.DensityRowGraph import DensityRowGraph
 
 
-MOTIVATION_UPDATE_DT = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0] # Valores de motivation update dt a probar
+MOTIVATION_UPDATE_DT = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # Valores de motivation update dt a probar
 
 WIDTH = 50
 PEDESTRIAN_COUNT = int(50 * (50 * 0.4) * 0.3)
@@ -21,12 +21,20 @@ PEDESTRIAN_COUNT = int(50 * (50 * 0.4) * 0.3)
 run_simulation = True
 
 
+def get_simulation_duration():
+    """
+    Obtiene la duración de la simulación desde el archivo config.json.
+    """
+    config = load_config('experiments/motivation_update_dt/config.json')
+    return config['parameters']['FORCE_TERMINATION_AT']['value']
+
+
 def motivation_update_dt():
     print(f"Ejecutando iteraciones para {PEDESTRIAN_COUNT} peatones variando Motivation Update DT y graficando carriles...\n")
     if run_simulation:
         for motivation_dt in MOTIVATION_UPDATE_DT:
             print(f"Ejecutando experimento para motivation_update_dt: {motivation_dt}")
-            # run(motivation_dt)
+            run(motivation_dt)
 
     # Graficar los resultados
     plot_results()
@@ -46,6 +54,7 @@ def run(motivation_dt):
     config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = Constants.PEDESTRIAN_MMOC
     config['parameters']['BORDER_IMPLEMENTATION']['value'] = Constants.BORDER_NONE
     config['parameters']['MOTIVATION_UPDATE_DT']['value'] = motivation_dt
+    config['parameters']['GROUPS_START_INDEX']['value'] = 500
 
     # Agregar desde dónde hasta dónde se generan los peatones
     config['parameters']['FROM_Y']['value'] = 15
@@ -87,6 +96,10 @@ def plot_results():
     """
     print("Generando gráficos de resultados...")
     
+    # Obtener la duración de la simulación desde el config
+    simulation_duration = get_simulation_duration()
+    print(f"Duración de la simulación: {simulation_duration} segundos")
+    
     # Obtener todos los directorios de resultados
     results_dirs = [d for d in os.listdir('experiments/motivation_update_dt/results') 
                    if os.path.isdir(os.path.join('experiments/motivation_update_dt/results', d))]
@@ -100,9 +113,12 @@ def plot_results():
         'time_std': [],
         'memory_mean': [],
         'memory_std': [],
+        'motivation_updates_per_sec_mean': [],
+        'motivation_updates_per_sec_std': [],
         'groups_data': [],
         'time_data': [],
-        'memory_data': []
+        'memory_data': [],
+        'motivation_updates_per_sec_data': []
     }
 
     # Recopilar datos de archivos metrics.csv
@@ -128,6 +144,14 @@ def plot_results():
                     groups_mean = np.mean(groups_data)
                     groups_std = np.std(groups_data, ddof=1)
                     
+                    # Calcular motivation updates per second
+                    # Total motivation updates = simulation_duration / motivation_update_dt
+                    total_motivation_updates = simulation_duration / motivation_dt
+                    
+                    # Convertir tiempo de ms a segundos y calcular updates per second
+                    time_data_seconds = [t / 1000.0 for t in time_data]  # Convertir ms a segundos
+                    motivation_updates_per_sec = [total_motivation_updates / t for t in time_data_seconds]
+                    
                     # Almacenar resultados
                     data['motivation_dts'].append(motivation_dt)
                     data['groups_mean'].append(groups_mean)
@@ -136,9 +160,12 @@ def plot_results():
                     data['time_std'].append(np.std(time_data, ddof=1) if time_data else 0)
                     data['memory_mean'].append(np.mean(memory_data) if memory_data else 0)
                     data['memory_std'].append(np.std(memory_data, ddof=1) if memory_data else 0)
+                    data['motivation_updates_per_sec_mean'].append(np.mean(motivation_updates_per_sec))
+                    data['motivation_updates_per_sec_std'].append(np.std(motivation_updates_per_sec, ddof=1))
                     data['groups_data'].append(groups_data)
                     data['time_data'].append(time_data)
                     data['memory_data'].append(memory_data)
+                    data['motivation_updates_per_sec_data'].append(motivation_updates_per_sec)
                     
                     print(f"Procesado dt={motivation_dt}: {len(groups_data)} puntos de datos")
                     
@@ -153,13 +180,14 @@ def plot_results():
     # Ordenar datos por motivation_dt
     sorted_indices = np.argsort(data['motivation_dts'])
     for key in data:
-        if key != 'groups_data' and key != 'time_data' and key != 'memory_data':
+        if key not in ['groups_data', 'time_data', 'memory_data', 'motivation_updates_per_sec_data']:
             data[key] = np.array(data[key])[sorted_indices]
         else:
             data[key] = [data[key][i] for i in sorted_indices]
 
     # Crear gráfico principal
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+    fig.suptitle('Análisis de Motivation Update DT: Formación de Carriles y Rendimiento', fontsize=16, fontweight='bold')
     
     # Gráfico 1: Grupos de carriles vs Motivation Update DT
     motivation_dts = data['motivation_dts']
@@ -210,20 +238,20 @@ def plot_results():
     plt.close()
     
     # Imprimir resumen
-    print("\n" + "="*80)
+    print("\n" + "="*90)
     print("RESUMEN DE RESULTADOS MOTIVATION UPDATE DT")
-    print("="*80)
-    print(f"{'Motivation DT':<12} {'Grupos':<10} {'Rendimiento (s)':<15}")
-    print("-" * 80)
+    print("="*90)
+    print(f"{'Motivation DT':<12} {'Grupos':<10} {'Tiempo (ms)':<12}")
+    print("-" * 90)
     
     for i, dt in enumerate(motivation_dts):
         groups_mean = groups_means[i]
         groups_std = groups_stds[i]
         time_mean = time_means[i]
         time_std = time_stds[i]
-        print(f"{dt:<12.3f} {groups_mean:.1f}±{groups_std:.1f}     {time_mean:.2f}±{time_std:.2f}")
+        print(f"{dt:<12.3f} {groups_mean:.1f}±{groups_std:.1f}     {time_mean:.1f}±{time_std:.1f}")
     
-    print("="*80)
+    print("="*90)
 
 if __name__ == '__main__':
     motivation_update_dt()

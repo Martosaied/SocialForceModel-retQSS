@@ -6,11 +6,11 @@ import imageio
 from math import sqrt
 from src.utils import parse_walls, process_parameters, get_parameter_combinations
 
-class FlowGraph:
+class FlowGraphSchool:
     """
-    Plot a flow graph of the simulation.
+    Plot a flow graph of the school simulation.
 
-    The flow graph is a GIF that shows the flow of pedestrians in the simulation.
+    The flow graph is a GIF that shows the flow of pedestrians in the school simulation.
 
     Args:
         solution_file: The path to the solution file.
@@ -25,59 +25,55 @@ class FlowGraph:
         self.solution_file = solution_file
         self.output_dir = output_dir
         self.parameters = list(get_parameter_combinations(process_parameters(parameters.get('parameters', {}))))[0]
+        self.raw_parameters = parameters['parameters']
 
-    def _get_volume_type_map(self, volumes_count):
+    def _get_school_config_matrices(self):
         """
-        Create a map of volume IDs to their types (obstacle, hallway, classroom).
-        Returns a dictionary mapping volume_id -> volume_type
+        Get school configuration matrices for obstacles, hallways, and classrooms.
+        Returns dictionaries with the matrix data.
         """
-        volume_type_map = {}
+        # Get the matrices from parameters - they are stored in the 'map' field
+        obstacles_param = self.raw_parameters.get('OBSTACLES', {})['map']
+        hallways_param = self.raw_parameters.get('HALLWAYS', {})['map']
+        classrooms_param = self.raw_parameters.get('CLASSROOMS', {})['map']
         
-        # Get processed volume IDs (comma-separated strings)
-        obstacles_str = self.parameters.get('OBSTACLES', '')
-        hallways_str = self.parameters.get('HALLWAYS', '')
-        classrooms_str = self.parameters.get('CLASSROOMS', '')
+        # Extract the map data
+        obstacles = obstacles_param
+        hallways = hallways_param
+        classrooms = classrooms_param
         
-        # Parse obstacle volume IDs
-        if obstacles_str:
-            obstacle_ids = [int(x.strip()) for x in obstacles_str.split(',') if x.strip()]
-            for volume_id in obstacle_ids:
-                volume_type_map[volume_id] = 'obstacle'
-        
-        # Parse hallway volume IDs
-        if hallways_str:
-            hallway_ids = [int(x.strip()) for x in hallways_str.split(',') if x.strip()]
-            for volume_id in hallway_ids:
-                volume_type_map[volume_id] = 'hallway'
-        
-        # Parse classroom volume IDs
-        if classrooms_str:
-            classroom_ids = [int(x.strip()) for x in classrooms_str.split(',') if x.strip()]
-            for volume_id in classroom_ids:
-                volume_type_map[volume_id] = 'classroom'
-        
-        return volume_type_map
+        return {
+            'obstacles': obstacles,
+            'hallways': hallways, 
+            'classrooms': classrooms
+        }
 
     def plot(self):
         walls = self.parameters.get('WALLS', [])
         walls = parse_walls(walls)
         
-        # Get grid parameters - use the same approach as FlowGraphInfections
+        # Get grid parameters - use school scenario approach
         GRID_SIZE = self.parameters.get('GRID_SIZE', 50)
-        # Determine VOLUMES_COUNT from GRID_DIVISIONS or default to 20
-        VOLUMES_COUNT = 10
-        CELL_SIZE = GRID_SIZE / VOLUMES_COUNT
+        # Get grid divisions from parameters
+        GRID_DIVISIONS = len(self.raw_parameters.get('OBSTACLES', {})['map'])
+        CELL_SIZE = GRID_SIZE / GRID_DIVISIONS
         N = self.parameters.get('N', 300)
+        
+        # Get pedestrian radius and calculate appropriate circle size
+        PEDESTRIAN_R = self.parameters.get('PEDESTRIAN_R', 0.3)
+        # Calculate circle size based on pedestrian radius relative to grid size
+        # Scale factor to make circles visible but proportional to actual size
+        circle_size = max(15, min(150, (PEDESTRIAN_R / GRID_SIZE) * 10000))
         
         # Get corridor parameters
         FROM_Y = self.parameters.get('FROM_Y', 0)
         TO_Y = self.parameters.get('TO_Y', GRID_SIZE)
         
-        # Get volume type mapping
-        volume_type_map = self._get_volume_type_map(VOLUMES_COUNT)
+        # Get school configuration matrices
+        school_config = self._get_school_config_matrices()
         
-        # Define colors for different volume types
-        volume_colors = {
+        # Define colors for different cell types (same as generate_single_flowgraph)
+        cell_colors = {
             'obstacle': 'black',
             'hallway': 'lightgray', 
             'classroom': 'lightblue'
@@ -89,23 +85,19 @@ class FlowGraph:
         # Create output directory for frames if it doesn't exist
         os.makedirs(frames_dir, exist_ok=True)
         
-        # Pre-calculate cell positions and IDs for efficiency (same as FlowGraphInfections)
-        cell_positions = []
-        cell_ids = []
-        for i in range(VOLUMES_COUNT):
-            for j in range(VOLUMES_COUNT):
-                cell_id = i % VOLUMES_COUNT + VOLUMES_COUNT * j + 1
-                cell_positions.append((j * CELL_SIZE, i * CELL_SIZE))
-                cell_ids.append(cell_id)
+        # Convert matrices to numpy arrays for easier processing (same as generate_single_flowgraph)
+        obstacles = np.array(school_config['obstacles'])
+        hallways = np.array(school_config['hallways'])
+        classrooms = np.array(school_config['classrooms'])
         
         # Pre-calculate grid lines
-        grid_lines_x = [CELL_SIZE * i for i in range(VOLUMES_COUNT + 1)]
-        grid_lines_y = [CELL_SIZE * i for i in range(VOLUMES_COUNT + 1)]
+        grid_lines_x = [CELL_SIZE * i for i in range(GRID_DIVISIONS + 1)]
+        grid_lines_y = [CELL_SIZE * i for i in range(GRID_DIVISIONS + 1)]
 
         # Create frames
         prev_row = None
         for index, row in df.iterrows():
-            if index % 5 != 0:
+            if index % 10 != 0:
                 continue
 
             # Create a new figure for each frame with better proportions
@@ -144,22 +136,38 @@ class FlowGraph:
             for y in grid_lines_y:
                 ax.axhline(y=y, color='lightgray', linestyle='-', alpha=0.4, linewidth=1.2)
             
-            # Color each cell based on volume type (similar to FlowGraphInfections VC coloring)
-            for i, (pos, cell_id) in enumerate(zip(cell_positions, cell_ids)):
-                if cell_id in volume_type_map:
-                    volume_type = volume_type_map[cell_id]
-                    color = volume_colors[volume_type]
-                    alpha = 0.7 if volume_type == 'obstacle' else 0.5
+            # Color each cell based on its type (same as generate_single_flowgraph)
+            for i in range(GRID_DIVISIONS):
+                for j in range(GRID_DIVISIONS):
+                    x = j * CELL_SIZE
+                    y = (GRID_DIVISIONS - 1 - i) * CELL_SIZE  # Flip Y axis to match matrix indexing
                     
-                    rect = plt.Rectangle(
-                        pos, 
-                        CELL_SIZE, 
-                        CELL_SIZE, 
-                        facecolor=color, 
-                        alpha=alpha,
-                        edgecolor='none'
-                    )
-                    ax.add_patch(rect)
+                    # Determine cell type (priority: obstacle > classroom > hallway)
+                    if obstacles[i, j] == 1:
+                        cell_type = 'obstacle'
+                        alpha = 0.8
+                    elif classrooms[i, j] == 1:
+                        cell_type = 'classroom'
+                        alpha = 0.6
+                    elif hallways[i, j] == 1:
+                        cell_type = 'hallway'
+                        alpha = 0.4
+                    else:
+                        cell_type = 'hallway'  # Default to hallway
+                        alpha = 0.4
+                    
+                    if cell_type != 'empty':
+                        color = cell_colors[cell_type]
+                        rect = plt.Rectangle(
+                            (x, y), 
+                            CELL_SIZE, 
+                            CELL_SIZE, 
+                            facecolor=color, 
+                            alpha=alpha,
+                            edgecolor='black',
+                            linewidth=0.5
+                        )
+                        ax.add_patch(rect)
 
             # Plot wall segments
             for wall in walls:
@@ -208,15 +216,14 @@ class FlowGraph:
 
             # Plot scatter points
             if len(frame_positions_x) > 0:
-                scatter = ax.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=200)
+                scatter = ax.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=circle_size)
             
-            # Create legend elements with updated colors
+            # Create legend elements with updated colors (same as generate_single_flowgraph)
             legend_elements = [
-                plt.scatter([], [], c='#4444FF', s=200, label='Izquierda'),
-                plt.scatter([], [], c='#FF4444', s=200, label='Derecha'),
-                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['obstacle'], alpha=0.7, label='Obstáculos') if self.parameters.get('OBSTACLES', '') else None,
-                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['hallway'], alpha=0.5, label='Pasillos') if self.parameters.get('HALLWAYS', '') else None,
-                plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['classroom'], alpha=0.5, label='Aulas') if self.parameters.get('CLASSROOMS', '') else None,
+                plt.scatter([], [], c='#4444FF', s=circle_size, label='Personas'),
+                plt.Rectangle((0, 0), 1, 1, facecolor=cell_colors['obstacle'], alpha=0.8, label='Obstáculos'),
+                plt.Rectangle((0, 0), 1, 1, facecolor=cell_colors['classroom'], alpha=0.6, label='Aulas'),
+                plt.Rectangle((0, 0), 1, 1, facecolor=cell_colors['hallway'], alpha=0.4, label='Pasillos'),
             ]
             
             # Add legend with better styling
@@ -225,33 +232,18 @@ class FlowGraph:
                       title='Leyenda', fontsize=16, title_fontsize=18,
                       frameon=True, fancybox=True, shadow=True)
             
-            # Add velocity vectors with quiver only if we have velocity data
-            if prev_row is not None and len(frame_velocities_x) > 0:
-                # Scale factor for velocity vectors (adjust this value to make arrows more visible)
-                length_velocities = [
-                    sqrt(frame_velocities_x[i] ** 2 + frame_velocities_y[i] ** 2) for i in range(len(frame_velocities_x))
-                ]
-                normalize_velocities_x = [
-                    frame_velocities_x[i] / length_velocities[i] if length_velocities[i] > 0 else 0 for i in range(len(frame_velocities_x))
-                ]
-                normalize_velocities_y = [
-                    frame_velocities_y[i] / length_velocities[i] if length_velocities[i] > 0 else 0 for i in range(len(frame_velocities_y))
-                ]
-                ax.quiver(frame_positions_x, frame_positions_y, 
-                        np.array(normalize_velocities_x), 
-                        np.array(normalize_velocities_y),
-                        color='gray', alpha=0.5, width=0.003, scale=30)
 
             active_pedestrians = len([i for i in range(1, N) if row.get(f'PX[{i}]') is not None])
             
-            # Add main title and timestamp with better styling
-            fig.suptitle('Simulación de Movimiento de Peatones', fontsize=24, fontweight='bold', y=0.95)
-            ax.set_title(f'Tiempo: {row["time"]:.2f} segundos | Peatones: {active_pedestrians} | Corredor: {abs(FROM_Y-TO_Y):.1f}m', 
-                        fontsize=16, fontweight='bold', pad=20)
+            # Add main title and timestamp with better styling (matching generate_single_flowgraph)
+            fig.suptitle('Simulación de Movimiento de Peatones - Escenario Escuela', fontsize=20, fontweight='bold', y=0.95)
+            ax.set_title(f'Tiempo: {row["time"]:.2f} segundos | Peatones: {active_pedestrians} | '
+                        f'Grilla: {GRID_DIVISIONS}x{GRID_DIVISIONS} ({GRID_SIZE}m x {GRID_SIZE}m)', 
+                        fontsize=14, fontweight='bold', pad=20)
             
             # Add axis labels with units
-            ax.set_xlabel('Posición X (metros)', fontsize=16, fontweight='bold')
-            ax.set_ylabel('Posición Y (metros)', fontsize=16, fontweight='bold')
+            ax.set_xlabel('Posición X (metros)', fontsize=14, fontweight='bold')
+            ax.set_ylabel('Posición Y (metros)', fontsize=14, fontweight='bold')
             
             # Improve tick labels
             ax.tick_params(axis='both', which='major', labelsize=12)
@@ -278,5 +270,3 @@ class FlowGraph:
         for frame_file in frame_files:
             os.remove(os.path.join(frames_dir, frame_file))
         os.rmdir(frames_dir)
-
-

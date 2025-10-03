@@ -138,7 +138,8 @@ def handle_plot_command(args):
             plotter.density_row_graph(args.solution_file, args.output_dir)
         ),
         'flow_graph_infections': lambda: plotter.flow_graph_infections(args.solution_file, args.output_dir, config),
-        'flow_graph_single_frame': lambda: plotter.flow_graph_single_frame(args.solution_file, args.output_dir, config)
+        'flow_graph_single_frame': lambda: plotter.flow_graph_single_frame(args.solution_file, args.output_dir, config),
+        'flow_graph_school': lambda: plotter.flow_graph_school(args.solution_file, args.output_dir, config),
     }
     
     if args.plot in plot_handlers:

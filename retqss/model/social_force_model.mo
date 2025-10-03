@@ -13,7 +13,7 @@ import retQSS_social_force_model_types;
 
 constant Integer
 	N = 300,
-	GRID_DIVISIONS = 1,
+	GRID_DIVISIONS = 10,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -44,7 +44,7 @@ parameter Real
 	EPS = 1e-5,
 	PI = 3.1415926,
 	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.1),
-	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1),
+	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.5),
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;
@@ -87,7 +87,7 @@ discrete Real nextProgressTick;
 discrete Real nextMotivationTick;
 
 // local variables
-discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID, groupID;
+discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID, groupID, randomY;
 discrete Boolean isolate;
 
 
@@ -167,13 +167,13 @@ equation
 algorithm	
 
 	//EVENT: particle enters a volume and update neighboring volumes that are obstacles
-	for i in 1:N loop
-		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
-			if BORDER_IMPLEMENTATION == 3 then
-				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
-			end if;
-		end when;
-	end for;
+	// for i in 1:N loop
+	// 	when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
+	// 		if BORDER_IMPLEMENTATION == 3 then
+	// 			_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
+	// 		end if;
+	// 	end when;
+	// end for;
 
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
@@ -188,8 +188,12 @@ algorithm
 
 	
 	when time > nextMotivationTick then
-		nextMotivationTick := time + PROGRESS_UPDATE_DT;
+		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
 		// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
+		for i in 1:N loop
+			_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
+		end for;
+		
 		for i in 1:N loop
 			hx := dx[i];
 			hy := dy[i];
@@ -204,6 +208,7 @@ algorithm
 		for i in 1:N loop
 			hx := x[i];
 			hy := y[i];
+			randomY := random(FROM_Y, TO_Y);
 			if CONVEYOR_BELT_EFFECT == 1 then
 				if y[i] < 0.0 then
 					hy := GRID_SIZE;
@@ -218,21 +223,22 @@ algorithm
 					hx := 0.0;
 				end if;
 				
+				// INFO: This form of conveyor belt affect the way the lanes are detected.
+				// Comment to run the breaking lanes experiment.
 				if hx <> x[i] then
 					reinit(x[i], hx);
+					reinit(y[i], randomY);
+					dy[i] := randomY;
 					_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
+				end if;
+				if hy <> y[i] then
+					reinit(y[i], hy);
+					_ := particle_relocate(i, x[i], hy, z[i], vx[i], vy[i], vz[i]);
 				end if;
 			end if;
 		end for;
 	end when;
 
-
-	//EVENT: Next progress output time: prints a new line in stdout and computes the next output time incrementing the variable
-	when time > nextProgressTick then
-		// _ := debug(INFO(), time, "Progress checkpoint",_,_,_,_);
-        nextProgressTick := time + PROGRESS_UPDATE_DT;
-	end when;
-	
 
 annotation(
 	experiment(
