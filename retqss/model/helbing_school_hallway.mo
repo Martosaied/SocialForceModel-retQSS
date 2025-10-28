@@ -13,8 +13,8 @@ import retQSS_classrooms;
 */
 
 constant Integer
-	N = 500,
-	GRID_DIVISIONS = 11,
+	N = 1000,
+	GRID_DIVISIONS = 15,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -49,8 +49,9 @@ parameter Real
 	CLASSROOM_UPDATE_DT = getRealModelParameter("CLASSROOM_UPDATE_DT", 0.1),
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0),
 	TIME_BEFORE_BREAK = getRealModelParameter("TIME_BEFORE_BREAK", 100),
-	BREAK_MOVEMENT_DURATION = getRealModelParameter("BREAK_MOVEMENT_DURATION", 20),
-	BREAK_DURATION = getRealModelParameter("BREAK_DURATION", 100),
+	BREAK_MOVEMENT_DURATION = getRealModelParameter("BREAK_MOVEMENT_DURATION", 10),
+	BREAK_DURATION = getRealModelParameter("BREAK_DURATION", 40),
+	BREAK_HALLWAY_CHANGE_DT = getRealModelParameter("BREAK_HALLWAY_CHANGE_DT", 10),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;
 
@@ -99,11 +100,14 @@ discrete Real nextMotivationTick;
 // Variable used to control and trigger class breaks in the school scenario
 discrete Real nextBreakTime;
 
+// Variable used to control and trigger break hallway change
+discrete Real nextBreakHallwayChangeTime;
+
 // local variables
 discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz;
 discrete Boolean isolate;
 discrete Integer classroomID;
-
+discrete Boolean isBreak;
 
 initial algorithm
 
@@ -162,11 +166,12 @@ initial algorithm
 	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
 	nextBreakTime := TIME_BEFORE_BREAK;
+	nextBreakHallwayChangeTime := EPS;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
     _ := debug(INFO(), time, "Pedestrian implementation: %d", PEDESTRIAN_IMPLEMENTATION,_,_,_);
 	_ := debug(INFO(), time, "Border implementation: %d", BORDER_IMPLEMENTATION,_,_,_);
 
-    
+    _ := initContiguousHallways(GRID_DIVISIONS);
 /*
   Model's diferential equations: for particles movements and volumes concentration
 */
@@ -214,26 +219,35 @@ algorithm
 	end when;
 
 	when time > nextBreakTime then
-			_ := debug(INFO(), time, "On break, going to the door", _,_,_,_);
-		    for i in 1:N loop
-		    	(dx[i], dy[i], dz[i]) := nearestHallwayPosition(i, dx[i], dy[i], dz[i]);
-		    end for;
+		_ := debug(INFO(), time, "On break, going to the door", _,_,_,_);
+		for i in 1:N loop
+			(dx[i], dy[i], dz[i]) := nearestHallwayPosition(i, dx[i], dy[i], dz[i]);
+		end for;
+	end when;
+
+	when time > nextBreakTime + BREAK_MOVEMENT_DURATION then
+		_ := debug(INFO(), time, "All moved to the hallway", _,_,_,_);
+		isBreak := true;
 	end when;
 
 	//EVENT: Next break starts / part 2. All particles arrived the classroom door and will start moving randomly in the hallway
-	when time > nextBreakTime + BREAK_MOVEMENT_DURATION then
-		_ := debug(INFO(), time, "All in the hallway", _,_,_,_);
-		for i in 1:N loop
-			(dx[i], dy[i], dz[i]) := randomConnectedHallway(i, dx[i], dy[i], dz[i]);
-		end for;
+	when time > nextBreakHallwayChangeTime then
+		nextBreakHallwayChangeTime := time + BREAK_HALLWAY_CHANGE_DT;
+		if isBreak then
+			_ := debug(INFO(), time, "Starting to move randomly in the hallway", _,_,_,_);
+			for i in 1:N loop
+				(dx[i], dy[i], dz[i]) := randomConnectedHallway(i, dx[i], dy[i], dz[i]);
+			end for;
+		end if;
 	end when;
 	
 	//EVENT: Current break finishes / part 1. All particles starts moving their corresponding classroom door
 	when time > nextBreakTime + BREAK_DURATION + BREAK_MOVEMENT_DURATION then
 		_ := debug(INFO(), time, "Finished break, reroute to door", _,_,_,_);
+		isBreak := false;
 		for i in 1:N loop
 			classroomID := particle_getProperty(i, "classroomID");
-			(hx, hy, hz) := volume_randomPoint(classroomID);
+			(hx, hy, hz) := volume_centroid(classroomID);
 			dx[i] := hx;
 			dy[i] := hy;
 			dz[i] := hz;
@@ -242,7 +256,7 @@ algorithm
 		nextBreakTime := nextBreakTime + TIME_BEFORE_BREAK + BREAK_DURATION;
 	end when;
 
-	
+		
 	when time > nextMotivationTick then
 		nextMotivationTick := time + PROGRESS_UPDATE_DT;
 		for i in 1:N loop

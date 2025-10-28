@@ -78,14 +78,14 @@ class LanesByIterationsExperiment:
         with open(config_copy_path, 'w') as f:
             json.dump(config, f, indent=2)
 
-        subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/helbing_not_qss.mo'])
-        subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/helbing_not_qss.mo'])
+        subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/helbing_only_qss.mo'])
+        subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/helbing_only_qss.mo'])
 
         # Compile the C++ code if requested
         compile_c_code()
 
         # Compile the model if requested
-        compile_model('helbing_not_qss')
+        compile_model('helbing_only_qss')
 
         # Deactivate metrics calculation
         config_manager.update_from_dict({
@@ -96,7 +96,7 @@ class LanesByIterationsExperiment:
         run_experiment(
             config, 
             output_dir, 
-            'helbing_not_qss', 
+            'helbing_only_qss', 
             plot=False, 
             copy_results=True
         )

@@ -71,7 +71,7 @@ def run_single_experiment(motivation_dt, deltaq):
     print(f"Tolerance: {formatted_tolerance}, AbsTolerance: {formatted_abs_tolerance}")
     
     # Update model file with parameters
-    model_file = '../retqss/model/helbing_not_qss.mo'
+    model_file = '../retqss/model/helbing_only_qss.mo'
     subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', model_file])
     subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', model_file])
     subprocess.run([
@@ -87,12 +87,12 @@ def run_single_experiment(motivation_dt, deltaq):
     
     # Compile and run
     compile_c_code()
-    compile_model('helbing_not_qss')
+    compile_model('helbing_only_qss')
     
     run_experiment(
         config, 
         output_dir, 
-        'helbing_not_qss', 
+        'helbing_only_qss', 
         plot=False, 
         copy_results=False # We don't want to copy the results to the latest directory
     )

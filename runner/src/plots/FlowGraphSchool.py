@@ -26,6 +26,8 @@ class FlowGraphSchool:
         self.output_dir = output_dir
         self.parameters = list(get_parameter_combinations(process_parameters(parameters.get('parameters', {}))))[0]
         self.raw_parameters = parameters['parameters']
+        # Number of witness particles to track (default: 1)
+        self.num_witness_particles = parameters.get('num_witness_particles', 1)
 
     def _get_school_config_matrices(self):
         """
@@ -94,6 +96,37 @@ class FlowGraphSchool:
         grid_lines_x = [CELL_SIZE * i for i in range(GRID_DIVISIONS + 1)]
         grid_lines_y = [CELL_SIZE * i for i in range(GRID_DIVISIONS + 1)]
 
+        # Find active witness particles from the first frame
+        witness_particle_ids = []
+        witness_trajectories = {}  # Dictionary to store trajectories for each witness
+        
+        # Look for the first frame to find active particles
+        for index, row in df.iterrows():
+            if index % 10 != 0:
+                continue
+            # Find active particles
+            active_particles = []
+            for i in range(1, N):
+                if row.get(f'PX[{i}]') is not None:
+                    active_particles.append(i)
+            
+            # Select up to num_witness_particles from active particles
+            import random
+            if len(active_particles) > 0:
+                num_to_select = min(self.num_witness_particles, len(active_particles))
+                witness_particle_ids = random.sample(active_particles, num_to_select)
+                break
+        
+        # Initialize trajectories for each witness
+        for witness_id in witness_particle_ids:
+            witness_trajectories[witness_id] = {'x': [], 'y': []}
+        
+        # Debug: Print witness particle info
+        if len(witness_particle_ids) > 0:
+            print(f"Selected {len(witness_particle_ids)} witness particles: {witness_particle_ids}")
+        else:
+            print("No active particles found for witness selection")
+        
         # Create frames
         prev_row = None
         for index, row in df.iterrows():
@@ -184,6 +217,9 @@ class FlowGraphSchool:
             frame_velocities_x = []
             frame_velocities_y = []
             
+            # Store witness particles for this frame
+            witness_particles = {}
+            
             for i in range(1, N):  # N particles
                 if row.get(f'PX[{i}]') is None:
                     continue
@@ -203,10 +239,19 @@ class FlowGraphSchool:
                         vx = (x - prev_x) / dt
                         vy = (y - prev_y) / dt
 
-                if state == 1:  # Right
-                    color = '#FF4444'  # Brighter red
-                else:  # Left
-                    color = '#4444FF'  # Brighter blue
+                # Check if this is a witness particle
+                if i in witness_particle_ids:
+                    witness_particles[i] = {'x': x, 'y': y}
+                    # Add to trajectory
+                    witness_trajectories[i]['x'].append(x)
+                    witness_trajectories[i]['y'].append(y)
+                    # Skip adding to regular particles - witness is plotted separately
+                    continue
+                else:
+                    if state == 1:  # Right
+                        color = '#FF4444'  # Brighter red
+                    else:  # Left
+                        color = '#4444FF'  # Brighter blue
 
                 frame_positions_x.append(x)
                 frame_positions_y.append(y)
@@ -214,17 +259,50 @@ class FlowGraphSchool:
                 frame_velocities_x.append(vx)
                 frame_velocities_y.append(vy)
 
-            # Plot scatter points
+            # Plot all scatter points (including witness)
             if len(frame_positions_x) > 0:
                 scatter = ax.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=circle_size)
+            
+            # Plot witness particles separately with larger size and border for emphasis
+            witness_colors = ['#FF4444']  # Different colors for each witness
+            for i, (witness_id, witness_data) in enumerate(witness_particles.items()):
+                color = witness_colors[i % len(witness_colors)]  # Cycle through colors
+                ax.scatter(witness_data['x'], witness_data['y'], c=color, s=circle_size*1.5, 
+                          edgecolors='black', linewidth=2, zorder=10)
+                # Debug: Print witness position
+                if index % 100 == 0:  # Print every 10th frame
+                    print(f"Frame {index}: Witness {witness_id} at ({witness_data['x']:.2f}, {witness_data['y']:.2f})")
+            
+            # Draw witness particle trajectories (only up to current position)
+            for i, (witness_id, trajectory) in enumerate(witness_trajectories.items()):
+                if len(trajectory['x']) > 1:
+                    color = witness_colors[i % len(witness_colors)]  # Same color as particle
+                    # Create a gradient effect - older parts are more transparent
+                    for j in range(1, len(trajectory['x'])):
+                        alpha = min(0.8, 0.3 + (j / len(trajectory['x'])) * 0.5)
+                        linewidth = max(1, 3 - (len(trajectory['x']) - j) * 0.1)
+                        ax.plot(trajectory['x'][j-1:j+1], trajectory['y'][j-1:j+1], 
+                               color=color, linewidth=linewidth, alpha=alpha, zorder=5,
+                               label='_nolegend_')
             
             # Create legend elements with updated colors (same as generate_single_flowgraph)
             legend_elements = [
                 plt.scatter([], [], c='#4444FF', s=circle_size, label='Personas'),
+            ]
+            
+            # Add witness particles to legend
+            witness_colors = ['#FF4444']
+            for i in range(len(witness_particle_ids)):
+                color = witness_colors[i % len(witness_colors)]
+                label = f'Testigo {i+1}' if len(witness_particle_ids) > 1 else 'Testigo'
+                legend_elements.append(plt.scatter([], [], c=color, s=circle_size*1.5, label=label))
+            
+            # Add other legend elements
+            legend_elements.extend([
                 plt.Rectangle((0, 0), 1, 1, facecolor=cell_colors['obstacle'], alpha=0.8, label='Obstáculos'),
                 plt.Rectangle((0, 0), 1, 1, facecolor=cell_colors['classroom'], alpha=0.6, label='Aulas'),
                 plt.Rectangle((0, 0), 1, 1, facecolor=cell_colors['hallway'], alpha=0.4, label='Pasillos'),
-            ]
+            ])
             
             # Add legend with better styling
             plt.legend(handles=[elem for elem in legend_elements if elem is not None], 

@@ -501,10 +501,13 @@ Bool social_force_model_outputCSV(double time,
 	sfm_outputCSV << std::fixed << std::setprecision(4) << time;
 	for(int i=0; i < N; i++){
 	    int pType = (int) RETQSS()->particle_get_property(i, "type");
-		double y = x[(i+N)*3];
-		double vx = x[(i+2*N)];
-		double vy = x[(i+3*N)];
-		sfm_outputCSV << "," << x[i*3] << "," << y << "," << vx << "," << vy << "," << pType;
+		double pX = x[i*3];
+		double pY = x[(i+N)*3];
+		// double pZ = x[(i+2*N)*3];
+		double vX = x[(i+3*N)*3];
+		double vY = x[(i+4*N)*3];
+		// double vZ = x[(i+5*N)*3];
+		sfm_outputCSV << "," << pX << "," << pY << "," << vX << "," << vY << "," << pType;
 	}
 	sfm_outputCSV << std::endl;
 	sfm_outputCSV.flush();
@@ -526,11 +529,14 @@ Bool social_force_model_notQSS_outputCSV(double time,
 	} 
 	sfm_outputCSV << std::fixed << std::setprecision(4) << time;
 	for(int i=0; i < N; i++){
-		double y = x[(i+N)*3];
-		double vx = x[(i+2*N)];
-		double vy = x[(i+3*N)];
+		double pX = x[i*3];
+		double pY = x[(i+N)*3];
+		// double pZ = x[(i+2*N)*3];
+		double vX = x[(i+3*N)*3];
+		double vY = x[(i+4*N)*3];
+		// double vZ = x[(i+5*N)*3];
 	    double pType = groupIDs[i];
-		sfm_outputCSV << "," << x[i*3] << "," << y << "," << vx << "," << vy << "," << groupIDs[i];
+		sfm_outputCSV << "," << pX << "," << pY << "," << vX << "," << vY << "," << pType;
 	}
 	sfm_outputCSV << std::endl;
 	sfm_outputCSV.flush();

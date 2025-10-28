@@ -26,7 +26,7 @@ use_metrics_csv = True
 run_experiments = True
 
 # Experiment parameters
-WIDTHS = [10]
+WIDTHS = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
 PEDESTRIAN_DENSITY = 0.3
 VOLUMES = 50
 GRID_SIZE = 50
@@ -123,12 +123,12 @@ class LanesByWidthExperiment:
         
         # Compile and run
         compile_c_code()
-        compile_model('helbing_not_qss')
+        compile_model('helbing_only_qss')
         
         run_experiment(
             config, 
             output_dir, 
-            'helbing_not_qss', 
+            'helbing_only_qss', 
             plot=False, 
             copy_results=True
         )
@@ -140,12 +140,12 @@ class LanesByWidthExperiment:
         subprocess.run([
             'sed', '-i', 
             r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(volumes) + '/', 
-            '../retqss/model/helbing_not_qss.mo'
+            '../retqss/model/helbing_only_qss.mo'
         ])
         subprocess.run([
             'sed', '-i', 
             r's/\bN\s*=\s*[0-9]\+/N = ' + str(pedestrians) + '/', 
-            '../retqss/model/helbing_not_qss.mo'
+            '../retqss/model/helbing_only_qss.mo'
         ])
     
     def _create_lanes_plot(self) -> None:

@@ -87,7 +87,7 @@ def run(cell_size, implementation):
     print(f"Directorio de salida creado: {output_dir}")
 
     # Configurar parámetros del experimento
-    config['iterations'] = 1
+    config['iterations'] = 10
     config['parameters']['N']['value'] = PEDESTRIAN_COUNT
     config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = implementation  # 1
     config['parameters']['BORDER_IMPLEMENTATION']['value'] = Constants.CORRIDOR_ONLY  # 1

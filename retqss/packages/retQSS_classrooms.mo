@@ -4,6 +4,13 @@ import retQSS;
 import retQSS_utils;
 import retQSS_social_force_model_types;
 
+function initContiguousHallways
+	input Integer gridDivisions;
+	output Boolean _;
+external "C" classrooms_initContiguousHallways(gridDivisions) annotation(
+	    Library="classrooms",
+	    Include="#include \"retqss_classrooms.h\"");
+end initContiguousHallways;
 
 function randomInitialClassroomPosition
 	input Integer particleID;

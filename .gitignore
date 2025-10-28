@@ -1,6 +1,7 @@
 runner/results/*/run_*
 runner/results/*/latest/*
 runner/results/*
+runner/experiments/*/results*/*
 
 retqss/bin/
 retqss/build/
@@ -12,9 +13,9 @@ retqss/.project
 
 result_*.csv
 particle_simulation.gif
-config.json
 benchmark.txt
 frame_*.png
+metrics.csv
 
 *.pyc
 

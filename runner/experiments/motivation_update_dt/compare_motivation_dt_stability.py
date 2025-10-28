@@ -174,7 +174,12 @@ def load_multiple_motivation_dt_data(results_dir):
         if os.path.isdir(item_path) and item.startswith('motivation_dt_'):
             try:
                 motivation_dt = float(item.split('motivation_dt_')[1])
-                latest_dir = os.path.join(item_path, 'latest')
+                dirs = os.listdir(item_path)
+                latest_dir = None
+                for dir in dirs:
+                    if dir.startswith('experiment_20250915_') or dir.startswith('experiment_20250916_'):
+                        latest_dir = os.path.join(item_path, dir)
+                        break
                 
                 if os.path.exists(latest_dir):
                     result_file = os.path.join(latest_dir, 'result_1.csv')

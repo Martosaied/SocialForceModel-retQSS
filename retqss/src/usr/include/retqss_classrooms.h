@@ -13,6 +13,8 @@ extern "C"
 {
 #endif
 
+void classrooms_initContiguousHallways(int gridDivisions);
+
 void classrooms_nearestHallwayPosition(
 	int particleID,
 	double currentDx,

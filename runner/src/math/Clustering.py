@@ -51,83 +51,20 @@ class Clustering:
 
     def similar_velocity(self, particle, other_particle):
         return True
-        v1 = np.array([particle[VX_INDEX], particle[VY_INDEX]])
-        v2 = np.array([other_particle[VX_INDEX], other_particle[VY_INDEX]])
+        # v1 = np.array([particle[VX_INDEX], particle[VY_INDEX]])
+        # v2 = np.array([other_particle[VX_INDEX], other_particle[VY_INDEX]])
 
-        dot = np.dot(v1, v2)
-        mag1 = np.linalg.norm(v1)
-        mag2 = np.linalg.norm(v2)
+        # dot = np.dot(v1, v2)
+        # mag1 = np.linalg.norm(v1)
+        # mag2 = np.linalg.norm(v2)
         
-        if mag1 == 0 or mag2 == 0:
-            return True
+        # if mag1 == 0 or mag2 == 0:
+        #     return True
         
-        cos_theta = dot / (mag1 * mag2)
-        cos_theta = np.clip(cos_theta, -1.0, 1.0)  # numerical safety
+        # cos_theta = dot / (mag1 * mag2)
+        # cos_theta = np.clip(cos_theta, -1.0, 1.0)  # numerical safety
         
-        return np.degrees(np.arccos(cos_theta)) < 30
-
-    def calculate_direction_consistency(self, group, particles_list):
-        """Calculate how consistent the direction is within a group"""
-        if len(group) < 2:
-            return 1.0
-        
-        velocities = []
-        for particle_id in group:
-            particle = next((p for p in particles_list if p[0] == particle_id), None)
-            if particle:
-                v = np.array([particle[VX_INDEX], particle[VY_INDEX]])
-                if np.linalg.norm(v) > 0:
-                    velocities.append(v / np.linalg.norm(v))  # normalize
-        
-        if len(velocities) < 2:
-            return 1.0
-        
-        # Calculate average direction consistency
-        velocities = np.array(velocities)
-        mean_direction = np.mean(velocities, axis=0)
-        mean_direction = mean_direction / np.linalg.norm(mean_direction)
-        
-        consistencies = [np.dot(v, mean_direction) for v in velocities]
-        return np.mean(consistencies)
-
-    def calculate_lane_width(self, group, particles_list):
-        """Calculate the width of a potential lane"""
-        if len(group) < 2:
-            return 0.0
-        
-        positions = []
-        for particle_id in group:
-            particle = next((p for p in particles_list if p[0] == particle_id), None)
-            if particle:
-                positions.append([particle[X_INDEX], particle[Y_INDEX]])
-        
-        if len(positions) < 2:
-            return 0.0
-        
-        positions = np.array(positions)
-        
-        # Calculate the width perpendicular to the main direction
-        if len(positions) >= 2:
-            # Get the main direction
-            velocities = []
-            for particle_id in group:
-                particle = next((p for p in particles_list if p[0] == particle_id), None)
-                if particle:
-                    v = np.array([particle[VX_INDEX], particle[VY_INDEX]])
-                    if np.linalg.norm(v) > 0:
-                        velocities.append(v / np.linalg.norm(v))
-            
-            if velocities:
-                mean_direction = np.mean(velocities, axis=0)
-                mean_direction = mean_direction / np.linalg.norm(mean_direction)
-                
-                # Project positions onto perpendicular direction
-                perpendicular = np.array([-mean_direction[1], mean_direction[0]])
-                projections = np.dot(positions, perpendicular)
-                width = np.max(projections) - np.min(projections)
-                return width
-        
-        return 0.0
+        # return np.degrees(np.arccos(cos_theta)) < 30
 
     def direct_group(self, particle, particles_list):
         particle_group = set([particle[0]])

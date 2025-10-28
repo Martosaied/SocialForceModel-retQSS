@@ -61,30 +61,30 @@ def run(deltaq):
     print(f"AbsTolerance={formatted_abs_tolerance}")
 
     # Reemplazar las divisiones de la grilla en el modelo
-    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/helbing_not_qss.mo'])
-    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/helbing_not_qss.mo'])
+    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(PEDESTRIAN_COUNT) + '/', '../retqss/model/helbing_only_qss.mo'])
+    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/helbing_only_qss.mo'])
     subprocess.run([
         'sed', '-i',
         f's/^[[:space:]]*Tolerance=[^,]*/       Tolerance={formatted_tolerance}/g',
-        '../retqss/model/helbing_not_qss.mo'
+        '../retqss/model/helbing_only_qss.mo'
     ])
     subprocess.run([
         'sed', '-i',
         f's/^[[:space:]]*AbsTolerance=[^,]*/       AbsTolerance={formatted_abs_tolerance}/g',
-        '../retqss/model/helbing_not_qss.mo'
+        '../retqss/model/helbing_only_qss.mo'
     ])
 
     # Compilar el código C++ si se solicita
     compile_c_code()
 
     # Compilar el modelo si se solicita
-    compile_model('helbing_not_qss')
+    compile_model('helbing_only_qss')
 
     # Ejecutar experimento
     run_experiment(
         config, 
         output_dir, 
-        'helbing_not_qss', 
+        'helbing_only_qss', 
         plot=False, 
         copy_results=True
     )

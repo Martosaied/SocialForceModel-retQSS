@@ -164,7 +164,7 @@ def run_experiment_with_params(n, implementation, grid_divisions, cell_size=1.0)
     impl_name = PEDESTRIANS_IMPLEMENTATION[implementation]
     if impl_name == 'qss':  # QSS solo
         exp_name = f'n_{n}_qss'
-        model_name = 'helbing_not_qss'
+        model_name = 'helbing_only_qss'
         pedestrian_implementation = Constants.PEDESTRIAN_MMOC
     elif impl_name == 'retqss':  # RETQSS without optimizations
         exp_name = f'n_{n}_retqss'
@@ -200,7 +200,7 @@ def run_experiment_with_params(n, implementation, grid_divisions, cell_size=1.0)
 
         # Update model file parameters based on implementation
         if implementation == 0:  # QSS solo
-            model_path = '../retqss/model/helbing_not_qss.mo'
+            model_path = '../retqss/model/helbing_only_qss.mo'
             subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(n) + '/', model_path])
             subprocess.run(['sed', '-i', r's/\bGRID_SIZE\s*=\s*[0-9.]\+/GRID_SIZE = ' + str(actual_grid_size) + '/', model_path])
         elif implementation == 1:  # RETQSS without optimizations

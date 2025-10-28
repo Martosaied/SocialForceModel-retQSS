@@ -13,7 +13,7 @@ import retQSS_social_force_model_types;
 
 constant Integer
 	N = 300,
-	GRID_DIVISIONS = 10,
+	GRID_DIVISIONS = 1,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -227,8 +227,8 @@ algorithm
 				// Comment to run the breaking lanes experiment.
 				if hx <> x[i] then
 					reinit(x[i], hx);
-					reinit(y[i], randomY);
-					dy[i] := randomY;
+					// reinit(y[i], randomY);
+					// dy[i] := randomY;
 					_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
 				end if;
 				if hy <> y[i] then
