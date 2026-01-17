@@ -257,17 +257,33 @@ retQSS::VolumeNeighborArray
 retQSS::VertexSharingNeighborhood::compute_neighbors(
 		const retQSS::Volume *volume)
 {
-	retQSS::VolumeNeighborArray neighbors;
+	retQSS::VolumeNeighborArray neighbors;	
+	// Volume 0 (boundary) and non-polyhedral volumes should not have neighbors
+	if(volume->get_ID() == 0 || !volume->is_polyhedral())
+	{
+		return neighbors;
+	}
+	
 	VolumeSet seen;
 	seen.insert(volume);
+	
 
+	int vertex_idx = 0;
 	for(auto vertex : volume->vertices())
 	{
 		auto vols = this->geometry->get_vertex_volumes(vertex);
+		
 		for(auto neighbor : vols)
 		{
-			if(seen.find(neighbor) == seen.end())
+			bool is_seen = seen.find(neighbor) != seen.end();
+			bool is_volume_zero = neighbor->get_ID() == 0;
+			bool is_poly = neighbor->is_polyhedral();
+			
+			// Skip volume 0 (boundary volume) and non-polyhedral volumes
+			if(!is_seen && !is_volume_zero && is_poly)
+			{
 				neighbors.push_back(this->new_neighbor(volume,neighbor));
+			}
 			seen.insert(neighbor);
 		}
 	}

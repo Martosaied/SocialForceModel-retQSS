@@ -26,6 +26,8 @@ class FlowGraph:
         self.output_dir = output_dir
         self.parameters = list(get_parameter_combinations(process_parameters(parameters.get('parameters', {}))))[0]
 
+        print(self.parameters)
+
     def _get_volume_type_map(self, volumes_count):
         """
         Create a map of volume IDs to their types (obstacle, hallway, classroom).
@@ -212,17 +214,21 @@ class FlowGraph:
             
             # Create legend elements with updated colors
             legend_elements = [
-                plt.scatter([], [], c='#4444FF', s=200, label='Izquierda'),
-                plt.scatter([], [], c='#FF4444', s=200, label='Derecha'),
                 plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['obstacle'], alpha=0.7, label='Obstáculos') if self.parameters.get('OBSTACLES', '') else None,
                 plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['hallway'], alpha=0.5, label='Pasillos') if self.parameters.get('HALLWAYS', '') else None,
                 plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['classroom'], alpha=0.5, label='Aulas') if self.parameters.get('CLASSROOMS', '') else None,
             ]
             
+            # Add area inaccesible (gray) to legend if corridor is defined
+            if FROM_Y is not None and TO_Y is not None:
+                legend_elements.append(
+                    plt.Rectangle((0, 0), 1, 1, facecolor='#808080', alpha=0.3, label='Área Inaccesible')
+                )
+            
             # Add legend with better styling
             plt.legend(handles=[elem for elem in legend_elements if elem is not None], 
                       loc='center left', bbox_to_anchor=(1, 0.5),
-                      title='Leyenda', fontsize=16, title_fontsize=18,
+                      title='Leyenda', fontsize=20, title_fontsize=24,
                       frameon=True, fancybox=True, shadow=True)
             
             # Add velocity vectors with quiver only if we have velocity data
@@ -244,10 +250,8 @@ class FlowGraph:
 
             active_pedestrians = len([i for i in range(1, N) if row.get(f'PX[{i}]') is not None])
             
-            # Add main title and timestamp with better styling
-            fig.suptitle('Simulación de Movimiento de Peatones', fontsize=24, fontweight='bold', y=0.95)
-            ax.set_title(f'Tiempo: {row["time"]:.2f} segundos | Peatones: {active_pedestrians} | Corredor: {abs(FROM_Y-TO_Y):.1f}m', 
-                        fontsize=16, fontweight='bold', pad=20)
+            # Add main title with better styling
+            fig.suptitle('Corredor Bidireccional', fontsize=24, fontweight='bold', y=0.95)
             
             # Add axis labels with units
             ax.set_xlabel('Posición X (metros)', fontsize=16, fontweight='bold')

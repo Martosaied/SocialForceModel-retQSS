@@ -47,8 +47,8 @@ class Plotter:
         flow_graph = FlowGraph(solution_file, output_dir, parameters)
         flow_graph.plot()
 
-    def grouped_lanes_graph(self, results, output_dir):
-        grouped_lanes_graph = GroupedLanesGraph(results, output_dir)
+    def grouped_lanes_graph(self, results, output_dir, parameters):
+        grouped_lanes_graph = GroupedLanesGraph(results, output_dir, parameters)
         grouped_lanes_graph.plot()
 
     def density_heatmap(self, solution_file, output_dir):

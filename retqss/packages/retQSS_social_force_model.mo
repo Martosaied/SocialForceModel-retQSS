@@ -748,4 +748,12 @@ algorithm
 end pedestrianTotalMotivation;
 
 
+function triggerMotivationUpdate
+	input Integer particleID;
+	output Boolean _;
+external "C" _=social_force_model_triggerMotivationUpdate(particleID) annotation(
+	    Library="social_force_model",
+	    Include="#include \"retqss_social_force_model.h\"");
+end triggerMotivationUpdate;
+
 end retQSS_social_force_model;

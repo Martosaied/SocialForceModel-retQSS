@@ -109,7 +109,7 @@
     "MOTIVATION_UPDATE_DT": {
       "name": "MOTIVATION_UPDATE_DT",
       "type": "value",
-      "value": 0.5
+      "value": 0.1
     },
     "GROUPS_START_INDEX": {
       "name": "GROUPS_START_INDEX",

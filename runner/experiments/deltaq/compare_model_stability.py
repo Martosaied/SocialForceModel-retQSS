@@ -5,11 +5,20 @@ Un modelo roto produce funciones Y(t) en zigzag, mientras que un modelo
 que funciona bien produce funciones más suaves y continuas.
 """
 
+import sys
+import os
+
+# Add the runner directory to the Python path to allow imports from src
+script_dir = os.path.dirname(os.path.abspath(__file__))
+runner_dir = os.path.abspath(os.path.join(script_dir, '..', '..'))
+if runner_dir not in sys.path:
+    sys.path.insert(0, runner_dir)
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
-import os
+from src.experiments import apply_publication_style
 
 def load_result_file(file_path):
     """
@@ -339,177 +348,13 @@ def calculate_smoothness_score(total_variation, velocity_sign_changes, accel_sig
     
     return max(0, min(1, smoothness))
 
-def plot_y_functions_multi(deltaq_data, output_dir):
-    """
-    Genera gráfico de las funciones Y(t) de muestra para múltiples deltaq.
-    """
-    plt.figure(figsize=(14, 10))
-    plt.title('Funciones Y(t) de Muestra - Análisis de Suavidad por DeltaQ', fontsize=16, fontweight='bold')
-    
-    colors = plt.cm.tab10(np.linspace(0, 1, len(deltaq_data)))
-    
-    for i, (deltaq, data) in enumerate(deltaq_data.items()):
-        df = data['df']
-        smoothness = data['smoothness']
-        
-        if smoothness:
-            scores = [(pid, data['smoothness_score']) for pid, data in smoothness.items()]
-            scores.sort(key=lambda x: x[1], reverse=True)
-            sample_pedestrians = [pid for pid, _ in scores[:2]]  # Los más suaves
-        else:
-            sample_pedestrians = []
-        
-        # Plotear funciones Y(t)
-        for j, ped_id in enumerate(sample_pedestrians):
-            ped_data = df[df['pedestrian_id'] == ped_id].sort_values('time')
-            if len(ped_data) > 0:
-                alpha = 0.8 if j == 0 else 0.5
-                linewidth = 2 if j == 0 else 1
-                label = f'ΔQ=1e{float(deltaq)}' if j == 0 else ""
-                plt.plot(ped_data['time'], ped_data['y'], color=colors[i], 
-                        alpha=alpha, linewidth=linewidth, label=label)
-    
-    plt.xlabel('Tiempo (s)')
-    plt.ylabel('Posición Y (m)')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'y_functions_multi_deltaq.png'), dpi=300, bbox_inches='tight')
-    plt.close()
-
-def plot_smoothness_distribution_multi(deltaq_data, output_dir):
-    """
-    Genera gráfico de distribución de puntuaciones de suavidad para múltiples deltaq con estadísticas detalladas.
-    """
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(18, 12))
-    fig.suptitle('Distribución de Puntuaciones de Suavidad por DeltaQ - Análisis Estadístico', fontsize=16, fontweight='bold')
-    
-    colors = plt.cm.tab10(np.linspace(0, 1, len(deltaq_data)))
-    
-    # Gráfico 1: Histogramas superpuestos
-    ax1.set_title('Distribución de Puntuaciones de Suavidad', fontsize=12, fontweight='bold')
-    for i, (deltaq, data) in enumerate(deltaq_data.items()):
-        smoothness = data['smoothness']
-        scores = [data['smoothness_score'] for data in smoothness.values()] if smoothness else []
-        
-        if scores:
-            ax1.hist(scores, bins=15, alpha=0.6, color=colors[i], 
-                    label=f'ΔQ=1e{float(deltaq)} (n={len(scores)})', density=True)
-    
-    ax1.set_xlabel('Puntuación de Suavidad (0=Zigzag, 1=Suave)')
-    ax1.set_ylabel('Densidad')
-    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax1.grid(True, alpha=0.3)
-    
-    # Gráfico 2: Box plots
-    ax2.set_title('Distribución de Suavidad - Box Plots', fontsize=12, fontweight='bold')
-    box_data = []
-    box_labels = []
-    box_colors = []
-    
-    for i, (deltaq, data) in enumerate(deltaq_data.items()):
-        smoothness = data['smoothness']
-        scores = [data['smoothness_score'] for data in smoothness.values()] if smoothness else []
-        
-        if scores:
-            box_data.append(scores)
-            box_labels.append(f'1e{float(deltaq)}')
-            box_colors.append(colors[i])
-    
-    if box_data:
-        bp = ax2.boxplot(box_data, tick_labels=box_labels, patch_artist=True)
-        for patch, color in zip(bp['boxes'], box_colors):
-            patch.set_facecolor(color)
-            patch.set_alpha(0.7)
-    
-    ax2.set_xlabel('DeltaQ')
-    ax2.set_ylabel('Puntuación de Suavidad')
-    ax2.grid(True, alpha=0.3)
-    ax2.tick_params(axis='x', rotation=45)
-    
-    # Gráfico 3: Violin plots
-    ax3.set_title('Distribución de Suavidad - Violin Plots', fontsize=12, fontweight='bold')
-    violin_data = []
-    violin_labels = []
-    violin_colors = []
-    
-    for i, (deltaq, data) in enumerate(deltaq_data.items()):
-        smoothness = data['smoothness']
-        scores = [data['smoothness_score'] for data in smoothness.values()] if smoothness else []
-        
-        if scores:
-            violin_data.append(scores)
-            violin_labels.append(f'1e{float(deltaq)}')
-            violin_colors.append(colors[i])
-    
-    if violin_data:
-        parts = ax3.violinplot(violin_data, positions=range(len(violin_data)), showmeans=True, showmedians=True)
-        for i, pc in enumerate(parts['bodies']):
-            pc.set_facecolor(violin_colors[i])
-            pc.set_alpha(0.7)
-    
-    ax3.set_xlabel('DeltaQ')
-    ax3.set_ylabel('Puntuación de Suavidad')
-    ax3.set_xticks(range(len(violin_labels)))
-    ax3.set_xticklabels(violin_labels, rotation=45)
-    ax3.grid(True, alpha=0.3)
-    
-    # Gráfico 4: Estadísticas resumidas
-    ax4.axis('off')
-    ax4.set_title('Estadísticas de Distribución', fontsize=12, fontweight='bold')
-    
-    # Calcular estadísticas para cada deltaq
-    stats_data = []
-    for deltaq, data in deltaq_data.items():
-        smoothness = data['smoothness']
-        scores = [data['smoothness_score'] for data in smoothness.values()] if smoothness else []
-        
-        if scores:
-            stats_row = [
-                f'1e{float(deltaq)}',
-                f'{len(scores)}',
-                f'{np.mean(scores):.3f}',
-                f'{np.std(scores):.3f}',
-                f'{np.min(scores):.3f}',
-                f'{np.max(scores):.3f}',
-                f'{np.median(scores):.3f}',
-                f'{np.percentile(scores, 25):.3f}',
-                f'{np.percentile(scores, 75):.3f}'
-            ]
-            stats_data.append(stats_row)
-    
-    headers = ['DeltaQ', 'N', 'Media', 'Desv.Est.', 'Mín', 'Máx', 'Mediana', 'Q1', 'Q3']
-    
-    table = ax4.table(cellText=stats_data,
-                     colLabels=headers,
-                     cellLoc='center',
-                     loc='center',
-                     bbox=[0, 0, 1, 1])
-    
-    table.auto_set_font_size(False)
-    table.set_fontsize(9)
-    table.scale(1, 1.8)
-    
-    # Colorear filas según suavidad promedio
-    for i, row in enumerate(stats_data):
-        if len(row) > 2:
-            mean_score = float(row[2])  # Media
-            color_intensity = mean_score  # 0-1 scale
-            color = plt.cm.RdYlGn(color_intensity)
-            for j in range(len(headers)):
-                table[(i+1, j)].set_facecolor(color)
-                table[(i+1, j)].set_alpha(0.3)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'smoothness_distribution_multi_deltaq.png'), dpi=300, bbox_inches='tight')
-    plt.close()
-
 def plot_smoothness_components_multi(deltaq_data, output_dir):
     """
     Genera gráfico de componentes de suavidad para múltiples deltaq con promedio y desviación estándar.
     """
-    plt.figure(figsize=(12, 8))
-    plt.title('Componentes de Suavidad por DeltaQ - Análisis Estadístico', fontsize=16, fontweight='bold')
+    apply_publication_style()
+    
+    fig = plt.figure(figsize=(24, 14))
     
     # Calcular estadísticas de componentes para cada deltaq
     deltaq_values = []
@@ -535,131 +380,23 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
     
     if deltaq_values:
         x = np.arange(len(deltaq_values))
-        width = 0.35
-        colors = ['#1f77b4', '#ff7f0e']
+        markers = ['o', 's']  # Different markers for clarity
         
-        # Gráfico: Promedios con barras de error (desviación estándar)
+        # Gráfico: Líneas con marcadores y barras de error
         for i, (component, stats) in enumerate(components_stats.items()):
-            plt.bar(x + i * width, stats['mean'], width, 
-                   yerr=stats['std'], capsize=5,
-                   label=component, alpha=0.8, color=colors[i])
+            plt.errorbar(x, stats['mean'], yerr=stats['std'], 
+                        marker=markers[i],
+                        label=component)
         
         plt.xlabel('DeltaQ')
-        plt.ylabel('Valor Promedio ± Desv. Est.')
-        plt.xticks(x + width, [f'1e{float(deltaq)}' for deltaq in deltaq_values], rotation=45)
-        plt.legend()
-        plt.grid(True, alpha=0.3)
+        plt.ylabel('Número de Cambios de Signo')
+        plt.xticks(x, [f'1e{float(deltaq)}' for deltaq in deltaq_values], rotation=45, ha='right')
+        plt.legend(loc='upper left')
+        plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'smoothness_components_multi_deltaq.png'), dpi=300, bbox_inches='tight')
-    plt.close()
-
-def plot_smoothness_summary_multi(deltaq_data, output_dir):
-    """
-    Genera gráfico de resumen estadístico para múltiples deltaq con información detallada.
-    """
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(18, 12))
-    fig.suptitle('Resumen de Análisis de Suavidad por DeltaQ - Análisis Estadístico Completo', fontsize=16, fontweight='bold')
-    
-    # Calcular estadísticas para cada deltaq
-    deltaq_values = []
-    avg_smoothness = []
-    std_smoothness = []
-    n_pedestrians = []
-    
-    for deltaq, data in deltaq_data.items():
-        smoothness = data['smoothness']
-        if smoothness:
-            scores = [d['smoothness_score'] for d in smoothness.values()]
-            deltaq_values.append(deltaq)
-            avg_smoothness.append(np.mean(scores))
-            std_smoothness.append(np.std(scores))
-            n_pedestrians.append(len(scores))
-    
-    if deltaq_values:
-        # Gráfico 1: Suavidad promedio con barras de error
-        ax1.errorbar(deltaq_values, avg_smoothness, yerr=std_smoothness, 
-                    marker='o', capsize=5, capthick=2, linewidth=2, markersize=8)
-        ax1.set_xlabel('DeltaQ')
-        ax1.set_ylabel('Suavidad Promedio ± Desv. Est.')
-        ax1.set_title('Suavidad Promedio por DeltaQ')
-        ax1.grid(True, alpha=0.3)
-        ax1.set_ylim(0, 1)
-        
-        # Formatear etiquetas del eje X
-        deltaq_labels = [f'1e{float(deltaq)}' for deltaq in deltaq_values]
-        ax1.set_xticks(deltaq_values)
-        ax1.set_xticklabels(deltaq_labels, rotation=45)
-        
-        # Colorear puntos según suavidad
-        colors = plt.cm.RdYlGn([s for s in avg_smoothness])
-        for i, (x, y) in enumerate(zip(deltaq_values, avg_smoothness)):
-            ax1.scatter(x, y, c=[colors[i]], s=100, zorder=5)
-        
-        # Gráfico 2: Desviación estándar de suavidad
-        ax2.bar(range(len(deltaq_values)), std_smoothness, 
-               color=colors, alpha=0.7, edgecolor='black', linewidth=1)
-        ax2.set_xlabel('DeltaQ')
-        ax2.set_ylabel('Desviación Estándar de Suavidad')
-        ax2.set_title('Variabilidad de Suavidad por DeltaQ')
-        ax2.set_xticks(range(len(deltaq_values)))
-        ax2.set_xticklabels(deltaq_labels, rotation=45)
-        ax2.grid(True, alpha=0.3)
-        
-        # Gráfico 3: Número de peatones analizados
-        ax3.bar(range(len(deltaq_values)), n_pedestrians, 
-               color='skyblue', alpha=0.7, edgecolor='black', linewidth=1)
-        ax3.set_xlabel('DeltaQ')
-        ax3.set_ylabel('Número de Peatones')
-        ax3.set_title('Número de Peatones Analizados por DeltaQ')
-        ax3.set_xticks(range(len(deltaq_values)))
-        ax3.set_xticklabels(deltaq_labels, rotation=45)
-        ax3.grid(True, alpha=0.3)
-        
-        # Gráfico 4: Tabla de estadísticas detalladas
-        ax4.axis('off')
-        ax4.set_title('Estadísticas Detalladas', fontsize=12, fontweight='bold')
-        
-        # Crear tabla de datos
-        table_data = []
-        for i, deltaq in enumerate(deltaq_values):
-            scores = [d['smoothness_score'] for d in deltaq_data[deltaq]['smoothness'].values()]
-            # Calcular estadísticas adicionales
-            min_score = np.min(scores)
-            max_score = np.max(scores)
-            median_score = np.median(scores)
-            
-            table_data.append([
-                f'1e{float(deltaq)}',
-                f'{avg_smoothness[i]:.3f}',
-                f'{std_smoothness[i]:.3f}',
-                f'{min_score:.3f}',
-                f'{max_score:.3f}',
-                f'{median_score:.3f}',
-                f'{n_pedestrians[i]}'
-            ])
-        
-        headers = ['DeltaQ', 'Promedio', 'Desv.Est.', 'Mínimo', 'Máximo', 'Mediana', 'N']
-        
-        table = ax4.table(cellText=table_data,
-                         colLabels=headers,
-                         cellLoc='center',
-                         loc='center',
-                         bbox=[0, 0, 1, 1])
-        
-        table.auto_set_font_size(False)
-        table.set_fontsize(9)
-        table.scale(1, 1.8)
-        
-        # Colorear filas según suavidad promedio
-        for i in range(len(table_data)):
-            color = colors[i] if i < len(colors) else 'white'
-            for j in range(len(headers)):
-                table[(i+1, j)].set_facecolor(color)
-                table[(i+1, j)].set_alpha(0.2)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'smoothness_summary_multi_deltaq.png'), dpi=300, bbox_inches='tight')
+    plt.subplots_adjust(left=0.12, right=0.97, bottom=0.16, top=0.92)
+    plt.savefig(os.path.join(output_dir, 'smoothness_components_multi_deltaq.png'))
     plt.close()
 
 def print_smoothness_report(smoothness1, smoothness2, file1_name, file2_name):
@@ -768,14 +505,8 @@ def generate_plots_from_csv(csv_file, output_dir):
     # Generar gráficos multi-deltaq
     print("\n📊 Generando gráficos de análisis de suavidad multi-DeltaQ...")
     
-    print("  - Generando gráfico de distribución de suavidad multi-DeltaQ...")
-    plot_smoothness_distribution_multi(deltaq_data, output_dir)
-    
     print("  - Generando gráfico de componentes de suavidad multi-DeltaQ...")
     plot_smoothness_components_multi(deltaq_data, output_dir)
-    
-    print("  - Generando gráfico de resumen multi-DeltaQ...")
-    plot_smoothness_summary_multi(deltaq_data, output_dir)
     
     # Imprimir reporte resumido
     print("\n📊 REPORTE RESUMIDO DE SUAVIDAD POR DELTAQ")
@@ -804,9 +535,7 @@ def generate_plots_from_csv(csv_file, output_dir):
     print(f"\n✅ Gráficos generados y guardados en: {output_dir}")
     print("📁 Archivos generados:")
     print("  - smoothness_analysis_consolidated.csv")
-    print("  - smoothness_distribution_multi_deltaq.png") 
     print("  - smoothness_components_multi_deltaq.png")
-    print("  - smoothness_summary_multi_deltaq.png")
 
 def main():
     parser = argparse.ArgumentParser(description='Analizar suavidad de la función Y(t) para múltiples DeltaQ')

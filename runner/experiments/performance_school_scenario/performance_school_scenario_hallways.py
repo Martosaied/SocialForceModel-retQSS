@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from itertools import product
 from matplotlib.patches import Rectangle
+from matplotlib.lines import Line2D
+from src.experiments import apply_publication_style
 
 # Load the school configurations
 def load_school_configs(config_type):
@@ -46,6 +48,11 @@ SCHOOL_CONFIG_TYPES = {
     'hallways': 'Pasillos',
     'square': 'Patio central'
 }
+
+def get_simulated_time():
+    """Get simulated time from config.json."""
+    config = load_config('experiments/performance_school_scenario/config.json')
+    return config['parameters']['FORCE_TERMINATION_AT']['value']
 
 def calculate_scenario_parameters(grid_divisions, school_config):
     """
@@ -220,6 +227,7 @@ def run_single_experiment(base_config, scenario_params, impl_config, config_name
                     'max_iteration_time': metrics_df['time'].max(),
                     'std_iteration_time': metrics_df['time'].std(),
                     'avg_memory_usage': metrics_df['memory_usage'].mean() if 'memory_usage' in metrics_df.columns else None,
+                    'std_memory_usage': metrics_df['memory_usage'].std() if 'memory_usage' in metrics_df.columns else None,
                 }
         except (pd.errors.EmptyDataError, KeyError):
             detailed_metrics = None
@@ -276,53 +284,151 @@ def generate_single_scenario_plot(config_data, config_type, config_name_spanish,
     """
     Generate a single comprehensive plot for one school scenario.
     """
+    apply_publication_style()
+
+    simulated_time = get_simulated_time()
+    implementations = list(config_data['implementation'].unique())
+    classroom_counts = sorted(config_data['classroom_count'].unique())
+    x_pos = np.arange(len(classroom_counts))
+    bar_width = 0.7 / max(1, len(implementations))
+
+    style_map = {
+        'RETQSS': {'color': '#4ECDC4', 'edgecolor': '#00B894', 'marker': 's'},
+        'RETQSS Optimizado': {'color': '#6C5CE7', 'edgecolor': '#5A4FCF', 'marker': '^'},
+    }
+
     # Create performance comparison plot (2x1 grid - only 2 graphs)
-    fig, axes = plt.subplots(2, 1, figsize=(10, 12))
-    fig.suptitle(f'Escenario Escuela - {config_name_spanish}', fontsize=16, fontweight='bold', y=0.98)
-    
-    colors = ['blue', 'red']
-    markers = ['o', 's']
-    
-    # Plot 1: Execution time vs Grid Size
+    fig, axes = plt.subplots(2, 1, figsize=(24, 16))
+    fig.suptitle(f'Escenario Escuela - {config_name_spanish}', fontsize=30, fontweight='bold', y=0.98)
+
+    rtf_by_impl = {}
+    memory_by_impl = {}
+
+    for impl_name in implementations:
+        impl_data = config_data[config_data['implementation'] == impl_name].sort_values('classroom_count')
+        impl_by_classroom = {row['classroom_count']: row for _, row in impl_data.iterrows()}
+
+        rtf_means = []
+        rtf_stds = []
+        time_means = []
+        mem_means = []
+        mem_stds = []
+
+        for classroom_count in classroom_counts:
+            row = impl_by_classroom.get(classroom_count)
+            metrics = row['detailed_metrics'] if row is not None else None
+            avg_time = metrics['avg_iteration_time'] if metrics else None
+            std_time = metrics['std_iteration_time'] if metrics else None
+
+            if avg_time is not None and not pd.isna(avg_time) and avg_time > 0:
+                rtf_mean = simulated_time / avg_time
+                rtf_std = simulated_time * std_time / (avg_time ** 2) if std_time is not None and not pd.isna(std_time) else 0
+            else:
+                rtf_mean = 0
+                rtf_std = 0
+                avg_time = 0
+
+            rtf_means.append(rtf_mean)
+            rtf_stds.append(rtf_std)
+            time_means.append(avg_time)
+
+            mem_mean = metrics['avg_memory_usage'] if metrics else None
+            mem_std = metrics['std_memory_usage'] if metrics else None
+            mem_means.append(mem_mean if mem_mean is not None and not pd.isna(mem_mean) else None)
+            mem_stds.append(mem_std if mem_std is not None and not pd.isna(mem_std) else None)
+
+        rtf_by_impl[impl_name] = (rtf_means, rtf_stds, time_means)
+        memory_by_impl[impl_name] = (mem_means, mem_stds)
+
+    all_rtf = [value for rtf_means, _, _ in rtf_by_impl.values() for value in rtf_means]
+    all_rtf_std = [value for _, rtf_stds, _ in rtf_by_impl.values() for value in rtf_stds]
+    max_rtf = max(all_rtf) if all_rtf else 1
+    max_rtf_std = max(all_rtf_std) if all_rtf_std else 0
+    min_rtf = min(all_rtf) if all_rtf else 0
+
+    # Plot 1: RTF vs Number of Classrooms
     ax1 = axes[0]
-    
-    for i, impl_name in enumerate(config_data['implementation'].unique()):
-        impl_data = config_data[config_data['implementation'] == impl_name].sort_values('grid_divisions')
-        if not impl_data.empty:
-            # Use grid size instead of obstacle count
-            grid_sizes = impl_data['grid_size'].values
-            times = []
-            stds = []
-            
-            for _, row in impl_data.iterrows():
-                times.append(row['detailed_metrics']['avg_iteration_time'] if row['detailed_metrics'] else 0)
-                stds.append(row['detailed_metrics']['std_iteration_time'] if row['detailed_metrics'] else 0)
-            
-            ax1.errorbar(grid_sizes, times, yerr=stds,
-                        fmt=f'{markers[i]}-', label=impl_name, linewidth=2, markersize=8, 
-                        capsize=4, color=colors[i])
-    
-    ax1.set_xlabel('Tamaño del escenario (metros)')
-    ax1.set_ylabel('Tiempo Promedio de Ejecución (s)')
-    ax1.set_title('Rendimiento vs Tamaño del escenario')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-    
+
+    for i, impl_name in enumerate(implementations):
+        rtf_means, rtf_stds, time_means = rtf_by_impl[impl_name]
+        style = style_map.get(impl_name, {})
+        bar_positions = x_pos + (i - (len(implementations) - 1) / 2) * bar_width
+        bars = ax1.bar(
+            bar_positions,
+            rtf_means,
+            yerr=rtf_stds,
+            color=style.get('color', 'skyblue'),
+            edgecolor=style.get('edgecolor', '#333333'),
+            width=bar_width,
+            capsize=4,
+            alpha=0.85,
+            label=impl_name,
+        )
+
+        label_offset = max_rtf * 0.06 if max_rtf > 0 else 0.06
+        for bar, mean, std, time_mean in zip(bars, rtf_means, rtf_stds, time_means):
+            if mean + std > 0:
+                ax1.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    mean + std + label_offset,
+                    f'{mean:.2f}x±{std:.2f}\n({time_mean:.1f}s)',
+                    ha='center',
+                    va='bottom',
+                    fontsize=14,
+                )
+
+    ax1.set_xlabel('Cantidad de aulas')
+    ax1.set_ylabel('RTF - tiempo simulado(s) / tiempo real(s)')
+    ax1.set_title('Rendimiento vs cantidad de aulas')
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels(classroom_counts, rotation=45, ha='right')
+
+    y_min = max(0, min_rtf - max_rtf_std * 1.5)
+    y_max = max_rtf * 1.6 if max_rtf > 0 else 1
+    ax1.set_ylim(y_min, y_max)
+
+    ax1.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.5)
+    handles, labels = ax1.get_legend_handles_labels()
+    handles.extend([
+        Line2D([0], [0], color='red', linestyle='--', label='Tiempo Real (1.0x)'),
+        Line2D([], [], linestyle='None', label=f'Tiempo simulado: {simulated_time:.0f}s'),
+    ])
+    labels.extend(['Tiempo Real (1.0x)', f'Tiempo simulado: {simulated_time:.0f}s'])
+    ax1.legend(handles=handles, labels=labels, loc='upper left')
+    ax1.grid(True)
+
     # Plot 2: Memory usage comparison (if available)
     ax2 = axes[1]
-    
-    for i, impl_name in enumerate(config_data['implementation'].unique()):
-        impl_data = config_data[config_data['implementation'] == impl_name].sort_values('grid_divisions')
-        if not impl_data.empty:
-            memory_usage = impl_data['detailed_metrics'].apply(lambda x: x['avg_memory_usage'] if x and x['avg_memory_usage'] else None)
-            if not memory_usage.isna().all():
-                ax2.plot(impl_data['grid_size'], memory_usage,
-                        f'{markers[i]}-', label=impl_name, linewidth=2, markersize=8, 
-                        color=colors[i])
-    
-    ax2.set_xlabel('Tamaño del escenario (metros)')
+
+    for i, impl_name in enumerate(implementations):
+        memory_means, memory_stds = memory_by_impl[impl_name]
+        if all(value is None for value in memory_means):
+            continue
+
+        y_values = [value if value is not None else np.nan for value in memory_means]
+        y_errors = [value if value is not None else 0 for value in memory_stds]
+        style = style_map.get(impl_name, {})
+
+        ax2.errorbar(
+            classroom_counts,
+            y_values,
+            yerr=y_errors if any(y_errors) else None,
+            fmt=f"{style.get('marker', 'o')}-",
+            label=impl_name,
+            linewidth=4,
+            markersize=10,
+            color=style.get('color', '#4ECDC4'),
+            capsize=6,
+            capthick=3,
+            elinewidth=3,
+            alpha=0.8,
+            markeredgecolor=style.get('edgecolor', '#333333'),
+            markeredgewidth=2,
+        )
+
+    ax2.set_xlabel('Cantidad de aulas')
     ax2.set_ylabel('Uso Promedio de Memoria (MB)')
-    ax2.set_title('Uso de Memoria vs Tamaño del escenario')
+    ax2.set_title('Uso de Memoria vs cantidad de aulas')
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
@@ -526,7 +632,8 @@ def save_results_to_csv(results):
                 'min_iteration_time': None,
                 'max_iteration_time': None,
                 'std_iteration_time': None,
-                'avg_memory_usage': None
+                'avg_memory_usage': None,
+                'std_memory_usage': None
             })
         metrics_data.append(base_data)
     

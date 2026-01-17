@@ -14,7 +14,7 @@
     "BORDER_IMPLEMENTATION": {
       "name": "BORDER_IMPLEMENTATION",
       "type": "value",
-      "value": -1
+      "value": 0
     },
     "FORCE_TERMINATION_AT": {
       "name": "FORCE_TERMINATION_AT",
@@ -41,10 +41,10 @@
       "type": "value",
       "value": 1
     },
-   "PEDESTRIAN_A_1": {
+    "PEDESTRIAN_A_1": {
       "name": "PEDESTRIAN_A_1",
       "type": "value",
-      "value": 0.0
+      "value": 2.1
     },
     "PEDESTRIAN_A_2": {
       "name": "PEDESTRIAN_A_2",
@@ -96,10 +96,10 @@
       "type": "value",
       "value": 0.26
     },
-     "MOTIVATION_UPDATE_DT": {
+    "MOTIVATION_UPDATE_DT": {
       "name": "MOTIVATION_UPDATE_DT",
       "type": "value",
-      "value": 0.5
+      "value": 0.1
     }
   }
 }

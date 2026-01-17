@@ -12,8 +12,8 @@ import retQSS_social_force_model_types;
 */
 
 constant Integer
-	N = 300,
-	GRID_DIVISIONS = 1,
+	N = 2000,
+	GRID_DIVISIONS = 27,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -22,7 +22,8 @@ parameter Integer
 	FORCE_TERMINATION_AT = getRealModelParameter("FORCE_TERMINATION_AT", 40),
 	PEDESTRIAN_IMPLEMENTATION = getIntegerModelParameter("PEDESTRIAN_IMPLEMENTATION", 0),
 	BORDER_IMPLEMENTATION = getIntegerModelParameter("BORDER_IMPLEMENTATION", 0),
-	CONVEYOR_BELT_EFFECT = getIntegerModelParameter("CONVEYOR_BELT_EFFECT", 0);
+	CONVEYOR_BELT_EFFECT = getIntegerModelParameter("CONVEYOR_BELT_EFFECT", 0),
+	VOLUME_NEIGHBORHOOD_TYPE = getIntegerModelParameter("VOLUME_NEIGHBORHOOD_TYPE", 0);
 
 // Output delta time parameter
 parameter Real
@@ -44,7 +45,7 @@ parameter Real
 	EPS = 1e-5,
 	PI = 3.1415926,
 	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.1),
-	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.5),
+	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1),
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;
@@ -128,6 +129,14 @@ initial algorithm
 	// setup the walls in RETQSS
 	_ := setUpWalls();
 
+	// setup volume neighborhood type
+	// 0: toDefault (face sharing), 1: toVertexSharing
+	if VOLUME_NEIGHBORHOOD_TYPE == 0 then
+		_ := volumeNeighborhood_toDefault();
+	elseif VOLUME_NEIGHBORHOOD_TYPE == 1 then
+		_ := volumeNeighborhood_toVertexSharing();
+	end if;
+	
 	if BORDER_IMPLEMENTATION == 3 then
 		// update the neighboring volumes for each particle
 		for i in 1:N loop
@@ -142,6 +151,7 @@ initial algorithm
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
     _ := debug(INFO(), time, "Pedestrian implementation: %d", PEDESTRIAN_IMPLEMENTATION,_,_,_);
 	_ := debug(INFO(), time, "Border implementation: %d", BORDER_IMPLEMENTATION,_,_,_);
+	_ := debug(INFO(), time, "Volume neighborhood type: %d", VOLUME_NEIGHBORHOOD_TYPE,_,_,_);
 
     
 /*
@@ -167,13 +177,13 @@ equation
 algorithm	
 
 	//EVENT: particle enters a volume and update neighboring volumes that are obstacles
-	// for i in 1:N loop
-	// 	when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
-	// 		if BORDER_IMPLEMENTATION == 3 then
-	// 			_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
-	// 		end if;
-	// 	end when;
-	// end for;
+	for i in 1:N loop
+		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
+			if BORDER_IMPLEMENTATION == 3 then
+				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
+			end if;
+		end when;
+	end for;
 
 	//EVENT: Next CSV output time: prints a new csv line and computes the next output time incrementing the variable
 	when time > nextOutputTick then
@@ -189,7 +199,6 @@ algorithm
 	
 	when time > nextMotivationTick then
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
-		// _ := debug(INFO(), time, "Updating particles motivation",_,_,_,_);
 		for i in 1:N loop
 			_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
 		end for;

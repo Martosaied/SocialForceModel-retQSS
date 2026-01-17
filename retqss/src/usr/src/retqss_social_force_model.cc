@@ -436,28 +436,20 @@ void social_force_model_desiredDirection(
 
 void social_force_model_acceleration(
 	int particleID,
-	double* desiredSpeed,
-	double* px,
-	double* py,
-	double* pz,
-	double* vx,
-	double* vy,
-	double* vz,
-	double targetX,
-	double targetY,
-	double targetZ,
 	double *x,
 	double *y,
 	double *z
 )
 {	
-	int index = (particleID-1)*3;
-	double currentX = px[index];
-	double currentY = py[index];
-	double currentZ = pz[index];
+	double currentX, currentY, currentZ;
+	retQSS_particle_currentPosition(particleID, &currentX, &currentY, &currentZ);
 
-	// The desired speed is gaussian distributed with mean 1.34 m/s and standard deviation 0.26 m/s
-	double desiredSpeedValue = desiredSpeed[particleID];
+	double targetX = retQSS_particle_getProperty(particleID, "desiredX");
+	double targetY = retQSS_particle_getProperty(particleID, "desiredY");
+	double targetZ = retQSS_particle_getProperty(particleID, "desiredZ");
+
+	double desiredSpeedValue = retQSS_particle_getProperty(particleID, "desiredSpeed");
+
 
 	// The desired direction is given by the difference between the current position and the target position
 	double desiredX, desiredY, desiredZ;
@@ -473,9 +465,8 @@ void social_force_model_acceleration(
 	desiredZ = (desiredZ*desiredSpeedValue);
 
 	// Current velocity
-	double currentVX = vx[index];
-	double currentVY = vy[index];
-	double currentVZ = vz[index];
+	double currentVX, currentVY, currentVZ;
+	retQSS_particle_currentVelocity(particleID, &currentVX, &currentVY, &currentVZ);
 
 	// The acceleration is the difference between the desired acceleration and the current acceleration
 	// The acceleration has a relaxation time of 0.5 seconds
@@ -589,6 +580,55 @@ Bool social_force_model_setUpWalls() {
 	return true;
 }
 
+
+Bool social_force_model_triggerMotivationUpdatePerParticle(
+	retQSS::ParticleNeighbor *neighbor,
+    Vector_3 &result
+) {
+	retQSS::Particle *p = neighbor->neighbor_particle();
+	int particleID = p->get_ID() + 1;
+
+	double desiredSpeed = retQSS_particle_getProperty(particleID, "desiredSpeed");
+	double pX = retQSS_particle_getProperty(particleID, "desiredX");
+	double pY = retQSS_particle_getProperty(particleID, "desiredY");
+
+	double accelerationX, accelerationY, accelerationZ;
+	social_force_model_acceleration(particleID, &accelerationX, &accelerationY, &accelerationZ);
+	double num_neighbors, repulsiveX, repulsiveY, repulsiveZ;
+
+	retQSS_particleNeighborhood_forEachParticle_2(particleID, "repulsive_pedestrian_effect", pX, pY, &num_neighbors, &repulsiveX, &repulsiveY, &repulsiveZ);
+
+	retQSS_particle_setProperty(particleID, "nextMotivationX", accelerationX + repulsiveX);
+	retQSS_particle_setProperty(particleID, "nextMotivationY", accelerationY + repulsiveY);
+	retQSS_particle_setProperty(particleID, "nextMotivationZ", accelerationZ + repulsiveZ);
+
+	return true;
+}
+
+Bool social_force_model_triggerMotivationUpdate(int particleID) {
+	double num_neighbors, totalRepulsiveX, totalRepulsiveY, totalRepulsiveZ;
+	int currentVolumeID = retQSS_particle_currentVolumeID(particleID);
+	if (currentVolumeID == 0) {
+		return true;
+	}
+	retQSS_particleNeighborhood_forEachParticle(particleID, "social_force_model_triggerMotivationUpdatePerParticle", &num_neighbors, &totalRepulsiveX, &totalRepulsiveY, &totalRepulsiveZ);
+
+	double desiredSpeed = retQSS_particle_getProperty(particleID, "desiredSpeed");
+	double pX = retQSS_particle_getProperty(particleID, "desiredX");
+	double pY = retQSS_particle_getProperty(particleID, "desiredY");
+
+	double accelerationX, accelerationY, accelerationZ;
+	social_force_model_acceleration(particleID, &accelerationX, &accelerationY, &accelerationZ);
+
+	double num_neighbors_2, repulsiveX, repulsiveY, repulsiveZ;
+
+	retQSS_particleNeighborhood_forEachParticle_2(particleID, "repulsive_pedestrian_effect", pX, pY, &num_neighbors_2, &repulsiveX, &repulsiveY, &repulsiveZ);
+
+	retQSS_particle_setProperty(particleID, "nextMotivationX", accelerationX + repulsiveX);
+	retQSS_particle_setProperty(particleID, "nextMotivationY", accelerationY + repulsiveY);
+	retQSS_particle_setProperty(particleID, "nextMotivationZ", accelerationZ + repulsiveZ);
+	return true;
+}
 
 
 }

@@ -11,11 +11,19 @@ import matplotlib.pyplot as plt
 import argparse
 import os
 import json
+import sys
 from itertools import combinations
 from scipy.spatial.distance import pdist, squareform
 import warnings
 import time
 warnings.filterwarnings('ignore')
+
+if __name__ == '__main__' or __package__ is None:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+from src.experiments import apply_publication_style
 
 def load_config(config_path):
     """
@@ -321,6 +329,8 @@ def plot_comparative_analysis(experiments_data, output_dir):
     """
     if not experiments_data:
         return
+
+    apply_publication_style()
     
     # Preparar datos para comparación
     cell_sizes = sorted(experiments_data.keys())
@@ -329,28 +339,32 @@ def plot_comparative_analysis(experiments_data, output_dir):
     n_runs = [experiments_data[dt]['n_runs'] for dt in cell_sizes]
     
     # Crear figura con el gráfico de invasiones totales con barras de error
-    plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(24, 14))
     
     # Gráfico: Invasiones totales por Cell Size con barras de error
     x_pos = range(len(cell_sizes))
-    bars = plt.bar(x_pos, total_invasions_mean, alpha=0.7, color='moccasin', 
-                   edgecolor='orange', yerr=total_invasions_std, capsize=5, error_kw={'elinewidth': 2})
+    bars = ax.bar(x_pos, total_invasions_mean, yerr=total_invasions_std,
+                  color='lightgreen', width=0.6)
     
-    plt.xlabel('Cell Size')
-    plt.ylabel('Invasiones Totales (Mean ± Std)')
-    plt.title('Invasiones Totales por Cell Size')
-    plt.xticks(x_pos, [f'{dt:.3f}' for dt in cell_sizes], rotation=45)
-    plt.grid(True, alpha=0.3)
+    ax.set_xlabel('Cell Size')
+    ax.set_ylabel('Invasiones Totales')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels([f'{dt:.3f}' for dt in cell_sizes], rotation=45, ha='right')
+    ax.grid(True)
     
     # Agregar anotaciones con mean + std
+    max_invasions = max(total_invasions_mean) if len(total_invasions_mean) > 0 else 0
+    if max_invasions > 0:
+        ax.set_ylim(0, max_invasions * 1.4)
     for i, (bar, mean_val, std_val) in enumerate(zip(bars, total_invasions_mean, total_invasions_std)):
         height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2., height + std_val + 5,
-                f'{mean_val:.1f}±{std_val:.1f}', ha='center', va='bottom', fontsize=8)
+        ax.text(bar.get_x() + bar.get_width()/2., height + std_val + max_invasions * 0.03 if max_invasions > 0 else 0.03,
+                f'{mean_val:.1f}±{std_val:.1f}', ha='center', va='bottom',
+                rotation=90)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'personal_space_invasion_comparative_analysis.png'), 
-                dpi=300, bbox_inches='tight')
+    plt.subplots_adjust(left=0.12, bottom=0.15, top=0.95, right=0.98)
+    plt.savefig(os.path.join(output_dir, 'personal_space_invasion_comparative_analysis.png'))
     plt.close()
     
     print(f"✅ Gráfico comparativo guardado en: {output_dir}")
@@ -426,4 +440,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

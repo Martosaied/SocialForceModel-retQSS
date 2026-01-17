@@ -1,0 +1,17 @@
+simulated_duration,implementation_id,implementation_name,real_time_mean,real_time_std,real_time_factor_mean,real_time_factor_std,num_iterations,output_dir
+10,1,Sin Optimizaciones,18.292,0.8005098375410507,0.5477592121565504,0.024529228005095542,10,experiments/simulated_vs_real_time_school/results/duration_10s_impl_1/run_20251228_161926
+10,2,Con Optimizaciones,2.2369999999999997,0.04075536774462958,4.471733918261511,0.08021652134033672,10,experiments/simulated_vs_real_time_school/results/duration_10s_impl_2/run_20251228_162019
+30,1,Sin Optimizaciones,67.197,4.204471548244797,0.44834723053446723,0.030413662179218214,10,experiments/simulated_vs_real_time_school/results/duration_30s_impl_1/run_20251228_162055
+30,2,Con Optimizaciones,7.007000000000001,0.1937549999354855,4.284714163949905,0.11871587854084596,10,experiments/simulated_vs_real_time_school/results/duration_30s_impl_2/run_20251228_162237
+60,1,Sin Optimizaciones,141.967,5.656055250790958,0.42331792385160794,0.017189486611363346,10,experiments/simulated_vs_real_time_school/results/duration_60s_impl_1/run_20251228_162319
+60,2,Con Optimizaciones,15.070000000000002,0.5747869170396972,3.987387958733561,0.1566529187227179,10,experiments/simulated_vs_real_time_school/results/duration_60s_impl_2/run_20251228_162617
+120,1,Sin Optimizaciones,298.75800000000004,7.333076843999378,0.4019057991615987,0.009898919452022599,10,experiments/simulated_vs_real_time_school/results/duration_120s_impl_1/run_20251228_162708
+120,2,Con Optimizaciones,35.83,2.4647149936655963,3.3650781262658156,0.2320068312200969,10,experiments/simulated_vs_real_time_school/results/duration_120s_impl_2/run_20251228_163242
+300,1,Sin Optimizaciones,772.123,7.158080818208203,0.3885726328932864,0.003613763577379271,10,experiments/simulated_vs_real_time_school/results/duration_300s_impl_1/run_20251228_163355
+300,2,Con Optimizaciones,92.18599999999999,3.7744567821078587,3.2598921381498465,0.1368987122919711,10,experiments/simulated_vs_real_time_school/results/duration_300s_impl_2/run_20251228_164731
+600,1,Sin Optimizaciones,1558.7220000000002,12.495357377842364,0.38495537640719907,0.0030743872049446,10,experiments/simulated_vs_real_time_school/results/duration_600s_impl_1/run_20251228_164942
+600,2,Con Optimizaciones,189.696,4.250459269302558,3.1645582268699592,0.07154666177629947,10,experiments/simulated_vs_real_time_school/results/duration_600s_impl_2/run_20251228_171630
+900,1,Sin Optimizaciones,2359.4820000000004,22.502041596264142,0.38147440561183943,0.003643970103568147,10,experiments/simulated_vs_real_time_school/results/duration_900s_impl_1/run_20251228_172022
+900,2,Con Optimizaciones,293.582,7.8629800966300385,3.0678149782829207,0.08339540387788252,10,experiments/simulated_vs_real_time_school/results/duration_900s_impl_2/run_20251228_180100
+1200,1,Sin Optimizaciones,2623.1949999999997,64.92266803667266,0.45772294903495886,0.010731456539290847,10,experiments/simulated_vs_real_time_school/results/duration_1200s_impl_1/run_20251228_180630
+1200,2,Con Optimizaciones,326.304,5.934755597326639,3.6787660354725182,0.06674644707882518,10,experiments/simulated_vs_real_time_school/results/duration_1200s_impl_2/run_20251228_185356

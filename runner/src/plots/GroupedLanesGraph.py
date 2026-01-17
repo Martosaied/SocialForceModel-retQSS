@@ -2,7 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from math import sqrt
-from src.math.Clustering import Clustering
+from src.math.Clustering import Clustering, MIN_X_DISTANCE, MIN_Y_DISTANCE
+from src.utils import get_parameter_combinations, process_parameters
 
 class GroupedLanesGraph:
     """
@@ -11,9 +12,10 @@ class GroupedLanesGraph:
     The grouped lanes graph is a graph that shows the grouped lanes of the simulation.
     """
 
-    def __init__(self, results, output_dir):
+    def __init__(self, results, output_dir, parameters):
         self.results = results
         self.output_dir = output_dir
+        self.parameters = list(get_parameter_combinations(process_parameters(parameters.get('parameters', {}))))[0]
 
     def plot(self):
         groups_per_time = {}
@@ -22,9 +24,6 @@ class GroupedLanesGraph:
 
             particles = int((len(df.columns) - 1) / 5)
             for index, row in df.iterrows():
-                if index < 900 or index % 10 != 0:
-                    continue
-
                 groups = Clustering(df, int(particles)).calculate_groups_by_time(row)
                 print(f"Groups at time {row['time']}: {len(groups)}")
                 if row['time'] not in groups_per_time:
@@ -41,8 +40,8 @@ class GroupedLanesGraph:
                 ax.set_ylim(0, 50)
                 
                 # Get corridor parameters (assuming they exist in the data or can be inferred)
-                FROM_Y = 20  # Default values, should be passed as parameters
-                TO_Y = 30
+                FROM_Y = self.parameters.get('FROM_Y', 0)
+                TO_Y = self.parameters.get('TO_Y', 50)
                 
                 # Highlight the corridor area
                 corridor_rect = plt.Rectangle(
@@ -109,6 +108,23 @@ class GroupedLanesGraph:
                         positions_y.append(y)
                         velocities_x.append(vx)
                         velocities_y.append(vy)
+                        
+                        # Draw rectangle centered on pedestrian using Clustering measurements
+                        rect_width = MIN_X_DISTANCE
+                        rect_height = MIN_Y_DISTANCE
+                        rect_x = x - rect_width / 2
+                        rect_y = y - rect_height / 2
+                        rect = plt.Rectangle(
+                            (rect_x, rect_y),
+                            rect_width,
+                            rect_height,
+                            facecolor='none',
+                            edgecolor=color,
+                            linewidth=2,
+                            alpha=0.6,
+                            linestyle='--'
+                        )
+                        ax.add_patch(rect)
                         
                         ax.scatter(x, y, color=color, s=200, alpha=0.8, edgecolors='black', linewidths=1.5)
                     

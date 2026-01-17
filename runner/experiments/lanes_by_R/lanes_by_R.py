@@ -1,13 +1,18 @@
 import json
 import os
-import subprocess
-from src.runner import run_experiment, compile_c_code, compile_model
-from src.utils import load_config, create_output_dir, copy_results_to_latest, generate_map
-from src.constants import Constants
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+
+from src.utils import load_config, create_output_dir
+from src.constants import Constants
 from src.math.Density import Density
+from src.experiments import (
+    ConfigBuilder, ModelUpdater, ExperimentRunner,
+    apply_publication_style, DEFAULT_COLORS
+)
+
+apply_publication_style()
 
 
 Rs = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
@@ -29,78 +34,34 @@ def lanes_by_R():
     plot_results()
 
 def run(r):
-    """
-    Ejecuta el experimento para un número dado de peatones.
-    """
+    """Execute experiment for given R parameter."""
     config = load_config('experiments/lanes_by_R/config.json')
-
-    # Crear directorio de salida con el nombre del experimento si se proporciona
     output_dir = create_output_dir(f'experiments/lanes_by_R/results/R_{r}')
     print(f"Directorio de salida creado: {output_dir}")
 
     pedestrians = int(PEDESTRIAN_DENSITY * WIDTH * VOLUMES)
 
-    config['parameters'][0]['value'] = pedestrians
-    config['parameters'][1]['value'] = Constants.PEDESTRIAN_MMOC
+    # Use ConfigBuilder for cleaner parameter setup
+    ConfigBuilder(config) \
+        .set_pedestrian_count(pedestrians) \
+        .set_pedestrian_implementation(Constants.PEDESTRIAN_MMOC) \
+        .set_corridor(VOLUMES, WIDTH) \
+        .set_parameter('PEDESTRIAN_R', r) \
+        .set_parameter('BORDER_R', r)
 
-
-    # Reemplazar el mapa en la configuración
-    generated_map = generate_map(VOLUMES,WIDTH)
-    config['parameters'].append({
-      "name": "OBSTACLES",
-      "type": "map",
-      "map": generated_map
-    })
-
-    # Agregar desde dónde hasta dónde se generan los peatones
-    config['parameters'].append({
-      "name": "FROM_Y",
-      "type": "value",
-      "value": (VOLUMES/ 2) - int(WIDTH / 2)
-    })
-    config['parameters'].append({
-      "name": "TO_Y",
-      "type": "value",
-      "value": (VOLUMES/ 2) + int(WIDTH / 2)
-    })
-    config['parameters'].append({
-      "name": "PEDESTRIAN_R",
-      "type": "value",
-      "value": r
-    })
-    config['parameters'].append({
-      "name": "BORDER_R",
-      "type": "value",
-      "value": r
-    })
-
-    # Guardar copia de configuración en el directorio del experimento
     config_copy_path = os.path.join(output_dir, 'config.json')
     with open(config_copy_path, 'w') as f:
         json.dump(config, f, indent=2)
 
-    # Reemplazar las divisiones de la grilla en el modelo
-    subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(VOLUMES) + '/', '../retqss/model/social_force_model.mo'])
-    # Reemplazar los peatones en el modelo
-    subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(pedestrians) + '/', '../retqss/model/social_force_model.mo'])
+    # Update model parameters
+    model = ModelUpdater('../retqss/model/social_force_model.mo')
+    model.update_parameters({
+        'GRID_DIVISIONS': VOLUMES,
+        'N': pedestrians
+    })
 
-    # Compilar el código C++ si se solicita
-    compile_c_code()
-
-    # Compilar el modelo si se solicita
-    compile_model('social_force_model')
-
-    # Ejecutar experimento
-    run_experiment(
-        config, 
-        output_dir, 
-        'social_force_model', 
-        plot=False, 
-        copy_results=True
-    )
-
-    # Copiar resultados del directorio de salida al directorio latest
-    copy_results_to_latest(output_dir)
+    # Use ExperimentRunner for compilation and execution
+    ExperimentRunner.run_standard_experiment(config, output_dir, 'social_force_model')
 
     print(f"\nExperimento completado. Resultados guardados en {output_dir}")
 

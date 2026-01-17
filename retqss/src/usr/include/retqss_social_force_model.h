@@ -123,16 +123,6 @@ void social_force_model_totalRepulsivePedestrianEffect(
 
 void social_force_model_acceleration(
 	int particleID,
-	double* desiredSpeed,
-	double* px,
-	double* py,
-	double* pz,
-	double* vx,
-	double* vy,
-	double* vz,
-	double targetX,
-	double targetY,
-	double targetZ,
 	double *x,
 	double *y,
 	double *z);
@@ -148,6 +138,7 @@ void social_force_model_desiredDirection(
 	double *desiredY,
 	double *desiredZ);
 
+Bool social_force_model_triggerMotivationUpdate(int particleID);
 
 #ifdef __cplusplus
 }

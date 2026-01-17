@@ -13,7 +13,7 @@ import retQSS_classrooms;
 */
 
 constant Integer
-	N = 1000,
+	N = 1400,
 	GRID_DIVISIONS = 15,
 	LEFT_COUNT = N / 2;
 

@@ -12,8 +12,8 @@ import retQSS_social_force_model_types;
 */
 
 constant Integer
-	N = 2000,
-	GRID_DIVISIONS = 1,
+	N = 300,
+	GRID_DIVISIONS = 2	,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -44,7 +44,8 @@ parameter Real
 	EPS = 1e-5,
 	PI = 3.1415926,
 	PROGRESS_UPDATE_DT = getRealModelParameter("PROGRESS_UPDATE_DT", 0.1),
-	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.1),
+	MOTIVATION_UPDATE_DT = getRealModelParameter("MOTIVATION_UPDATE_DT", 0.5),
+	CONVEYOR_BELT_UPDATE_DT = getRealModelParameter("CONVEYOR_BELT_UPDATE_DT", 0.1),
 	GRID_SIZE = getRealModelParameter("GRID_SIZE", 20.0),
 	CELL_EDGE_LENGTH = GRID_SIZE / GRID_DIVISIONS,
 	Z_COORD = CELL_EDGE_LENGTH / 2.0;
@@ -86,6 +87,9 @@ discrete Real nextProgressTick;
 // Variable used to control and trigger motivation update
 discrete Real nextMotivationTick;
 
+// Variable used to control and trigger conveyor belt update
+discrete Real nextConveyorBeltTick;
+
 // local variables
 discrete Real _, normalX, normalY, ux, uy, uz, hx, hy, hz, volumeID, groupID, randomY;
 discrete Boolean isolate;
@@ -121,7 +125,16 @@ initial algorithm
 	for i in 1:N loop
         (groupID, x[i], y[i], z[i], dx[i], dy[i], dz[i]) := randomRoute(GRID_SIZE, Z_COORD, FROM_Y, TO_Y);
 		_ := particle_setProperty(i, "type", groupID);
-		desiredSpeed[i] := random_normal(SPEED_MU, SPEED_SIGMA);
+		_ := particle_setProperty(i, "nextMotivationX", 1.0);
+		_ := particle_setProperty(i, "nextMotivationY", 1.0);
+		_ := particle_setProperty(i, "nextMotivationZ", 1.0);
+		reinit(ax[i], 1.0);
+		reinit(ay[i], 1.0);
+		reinit(az[i], 0.0);
+		_ := particle_setProperty(i, "desiredSpeed", random_normal(SPEED_MU, SPEED_SIGMA));
+		_ := particle_setProperty(i, "desiredX", dx[i]);
+		_ := particle_setProperty(i, "desiredY", dy[i]);
+		_ := particle_setProperty(i, "desiredZ", dz[i]);
 		_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
     end for;
 
@@ -135,10 +148,12 @@ initial algorithm
 		end for;
 	end if;
 
+	_ := volumeNeighborhood_toVertexSharing();
     terminateTime := FORCE_TERMINATION_AT;
     nextProgressTick := EPS;
 	nextMotivationTick := EPS;
 	nextOutputTick := EPS;
+	nextConveyorBeltTick := EPS;
     _ := debug(INFO(), time, "Done initial algorithm",_,_,_,_);
     _ := debug(INFO(), time, "Pedestrian implementation: %d", PEDESTRIAN_IMPLEMENTATION,_,_,_);
 	_ := debug(INFO(), time, "Border implementation: %d", BORDER_IMPLEMENTATION,_,_,_);
@@ -165,11 +180,16 @@ equation
   Model's time events
 */
 algorithm	
+
+	//EVENT: particle enters a volume and update neighboring volumes that are obstacles
 	for i in 1:N loop
 		when time > particle_nextCrossingTime(i,x[i],y[i],z[i],vx[i],vy[i],vz[i]) then
-			if BORDER_IMPLEMENTATION == 3 then
-				_ := updateNeighboringVolumes(i, GRID_DIVISIONS);
-			end if;
+			_ := triggerMotivationUpdate(i);
+			for j in 1:N loop
+				reinit(ax[j], particle_getProperty(j, "nextMotivationX"));
+				reinit(ay[j], particle_getProperty(j, "nextMotivationY"));
+				reinit(az[j], 0.0);
+			end for;
 		end when;
 	end for;
 
@@ -181,29 +201,14 @@ algorithm
 
 	//EVENT: Terminate time is reached, calling native function terminate()
 	when time > terminateTime then
+		_ := debug(INFO(), time, "Terminating simulation",_,_,_,_);
 		terminate();
 	end when;
 
-	
-	when time > nextMotivationTick then
-		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
 
-		// Update particles position
-		for i in 1:N loop
-			_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
-		end for;
-		
-		for i in 1:N loop
-			hx := dx[i];
-			hy := dy[i];
-			hz := dz[i];
-			(hx, hy, hz) := pedestrianTotalMotivation(i, desiredSpeed, x, y, z, vx, vy, vz, hx, hy, hz, CELL_EDGE_LENGTH, VOLUMES_COUNT, N);
-			reinit(ax[i], hx);
-			reinit(ay[i], hy);
-			reinit(az[i], hz);	
-		end for;
-
-		_ := debug(INFO(), time, "Updating particles position",_,_,_,_);
+	when time > nextConveyorBeltTick then
+		nextConveyorBeltTick := time + CONVEYOR_BELT_UPDATE_DT;
+		_ := debug(INFO(), time, "Updating particles conveyor belt",_,_,_,_);
 		for i in 1:N loop
 			hx := x[i];
 			hy := y[i];
@@ -222,8 +227,12 @@ algorithm
 					hx := 0.0;
 				end if;
 				
+				// INFO: This form of conveyor belt affect the way the lanes are detected.
+				// Comment to run the breaking lanes experiment.
 				if hx <> x[i] then
 					reinit(x[i], hx);
+					// reinit(y[i], randomY);
+					// dy[i] := randomY;
 					_ := particle_relocate(i, hx, hy, z[i], vx[i], vy[i], vz[i]);
 				end if;
 				if hy <> y[i] then
@@ -233,6 +242,7 @@ algorithm
 			end if;
 		end for;
 	end when;
+
 
 
 annotation(

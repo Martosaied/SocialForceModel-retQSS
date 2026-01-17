@@ -12,7 +12,7 @@ import retQSS_helbing_only_qss;
 */
 
 constant Integer
-	N = 300;
+	N = 2000;
 
 // Initial conditions parameters
 parameter Integer
@@ -167,6 +167,7 @@ algorithm
 	when time > nextConveyorBeltTick then
 		nextConveyorBeltTick := time + CONVEYOR_BELT_UPDATE_DT;
 		_ := debug(INFO(), time, "Updating particles conveyor belt",_,_,_,_);
+
 		for i in 1:N loop
 			hx := x[i];
 			hy := y[i];
@@ -215,8 +216,8 @@ annotation(
 		Jacobian=Dense,
 		StartTime=0.0,
 		StopTime=1000.0,
-       Tolerance=3.1622776601683795,
-       AbsTolerance=0.0031622776601683794
+		Tolerance={1e-5},
+		AbsTolerance={1e-8}
 	));
 
 end helbing_only_qss;

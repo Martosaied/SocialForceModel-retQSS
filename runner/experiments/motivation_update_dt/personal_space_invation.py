@@ -11,11 +11,19 @@ import matplotlib.pyplot as plt
 import argparse
 import os
 import json
+import sys
 from itertools import combinations
 from scipy.spatial.distance import pdist, squareform
 import warnings
 import time
 warnings.filterwarnings('ignore')
+
+if __name__ == '__main__' or __package__ is None:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+from src.experiments import apply_publication_style
 
 def load_config(config_path):
     """
@@ -117,13 +125,17 @@ def calculate_personal_space_invasions(df, pedestrian_r, groups_start_index):
         if len(group) < 2:  # Necesitamos al menos 2 peatones
             continue
             
-        # Obtener posiciones de todos los peatones activos en este timestep
+        # Obtener posiciones y velocidades de todos los peatones activos en este timestep
         positions = group[['x', 'y']].values
+        velocities = group[['velocity_x', 'velocity_y']].values
         pedestrian_ids = group['pedestrian_id'].values
         
         # Calcular matriz de distancias
         distances = pdist(positions)
         distance_matrix = squareform(distances)
+        
+        # Umbral más estricto: 1.5 * radio en lugar de 2 * radio
+        invasion_threshold = personal_space_radius * 1.5
         
         # Encontrar pares que están dentro del espacio personal
         invasion_pairs = []
@@ -131,8 +143,39 @@ def calculate_personal_space_invasions(df, pedestrian_r, groups_start_index):
         
         for i in range(len(positions)):
             for j in range(i + 1, len(positions)):
-                if distance_matrix[i, j] < personal_space_radius:
-                    invasion_pairs.append((pedestrian_ids[i], pedestrian_ids[j], distance_matrix[i, j]))
+                distance = distance_matrix[i, j]
+                
+                # Verificar si están dentro del umbral más estricto
+                if distance < invasion_threshold:
+                    # Calcular direcciones de movimiento
+                    vel_i = velocities[i]
+                    vel_j = velocities[j]
+                    
+                    # Calcular magnitudes de velocidad
+                    speed_i = np.linalg.norm(vel_i)
+                    speed_j = np.linalg.norm(vel_j)
+                    
+                    # Si ambos se están moviendo (velocidad > umbral mínimo)
+                    min_speed_threshold = 0.01  # Evitar divisiones por cero
+                    if speed_i > min_speed_threshold and speed_j > min_speed_threshold:
+                        # Normalizar vectores de velocidad para obtener direcciones
+                        dir_i = vel_i / speed_i
+                        dir_j = vel_j / speed_j
+                        
+                        # Calcular ángulo entre direcciones usando producto punto
+                        # cos(angle) = dot(dir_i, dir_j)
+                        cos_angle = np.dot(dir_i, dir_j)
+                        # Limitar a [-1, 1] por posibles errores numéricos
+                        cos_angle = np.clip(cos_angle, -1.0, 1.0)
+                        angle = np.arccos(cos_angle)
+                        
+                        # Filtrar: si se mueven en la misma dirección (ángulo < 45 grados = π/4)
+                        # No contar como invasión problemática
+                        if angle < np.pi / 4:  # 45 grados
+                            continue  # Saltar esta invasión
+                    
+                    # Si llegamos aquí, es una invasión problemática
+                    invasion_pairs.append((pedestrian_ids[i], pedestrian_ids[j], distance))
                     invasion_count += 1
         
         invasion_data.append({
@@ -201,47 +244,6 @@ def calculate_aggregated_statistics(all_stats):
     
     return aggregated
 
-
-
-def print_invasion_report(invasion_data, stats, experiment_name="experiment"):
-    """
-    Imprime un reporte detallado de las invasiones del espacio personal.
-    """
-    print("\n" + "="*80)
-    print(f"REPORTE DE INVASIONES DEL ESPACIO PERSONAL - {experiment_name.upper()}")
-    print("="*80)
-    
-    print(f"\n📊 ESTADÍSTICAS GENERALES")
-    print(f"Total de invasiones: {stats['total_invasions']}")
-    print(f"Total de timesteps: {stats['total_timesteps']}")
-    print(f"Frecuencia de invasión: {stats['invasion_frequency']:.4f} invasiones/timestep")
-    
-    print(f"\n📈 ESTADÍSTICAS POR TIMESTEP")
-    print(f"Colisiones promedio por timestep: {stats['avg_invasions_per_timestep']:.2f} ± {stats['std_invasions_per_timestep']:.2f}")
-    print(f"Máximo de invasiones en un timestep: {stats['max_invasions_per_timestep']}")
-    print(f"Mínimo de invasiones en un timestep: {stats['min_invasions_per_timestep']}")
-    
-    print(f"\n📊 TASAS DE INVASIÓN")
-    print(f"Tasa de invasión promedio: {stats['avg_invasion_rate']:.4f}")
-    print(f"Tasa de invasión máxima: {stats['max_invasion_rate']:.4f}")
-    
-    print(f"\n👥 POBLACIÓN")
-    print(f"Promedio de peatones por timestep: {stats['avg_pedestrians_per_timestep']:.1f}")
-    
-    # Análisis temporal
-    if len(invasion_data) > 10:
-        first_half = invasion_data[:len(invasion_data)//2]
-        second_half = invasion_data[len(invasion_data)//2:]
-        
-        first_half_avg = np.mean([d['invasion_count'] for d in first_half])
-        second_half_avg = np.mean([d['invasion_count'] for d in second_half])
-        
-        print(f"\n⏰ ANÁLISIS TEMPORAL")
-        print(f"Primera mitad (promedio): {first_half_avg:.2f} invasiones/timestep")
-        print(f"Segunda mitad (promedio): {second_half_avg:.2f} invasiones/timestep")
-        print(f"Cambio temporal: {second_half_avg - first_half_avg:+.2f} invasiones/timestep")
-    
-    print("="*80)
 
 def load_multiple_experiments(results_dir, config_path):
     """
@@ -315,12 +317,104 @@ def load_multiple_experiments(results_dir, config_path):
     
     return experiments_data
 
+def save_results_to_csv(experiments_data, output_dir):
+    """
+    Guarda los resultados agregados en un archivo CSV.
+    """
+    if not experiments_data:
+        return
+    
+    # Preparar datos para CSV
+    motivation_dts = sorted(experiments_data.keys())
+    
+    rows = []
+    for dt in motivation_dts:
+        agg_stats = experiments_data[dt]['aggregated_stats']
+        n_runs = experiments_data[dt]['n_runs']
+        
+        rows.append({
+            'motivation_update_dt': dt,
+            'n_runs': n_runs,
+            'total_invasions_mean': agg_stats.get('total_invasions_mean', 0),
+            'total_invasions_std': agg_stats.get('total_invasions_std', 0),
+            'total_invasions_min': agg_stats.get('total_invasions_min', 0),
+            'total_invasions_max': agg_stats.get('total_invasions_max', 0),
+            'total_timesteps_mean': agg_stats.get('total_timesteps_mean', 0),
+            'avg_invasions_per_timestep_mean': agg_stats.get('avg_invasions_per_timestep_mean', 0),
+            'avg_invasions_per_timestep_std': agg_stats.get('avg_invasions_per_timestep_std', 0),
+            'max_invasions_per_timestep_mean': agg_stats.get('max_invasions_per_timestep_mean', 0),
+            'min_invasions_per_timestep_mean': agg_stats.get('min_invasions_per_timestep_mean', 0),
+            'std_invasions_per_timestep_mean': agg_stats.get('std_invasions_per_timestep_mean', 0),
+            'avg_invasion_rate_mean': agg_stats.get('avg_invasion_rate_mean', 0),
+            'avg_invasion_rate_std': agg_stats.get('avg_invasion_rate_std', 0),
+            'max_invasion_rate_mean': agg_stats.get('max_invasion_rate_mean', 0),
+            'avg_pedestrians_per_timestep_mean': agg_stats.get('avg_pedestrians_per_timestep_mean', 0),
+            'invasion_frequency_mean': agg_stats.get('invasion_frequency_mean', 0),
+            'invasion_frequency_std': agg_stats.get('invasion_frequency_std', 0)
+        })
+    
+    df = pd.DataFrame(rows)
+    csv_path = os.path.join(output_dir, 'personal_space_invasion_results.csv')
+    df.to_csv(csv_path, index=False)
+    print(f"✅ Resultados guardados en CSV: {csv_path}")
+
+def load_data_from_csv(csv_path):
+    """
+    Carga datos desde un CSV previamente generado y los convierte al formato
+    esperado por plot_comparative_analysis.
+    """
+    if not os.path.exists(csv_path):
+        print(f"❌ Archivo CSV no encontrado: {csv_path}")
+        return {}
+    
+    try:
+        df = pd.read_csv(csv_path)
+        print(f"✅ CSV cargado: {csv_path}")
+        print(f"   {len(df)} experimentos encontrados")
+        
+        experiments_data = {}
+        for _, row in df.iterrows():
+            motivation_dt = row['motivation_update_dt']
+            n_runs = int(row['n_runs'])
+            
+            # Construir aggregated_stats desde el CSV
+            aggregated_stats = {
+                'total_invasions_mean': row['total_invasions_mean'],
+                'total_invasions_std': row['total_invasions_std'],
+                'total_invasions_min': row.get('total_invasions_min', 0),
+                'total_invasions_max': row.get('total_invasions_max', 0),
+                'total_timesteps_mean': row.get('total_timesteps_mean', 0),
+                'avg_invasions_per_timestep_mean': row['avg_invasions_per_timestep_mean'],
+                'avg_invasions_per_timestep_std': row['avg_invasions_per_timestep_std'],
+                'max_invasions_per_timestep_mean': row.get('max_invasions_per_timestep_mean', 0),
+                'min_invasions_per_timestep_mean': row.get('min_invasions_per_timestep_mean', 0),
+                'std_invasions_per_timestep_mean': row.get('std_invasions_per_timestep_mean', 0),
+                'avg_invasion_rate_mean': row['avg_invasion_rate_mean'],
+                'avg_invasion_rate_std': row['avg_invasion_rate_std'],
+                'max_invasion_rate_mean': row.get('max_invasion_rate_mean', 0),
+                'avg_pedestrians_per_timestep_mean': row.get('avg_pedestrians_per_timestep_mean', 0),
+                'invasion_frequency_mean': row['invasion_frequency_mean'],
+                'invasion_frequency_std': row['invasion_frequency_std']
+            }
+            
+            experiments_data[motivation_dt] = {
+                'aggregated_stats': aggregated_stats,
+                'n_runs': n_runs
+            }
+        
+        return experiments_data
+    except Exception as e:
+        print(f"❌ Error cargando CSV: {e}")
+        return {}
+
 def plot_comparative_analysis(experiments_data, output_dir):
     """
     Genera gráfico de invasiones totales por Motivation DT con barras de error.
     """
     if not experiments_data:
         return
+
+    apply_publication_style()
     
     # Preparar datos para comparación
     motivation_dts = sorted(experiments_data.keys())
@@ -329,28 +423,35 @@ def plot_comparative_analysis(experiments_data, output_dir):
     n_runs = [experiments_data[dt]['n_runs'] for dt in motivation_dts]
     
     # Crear figura con el gráfico de invasiones totales con barras de error
-    plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(16, 14))
     
     # Gráfico: Colisiones totales por Motivation DT con barras de error
     x_pos = range(len(motivation_dts))
-    bars = plt.bar(x_pos, total_invasions_mean, alpha=0.7, color='moccasin', 
-                   edgecolor='orange', yerr=total_invasions_std, capsize=5, error_kw={'elinewidth': 2})
+    bars = ax.bar(x_pos, total_invasions_mean, color='moccasin', 
+                   yerr=total_invasions_std)
     
-    plt.xlabel('Motivation Update DT')
-    plt.ylabel('Colisiones Totales (Mean ± Std)')
-    plt.title('Colisiones Totales por Motivation Update DT')
-    plt.xticks(x_pos, [f'{dt:.3f}' for dt in motivation_dts], rotation=90)
-    plt.grid(True, alpha=0.3)
+    ax.set_xlabel('Motivation Update DT (s)')
+    ax.set_ylabel('Colisiones Totales')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels([f'{dt:.3f}' for dt in motivation_dts], rotation=90)
+    ax.grid(True)
     
-    # Agregar anotaciones con mean + std
+    # Calcular el máximo valor incluyendo barras de error para establecer el límite Y
+    max_value = max([mean + std for mean, std in zip(total_invasions_mean, total_invasions_std)])
+    y_max = max_value * 1.40  # 35% más de espacio para los labels
+    ax.set_ylim(0, y_max)
+    
+    # Agregar anotaciones con mean + std en vertical, asegurándose de que quepan
     for i, (bar, mean_val, std_val) in enumerate(zip(bars, total_invasions_mean, total_invasions_std)):
         height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2., height + std_val + 5,
-                f'{mean_val:.1f}±{std_val:.1f}', ha='center', va='bottom', fontsize=8)
+        # Calcular posición del label dentro del área visible
+        label_y = min(height + std_val + max_value * 0.03, y_max * 0.97)
+        ax.text(bar.get_x() + bar.get_width()/2., label_y,
+                f'{mean_val:.1f}±{std_val:.1f}', ha='center', va='bottom',
+                rotation=90)
     
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'personal_space_invasion_comparative_analysis.png'), 
-                dpi=300, bbox_inches='tight')
+    plt.subplots_adjust(left=0.12, right=0.95, top=0.88, bottom=0.25)
+    plt.savefig(os.path.join(output_dir, 'personal_space_invasion_comparative_analysis.png'))
     plt.close()
     
     print(f"✅ Gráfico comparativo guardado en: {output_dir}")
@@ -368,6 +469,8 @@ def main():
                        help='Directorio de salida para los resultados')
     parser.add_argument('--single-file', '-f',
                        help='Analizar un solo archivo result_0.csv')
+    parser.add_argument('--csv', '--use-csv',
+                       help='Usar datos de un CSV previamente generado en lugar de procesar archivos result_*.csv')
     
     args = parser.parse_args()
     
@@ -377,12 +480,20 @@ def main():
     print("🔍 ANÁLISIS DE INVASIONES DEL ESPACIO PERSONAL")
     print("="*60)
     
-    # Análisis de múltiples experimentos
-    print(f"\n📂 Cargando datos desde: {args.results_dir}")
-    start_time = time.time()
-    experiments_data = load_multiple_experiments(args.results_dir, args.config)
-    load_time = time.time() - start_time
-    print(f"⏱️  Tiempo de carga: {load_time:.2f} segundos")
+    # Cargar datos desde CSV o procesar archivos
+    if args.csv:
+        print(f"\n📂 Cargando datos desde CSV: {args.csv}")
+        start_time = time.time()
+        experiments_data = load_data_from_csv(args.csv)
+        load_time = time.time() - start_time
+        print(f"⏱️  Tiempo de carga: {load_time:.2f} segundos")
+    else:
+        # Análisis de múltiples experimentos
+        print(f"\n📂 Cargando datos desde: {args.results_dir}")
+        start_time = time.time()
+        experiments_data = load_multiple_experiments(args.results_dir, args.config)
+        load_time = time.time() - start_time
+        print(f"⏱️  Tiempo de carga: {load_time:.2f} segundos")
     
     if not experiments_data:
         print("❌ No se encontraron datos válidos. Terminando.")
@@ -390,40 +501,12 @@ def main():
     
     print(f"\n✅ Cargados {len(experiments_data)} experimentos exitosamente")
     
+    # Guardar resultados en CSV solo si no se usó CSV como entrada
+    if not args.csv:
+        save_results_to_csv(experiments_data, args.output)
     
     # Generar gráfico comparativo
     plot_comparative_analysis(experiments_data, args.output)
-    
-    # Imprimir reportes agregados
-    print("\n📊 REPORTES AGREGADOS (Mean ± Std)")
-    for motivation_dt in sorted(experiments_data.keys()):
-        data = experiments_data[motivation_dt]
-        agg_stats = data['aggregated_stats']
-        n_runs = data['n_runs']
-        
-        print(f"\n--- Motivation DT: {motivation_dt:.3f} (n={n_runs} runs) ---")
-        print(f"Total invasiones: {agg_stats['total_invasions_mean']:.1f} ± {agg_stats['total_invasions_std']:.1f}")
-        print(f"Promedio/timestep: {agg_stats['avg_invasions_per_timestep_mean']:.2f} ± {agg_stats['avg_invasions_per_timestep_std']:.2f}")
-        print(f"Tasa promedio: {agg_stats['avg_invasion_rate_mean']:.4f} ± {agg_stats['avg_invasion_rate_std']:.4f}")
-        print(f"Frecuencia: {agg_stats['invasion_frequency_mean']:.4f} ± {agg_stats['invasion_frequency_std']:.4f}")
-    
-    # Reporte comparativo
-    print("\n📊 REPORTE COMPARATIVO (Mean ± Std)")
-    print("="*80)
-    print(f"{'Motivation DT':<15} {'Colisiones Totales':<25} {'Promedio/Timestep':<25} {'Tasa Promedio':<20} {'Runs':<8}")
-    print("-" * 95)
-    for motivation_dt in sorted(experiments_data.keys()):
-        agg_stats = experiments_data[motivation_dt]['aggregated_stats']
-        n_runs = experiments_data[motivation_dt]['n_runs']
-        print(f"{motivation_dt:<15.3f} "
-              f"{agg_stats['total_invasions_mean']:.1f}±{agg_stats['total_invasions_std']:.1f}{'':<15} "
-              f"{agg_stats['avg_invasions_per_timestep_mean']:.2f}±{agg_stats['avg_invasions_per_timestep_std']:.2f}{'':<15} "
-              f"{agg_stats['avg_invasion_rate_mean']:.4f}±{agg_stats['avg_invasion_rate_std']:.4f}{'':<10} "
-              f"{n_runs:<8}")
-    
-    print("\n✅ Análisis completado. Resultados guardados en:", args.output)
-    print("="*60)
 
 if __name__ == '__main__':
     main()
-

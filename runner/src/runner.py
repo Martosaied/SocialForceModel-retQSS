@@ -12,6 +12,7 @@ import numpy as np
 from src.plotter import Plotter
 from src.math.Density import Density
 from src.math.Clustering import Clustering
+from src.math.Collisions import Collisions
 from src.utils import process_parameters, get_parameter_combinations
 from src.config_manager import get_config
 
@@ -42,6 +43,8 @@ def run_model(model_name: str, directory: str, parameters: dict):
             'memory_usage': 0,
             'density_based_groups': 0,
             'clustering_based_groups': 0,
+            'total_collisions': 0,
+            'avg_collision_rate': 0,
         }
         if not config.verbose:
             # Get the time from the output
@@ -61,9 +64,18 @@ def run_model(model_name: str, directory: str, parameters: dict):
                 # Calculate clustering-based groups if not skipped
                 print("Calculating clustering-based groups")
                 metrics['clustering_based_groups'] = Clustering(df, particles).calculate_groups(start_index=groups_start_index)
+                
+                # Calculate collisions
+                print("Calculating collisions")
+                pedestrian_r = parameters.get('PEDESTRIAN_R', 0.3)
+                collision_threshold = 2 * pedestrian_r
+                collisions = Collisions(df, particles, collision_threshold, start_index=groups_start_index)
+                collision_stats = collisions.calculate_total_collisions()
+                metrics['total_collisions'] = collision_stats['total_collisions']
+                metrics['avg_collision_rate'] = collision_stats['avg_collision_rate']
             else:
                 # Skip all calculations
-                print("Skipping density and clustering calculations")
+                print("Skipping density, clustering, and collision calculations")
 
         # Check if solution.csv was created
         if not os.path.exists(solution_path):
@@ -119,7 +131,7 @@ def run_parallel_model(
         solution_path, metrics = run_model(model_name, directory, parameters)
 
         # Write metrics to file
-        metrics_file.write(f"{metrics['time']},{metrics['memory_usage']},{metrics['density_based_groups']},{metrics['clustering_based_groups']}\n")
+        metrics_file.write(f"{metrics['time']},{metrics['memory_usage']},{metrics['density_based_groups']},{metrics['clustering_based_groups']},{metrics['total_collisions']},{metrics['avg_collision_rate']}\n")
 
         print(f"Flushing metrics file")
         metrics_file.flush()
@@ -158,7 +170,7 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str = "outp
     metrics_file = os.path.join(output_dir, f'metrics.csv')
 
     metrics_file = open(metrics_file, 'w')
-    metrics_file.write('time,memory_usage,density_based_groups,clustering_based_groups\n')
+    metrics_file.write('time,memory_usage,density_based_groups,clustering_based_groups,total_collisions,avg_collision_rate\n')
     metrics_file.flush()
     results = []
     processes = []

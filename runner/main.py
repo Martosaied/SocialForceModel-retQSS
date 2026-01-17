@@ -22,6 +22,8 @@ from experiments.subway_attack_rate.subway_attack_rate import subway_attack_rate
 from experiments.performance_school_scenario.performance_school_scenario_hallways import performance_school_scenario_hallways
 from experiments.motivation_update_dt.motivation_update_dt import motivation_update_dt
 from experiments.motivation_tick_deltaq_heatmap.motivation_tick_deltaq_heatmap import motivation_tick_deltaq_heatmap
+from experiments.volume_neighborhood_comparison.volume_neighborhood_comparison import volume_neighborhood_comparison
+from experiments.simulated_vs_real_time_school.simulated_vs_real_time_school import simulated_vs_real_time_school
 from src.plotter import Plotter
 
 
@@ -44,6 +46,8 @@ EXPERIMENT_REGISTRY = {
     'performance_school_scenario_hallways': performance_school_scenario_hallways,
     'motivation_update_dt': motivation_update_dt,
     'motivation_tick_deltaq_heatmap': motivation_tick_deltaq_heatmap,
+    'volume_neighborhood_comparison': volume_neighborhood_comparison,
+    'simulated_vs_real_time_school': simulated_vs_real_time_school,
 }
 
 
@@ -132,7 +136,7 @@ def handle_plot_command(args):
     
     plot_handlers = {
         'gif': lambda: plotter.flow_graph(args.solution_file, args.output_dir, config),
-        'grouped_lanes': lambda: plotter.grouped_lanes_graph([args.solution_file], args.output_dir),
+        'grouped_lanes': lambda: plotter.grouped_lanes_graph([args.solution_file], args.output_dir, config),
         'pedestrian_heatmap': lambda: (
             plotter.density_heatmap(args.solution_file, args.output_dir),
             plotter.density_row_graph(args.solution_file, args.output_dir)

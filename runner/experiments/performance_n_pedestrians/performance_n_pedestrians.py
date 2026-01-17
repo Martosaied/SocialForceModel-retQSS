@@ -6,6 +6,7 @@ from src.runner import run_experiment, compile_c_code, compile_model
 from src.utils import load_config, create_output_dir, copy_results_to_latest
 from src.config_manager import config_manager
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import pandas as pd
 from itertools import product
 from src.constants import Constants
@@ -14,9 +15,15 @@ from src.constants import Constants
 execute_experiment = True
 
 # Test configurations
-N_PEDESTRIANS = [300, 500, 1000, 2000, 3000, 5000] #, 10000]
+N_PEDESTRIANS = [2000] #, 10000]
 TARGET_DENSITY = 0.3  # peatones/m² - densidad constante
-CELL_SIZES = [5.0]  # metros por celda - diferentes tamaños de celda
+CELL_SIZES = [3.0]  # metros por celda - diferentes tamaños de celda
+
+
+def get_simulated_time():
+    """Get simulated time from config.json."""
+    config = load_config('experiments/performance_n_pedestrians/config.json')
+    return config['parameters']['FORCE_TERMINATION_AT']['value']
 
 # Calculate grid size and divisions for each N and cell size
 def calculate_grid_params(n_pedestrians, density=TARGET_DENSITY, cell_size=1.0):
@@ -77,9 +84,9 @@ def performance_n_pedestrians():
     results = []
 
     # # Update configuration from command line arguments
-    # config_manager.update_from_dict({
-    #     'skip_metrics': True
-    # })
+    config_manager.update_from_dict({
+        'skip_metrics': True
+    })
     
     # Phase 1: Test QSS solo (baseline)
     print("\n1. Testing QSS solo (baseline)...")
@@ -185,10 +192,10 @@ def run_experiment_with_params(n, implementation, grid_divisions, cell_size=1.0)
 
     if execute_experiment:
         # Update config parameters
-        config['iterations'] = 10
+        config['iterations'] = 1
         config['parameters']['N']['value'] = n
         config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = pedestrian_implementation
-        config['parameters']['BORDER_IMPLEMENTATION']['value'] = Constants.CORRIDOR_ONLY
+        config['parameters']['BORDER_IMPLEMENTATION']['value'] = 0
         config['parameters']['GRID_SIZE']['value'] = actual_grid_size  # Update grid size
         config['parameters']['FROM_Y']['value'] = from_y
         config['parameters']['TO_Y']['value'] = to_y
@@ -245,12 +252,21 @@ def run_experiment_with_params(n, implementation, grid_divisions, cell_size=1.0)
         try:
             metrics_df = pd.read_csv(metrics_file)
             if not metrics_df.empty and 'time' in metrics_df.columns:
+                # Get simulated time from config
+                simulated_time = get_simulated_time()
+                
+                # Calculate simulation speed ratio: simulated_time / execution_time
+                # Higher is better (simulation runs faster than real-time)
+                speed_ratios = simulated_time / metrics_df['time']
+                
                 detailed_metrics = {
                     'total_iterations': len(metrics_df),
-                    'avg_iteration_time': metrics_df['time'].mean(),
-                    'min_iteration_time': metrics_df['time'].min(),
-                    'max_iteration_time': metrics_df['time'].max(),
-                    'std_iteration_time': metrics_df['time'].std(),
+                    'execution_time': metrics_df['time'].mean(),  # Execution time in seconds
+                    'execution_time_std': metrics_df['time'].std(),  # Std dev of execution time in seconds
+                    'avg_iteration_time': speed_ratios.mean(),  # Now contains speed ratio instead of time
+                    'min_iteration_time': speed_ratios.min(),  # Minimum speed ratio
+                    'max_iteration_time': speed_ratios.max(),  # Maximum speed ratio
+                    'std_iteration_time': speed_ratios.std(),  # Std of speed ratio
                     'avg_memory_usage': (metrics_df['memory_usage'].mean() / 1024) if 'memory_usage' in metrics_df.columns else None,  # Convert KB to MB
                     'std_memory_usage': (metrics_df['memory_usage'].std() / 1024) if 'memory_usage' in metrics_df.columns else None,  # Convert KB to MB
                 }
@@ -363,8 +379,12 @@ def plot_comprehensive_results(results, optimal_configs=None):
                         capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='#5A4FCF', markeredgewidth=2)
     
     plt.xlabel('Número de Peatones (N)', fontsize=14)
-    plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14)
-    plt.title(f'Comparación de Rendimiento: Densidad Constante ({TARGET_DENSITY} peatones/m²)', fontsize=16)
+    plt.ylabel('Ratio de Velocidad (tiempo simulado / tiempo real)', fontsize=14)
+    plt.title(f'Velocidad de Simulación: Densidad Constante ({TARGET_DENSITY} peatones/m²)', fontsize=16)
+    
+    # Add horizontal line at 1.0 to show real-time threshold
+    plt.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.5, label='Tiempo Real (1.0x)')
+    
     plt.legend(fontsize=12)
     plt.grid(True, alpha=0.3)
     plt.tick_params(axis='both', which='major', labelsize=12)
@@ -645,7 +665,7 @@ def plot_performance_bar_chart(results, optimal_configs=None):
     retqss_data = df[df['implementation'] == 'retqss'].sort_values('n_pedestrians')
     retqss_opt_data = df[df['implementation'] == 'retqss_opt']
     
-    # Prepare data for bar chart
+    # Prepare data for bar charts
     n_values = sorted(N_PEDESTRIANS)
     qss_means = []
     qss_stds = []
@@ -653,6 +673,12 @@ def plot_performance_bar_chart(results, optimal_configs=None):
     retqss_stds = []
     retqss_opt_means = []
     retqss_opt_stds = []
+    qss_exec_means = []
+    qss_exec_stds = []
+    retqss_exec_means = []
+    retqss_exec_stds = []
+    retqss_opt_exec_means = []
+    retqss_opt_exec_stds = []
     
     # Extract performance data for each N value
     for n in n_values:
@@ -661,18 +687,26 @@ def plot_performance_bar_chart(results, optimal_configs=None):
         if not qss_n.empty and qss_n['detailed_metrics'].iloc[0]:
             qss_means.append(qss_n['detailed_metrics'].iloc[0]['avg_iteration_time'])
             qss_stds.append(qss_n['detailed_metrics'].iloc[0]['std_iteration_time'])
+            qss_exec_means.append(qss_n['detailed_metrics'].iloc[0]['execution_time'])
+            qss_exec_stds.append(qss_n['detailed_metrics'].iloc[0].get('execution_time_std') or 0)
         else:
             qss_means.append(0)
             qss_stds.append(0)
+            qss_exec_means.append(0)
+            qss_exec_stds.append(0)
         
         # RETQSS data
         retqss_n = retqss_data[retqss_data['n_pedestrians'] == n]
         if not retqss_n.empty and retqss_n['detailed_metrics'].iloc[0]:
             retqss_means.append(retqss_n['detailed_metrics'].iloc[0]['avg_iteration_time'])
             retqss_stds.append(retqss_n['detailed_metrics'].iloc[0]['std_iteration_time'])
+            retqss_exec_means.append(retqss_n['detailed_metrics'].iloc[0]['execution_time'])
+            retqss_exec_stds.append(retqss_n['detailed_metrics'].iloc[0].get('execution_time_std') or 0)
         else:
             retqss_means.append(0)
             retqss_stds.append(0)
+            retqss_exec_means.append(0)
+            retqss_exec_stds.append(0)
         
         # RETQSS Opt data (best configuration for each N)
         if optimal_configs and n in optimal_configs:
@@ -681,12 +715,18 @@ def plot_performance_bar_chart(results, optimal_configs=None):
             if not retqss_opt_n.empty and retqss_opt_n['detailed_metrics'].iloc[0]:
                 retqss_opt_means.append(retqss_opt_n['detailed_metrics'].iloc[0]['avg_iteration_time'])
                 retqss_opt_stds.append(retqss_opt_n['detailed_metrics'].iloc[0]['std_iteration_time'])
+                retqss_opt_exec_means.append(retqss_opt_n['detailed_metrics'].iloc[0]['execution_time'])
+                retqss_opt_exec_stds.append(retqss_opt_n['detailed_metrics'].iloc[0].get('execution_time_std') or 0)
             else:
                 retqss_opt_means.append(0)
                 retqss_opt_stds.append(0)
+                retqss_opt_exec_means.append(0)
+                retqss_opt_exec_stds.append(0)
         else:
             retqss_opt_means.append(0)
             retqss_opt_stds.append(0)
+            retqss_opt_exec_means.append(0)
+            retqss_opt_exec_stds.append(0)
     
     # Create the bar chart
     fig, ax = plt.subplots(figsize=(16, 10))
@@ -717,14 +757,18 @@ def plot_performance_bar_chart(results, optimal_configs=None):
             if mean > 0:  # Only show label if there's data
                 height = bar.get_height()
                 ax.text(bar.get_x() + bar.get_width()/2., height + std + height*0.01,
-                       f'{mean:.2f}s', ha='center', va='bottom', fontsize=9, fontweight='bold')
+                       f'{mean:.2f}x', ha='center', va='bottom', fontsize=9, fontweight='bold')
     
     # Customize the plot
     ax.set_xlabel('Número de Peatones (N)', fontsize=14)
-    ax.set_ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14)
-    ax.set_title(f'Comparación de Rendimiento: Densidad Constante ({TARGET_DENSITY} peatones/m²)', fontsize=16)
+    ax.set_ylabel('Ratio de Velocidad (tiempo simulado / tiempo real)', fontsize=14)
+    ax.set_title(f'Velocidad de Simulación: Densidad Constante ({TARGET_DENSITY} peatones/m²)', fontsize=16)
     ax.set_xticks(x)
     ax.set_xticklabels([str(n) for n in n_values])
+    
+    # Add horizontal line at 1.0 to show real-time threshold
+    ax.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.5, label='Tiempo Real (1.0x)')
+    
     ax.legend(fontsize=12)
     ax.grid(True, alpha=0.3, axis='y')
     ax.tick_params(axis='both', which='major', labelsize=12)
@@ -735,6 +779,51 @@ def plot_performance_bar_chart(results, optimal_configs=None):
     
     print("Performance comparison bar chart generated successfully!")
     print("Generated file: 02_performance_comparison_bar_chart.png")
+
+    # Create the execution time bar chart
+    fig, ax = plt.subplots(figsize=(16, 10))
+    fig.suptitle('Comparación de Rendimiento: Tiempo de Ejecución Absoluto', fontsize=18, fontweight='bold')
+
+    # Create bars
+    bars1 = ax.bar(x - width, qss_exec_means, width, yerr=qss_exec_stds,
+                   capsize=5, alpha=0.8, color='#FF6B6B', edgecolor='#D63031',
+                   linewidth=1.5, label='QSS')
+
+    bars2 = ax.bar(x, retqss_exec_means, width, yerr=retqss_exec_stds,
+                   capsize=5, alpha=0.8, color='#4ECDC4', edgecolor='#00B894',
+                   linewidth=1.5, label='RETQSS')
+
+    bars3 = ax.bar(x + width, retqss_opt_exec_means, width, yerr=retqss_opt_exec_stds,
+                   capsize=5, alpha=0.8, color='#6C5CE7', edgecolor='#5A4FCF',
+                   linewidth=1.5, label='RETQSS Opt')
+
+    # Add value labels on top of bars
+    for bars, means, stds in [(bars1, qss_exec_means, qss_exec_stds),
+                              (bars2, retqss_exec_means, retqss_exec_stds),
+                              (bars3, retqss_opt_exec_means, retqss_opt_exec_stds)]:
+        for bar, mean, std in zip(bars, means, stds):
+            if mean > 0:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height + std + height*0.01,
+                        f'{mean:.2f}s', ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+    # Customize the plot
+    ax.set_xlabel('Número de Peatones (N)', fontsize=14)
+    ax.set_ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14)
+    ax.set_title(f'Tiempo de Ejecución: Densidad Constante ({TARGET_DENSITY} peatones/m²)', fontsize=16)
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(n) for n in n_values])
+
+    ax.legend(fontsize=12)
+    ax.grid(True, alpha=0.3, axis='y')
+    ax.tick_params(axis='both', which='major', labelsize=12)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '02_performance_comparison_bar_chart_exec_time.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+
+    print("Execution time bar chart generated successfully!")
+    print("Generated file: 02_performance_comparison_bar_chart_exec_time.png")
 
 def plot_enhanced_cell_size_comparison(results):
     """
@@ -753,6 +842,16 @@ def plot_enhanced_cell_size_comparison(results):
     if retqss_opt_data.empty:
         print("Warning: No RETQSS optimized results found for enhanced cell size comparison")
         return
+
+    simulated_time = get_simulated_time()
+
+    def load_execution_time_stats(output_dir):
+        metrics_path = os.path.join(output_dir, 'latest', 'metrics.csv')
+        if os.path.exists(metrics_path):
+            df_metrics = pd.read_csv(metrics_path)
+            if not df_metrics.empty and 'time' in df_metrics.columns:
+                return df_metrics['time'].mean(), df_metrics['time'].std()
+        return 0, 0
     
     # Use all cell sizes
     all_cell_sizes = sorted(retqss_opt_data['cell_size'].unique())
@@ -764,10 +863,12 @@ def plot_enhanced_cell_size_comparison(results):
     retqss_opt_data['std_time'] = retqss_opt_data['detailed_metrics'].apply(
         lambda x: x['std_iteration_time'] if x else 0
     )
+    execution_stats = retqss_opt_data['output_dir'].apply(load_execution_time_stats)
+    retqss_opt_data['execution_time_mean'] = execution_stats.apply(lambda x: x[0])
+    retqss_opt_data['execution_time_std'] = execution_stats.apply(lambda x: x[1])
     
     # Create comprehensive bar chart comparison for all cell sizes
-    plt.figure(figsize=(20, 12))
-    plt.suptitle('Comparación Completa: Rendimiento por Tamaño de Celda (Todos los Valores)', fontsize=20, fontweight='bold')
+    plt.figure(figsize=(20, 10))
     
     # Create subplots for different N values
     n_values = sorted(retqss_opt_data['n_pedestrians'].unique())
@@ -795,6 +896,7 @@ def plot_enhanced_cell_size_comparison(results):
             cell_sizes = n_data['cell_size']
             times = n_data['avg_time']
             stds = n_data['std_time']
+            exec_times = n_data['execution_time_mean']
             
             # Create bars with colors for each cell size
             colors = [cell_size_colors.get(cs, '#CCCCCC') for cs in cell_sizes]
@@ -802,31 +904,46 @@ def plot_enhanced_cell_size_comparison(results):
                           color=colors, alpha=0.8, capsize=5, 
                           edgecolor='black', linewidth=1.5)
             
+            max_rtf = max(times) if len(times) > 0 else 0
+            max_std = max(stds) if len(stds) > 0 else 0
+            if max_rtf > 0:
+                plt.ylim(0, max_rtf + max_std + max_rtf * 0.7)
+            label_offset = max_rtf * 0.06 if max_rtf > 0 else 0.06
+            time_offset = max_rtf * 0.02 if max_rtf > 0 else 0.02
+
             # Add value labels on top of bars
-            for j, (bar, time, std) in enumerate(zip(bars, times, stds)):
+            for j, (bar, rtf, std, exec_time) in enumerate(zip(bars, times, stds, exec_times)):
                 height = bar.get_height()
-                plt.text(bar.get_x() + bar.get_width()/2., height + std + height*0.01,
-                        f'{time:.1f}s', ha='center', va='bottom', fontsize=9, fontweight='bold')
+                if height + std > 0:
+                    plt.text(bar.get_x() + bar.get_width()/2., height + std + label_offset,
+                             f'{rtf:.2f}x±{std:.2f}', ha='center', va='bottom',
+                             fontsize=15, fontweight='bold', rotation=90)
+                    if exec_time > 0:
+                        plt.text(bar.get_x() + bar.get_width()/2., height + std + time_offset,
+                                 f'{exec_time:.1f}s', ha='center', va='bottom',
+                                 fontsize=9, rotation=90)
             
-            plt.xlabel('Tamaño de Celda (m)', fontsize=12)
-            plt.ylabel('Tiempo (s)', fontsize=12)
-            plt.title(f'N = {n}', fontsize=14, fontweight='bold')
+            plt.xlabel('Tamaño de Celda (m)', fontsize=25)
+            plt.ylabel('RTF', fontsize=25)
+            plt.title(f'N = {n}', fontsize=25, fontweight='bold')
             plt.xticks(range(len(cell_sizes)), [f'{cs}m' for cs in cell_sizes], rotation=45)
+            
+            # Add horizontal line at 1.0 to show real-time threshold
+            plt.axhline(y=1.0, color='red', linestyle='--', linewidth=1.5, alpha=0.6)
+            
             plt.grid(True, alpha=0.3, axis='y')
+            legend_handles = [
+                Line2D([0], [0], color='red', linestyle='--', label='Tiempo Real (1.0x)'),
+                Line2D([], [], linestyle='None', label=f'Tiempo simulado: {simulated_time:.0f}s'),
+            ]
+            plt.legend(handles=legend_handles, fontsize=20, loc='upper right')
             
             # Highlight the best performing cell size
-            best_idx = times.idxmin()
+            best_idx = times.idxmax()
             best_bar = bars[times.index.get_loc(best_idx)]
             best_bar.set_edgecolor('gold')
             best_bar.set_linewidth(4)
             
-            # Add performance ranking text
-            sorted_times = sorted(zip(cell_sizes, times), key=lambda x: x[1])
-            ranking_text = "Ranking: " + " > ".join([f"{cs}m" for cs, _ in sorted_times[:3]])
-            plt.text(0.02, 0.98, ranking_text, transform=plt.gca().transAxes, 
-                    fontsize=8, verticalalignment='top', 
-                    bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8))
-    
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, '08_comprehensive_cell_size_comparison.png'), dpi=300, bbox_inches='tight')
     plt.show()
@@ -927,14 +1044,18 @@ def plot_qss_vs_retqss_bar_chart(results):
             if mean > 0:  # Only show label if there's data
                 height = bar.get_height()
                 ax1.text(bar.get_x() + bar.get_width()/2., height + std + height*0.02,
-                        f'{mean:.2f}s', ha='center', va='bottom', fontsize=9, fontweight='bold')
+                        f'{mean:.2f}x', ha='center', va='bottom', fontsize=9, fontweight='bold')
     
     # Customize performance subplot
     ax1.set_xlabel('Número de Peatones (N)', fontsize=14, fontweight='bold')
-    ax1.set_ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14, fontweight='bold')
-    ax1.set_title('Rendimiento: QSS vs RETQSS', fontsize=16, fontweight='bold')
+    ax1.set_ylabel('Ratio de Velocidad (tiempo simulado / tiempo real)', fontsize=14, fontweight='bold')
+    ax1.set_title('Velocidad de Simulación: QSS vs RETQSS', fontsize=16, fontweight='bold')
     ax1.set_xticks(x)
     ax1.set_xticklabels([str(n) for n in n_values], fontsize=12)
+    
+    # Add horizontal line at 1.0 to show real-time threshold
+    ax1.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.5, label='Tiempo Real (1.0x)')
+    
     ax1.legend(fontsize=12, loc='upper left')
     ax1.grid(True, alpha=0.3, axis='y')
     ax1.tick_params(axis='both', which='major', labelsize=12)
