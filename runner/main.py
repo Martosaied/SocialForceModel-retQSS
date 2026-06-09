@@ -24,6 +24,7 @@ from experiments.motivation_update_dt.motivation_update_dt import motivation_upd
 from experiments.motivation_tick_deltaq_heatmap.motivation_tick_deltaq_heatmap import motivation_tick_deltaq_heatmap
 from experiments.volume_neighborhood_comparison.volume_neighborhood_comparison import volume_neighborhood_comparison
 from experiments.simulated_vs_real_time_school.simulated_vs_real_time_school import simulated_vs_real_time_school
+from experiments.obstacles_showcase.obstacles_showcase import obstacles_showcase
 from src.plotter import Plotter
 
 
@@ -48,6 +49,7 @@ EXPERIMENT_REGISTRY = {
     'motivation_tick_deltaq_heatmap': motivation_tick_deltaq_heatmap,
     'volume_neighborhood_comparison': volume_neighborhood_comparison,
     'simulated_vs_real_time_school': simulated_vs_real_time_school,
+    'obstacles_showcase': obstacles_showcase,
 }
 
 

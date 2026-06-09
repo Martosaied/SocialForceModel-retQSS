@@ -27,7 +27,7 @@ class FlowGraphSchool:
         self.parameters = list(get_parameter_combinations(process_parameters(parameters.get('parameters', {}))))[0]
         self.raw_parameters = parameters['parameters']
         # Number of witness particles to track (default: 1)
-        self.num_witness_particles = parameters.get('num_witness_particles', 1)
+        self.num_witness_particles = parameters.get('num_witness_particles', 3)
 
     def _get_school_config_matrices(self):
         """
@@ -66,7 +66,17 @@ class FlowGraphSchool:
         # Calculate circle size based on pedestrian radius relative to grid size
         # Scale factor to make circles visible but proportional to actual size
         circle_size = max(15, min(150, (PEDESTRIAN_R / GRID_SIZE) * 10000))
-        
+        # Testigos: clearly larger than regular pedestrians; legend matches
+        witness_marker_scale = 2.45
+        circle_size_witness = circle_size * witness_marker_scale
+        witness_edge_lw = 3.0
+        # Trajectory: thicker line + slightly higher alpha than before
+        trace_lw_max = 7.0
+        trace_lw_min = 3.0
+        trace_lw_taper = 0.14  # newer segments stay closer to trace_lw_max
+        trace_alpha_floor = 0.45
+        trace_alpha_cap = 0.95
+
         # Get corridor parameters
         FROM_Y = self.parameters.get('FROM_Y', 0)
         TO_Y = self.parameters.get('TO_Y', GRID_SIZE)
@@ -120,6 +130,13 @@ class FlowGraphSchool:
         # Initialize trajectories for each witness
         for witness_id in witness_particle_ids:
             witness_trajectories[witness_id] = {'x': [], 'y': []}
+
+        # Distinct colors per testigo (stable by witness id order)
+        witness_palette = ['#E63946', '#2A9D8F', '#F4A261', '#8338EC', '#06D6A0', '#FF006E']
+        witness_color_by_id = {
+            wid: witness_palette[i % len(witness_palette)]
+            for i, wid in enumerate(witness_particle_ids)
+        }
         
         # Debug: Print witness particle info
         if len(witness_particle_ids) > 0:
@@ -264,26 +281,31 @@ class FlowGraphSchool:
                 scatter = ax.scatter(frame_positions_x, frame_positions_y, c=frame_positions_color, s=circle_size)
             
             # Plot witness particles separately with larger size and border for emphasis
-            witness_colors = ['#FF4444']  # Different colors for each witness
-            for i, (witness_id, witness_data) in enumerate(witness_particles.items()):
-                color = witness_colors[i % len(witness_colors)]  # Cycle through colors
-                ax.scatter(witness_data['x'], witness_data['y'], c=color, s=circle_size*1.5, 
-                          edgecolors='black', linewidth=2, zorder=10)
+            for witness_id, witness_data in witness_particles.items():
+                color = witness_color_by_id[witness_id]
+                ax.scatter(witness_data['x'], witness_data['y'], c=color, s=circle_size_witness, 
+                          edgecolors='black', linewidth=witness_edge_lw, zorder=10)
                 # Debug: Print witness position
                 if index % 100 == 0:  # Print every 10th frame
                     print(f"Frame {index}: Witness {witness_id} at ({witness_data['x']:.2f}, {witness_data['y']:.2f})")
             
             # Draw witness particle trajectories (only up to current position)
-            for i, (witness_id, trajectory) in enumerate(witness_trajectories.items()):
+            for witness_id, trajectory in witness_trajectories.items():
                 if len(trajectory['x']) > 1:
-                    color = witness_colors[i % len(witness_colors)]  # Same color as particle
-                    # Create a gradient effect - older parts are more transparent
-                    for j in range(1, len(trajectory['x'])):
-                        alpha = min(0.8, 0.3 + (j / len(trajectory['x'])) * 0.5)
-                        linewidth = max(1, 3 - (len(trajectory['x']) - j) * 0.1)
+                    color = witness_color_by_id[witness_id]
+                    nseg = len(trajectory['x'])
+                    # Gradient: older segments thinner/more transparent, recent part bold
+                    for j in range(1, nseg):
+                        t = j / max(1, nseg - 1)
+                        alpha = min(trace_alpha_cap, trace_alpha_floor + t * (trace_alpha_cap - trace_alpha_floor))
+                        # Recent segments (large j) get linewidth near trace_lw_max
+                        linewidth = max(
+                            trace_lw_min,
+                            trace_lw_max - (nseg - j) * trace_lw_taper,
+                        )
                         ax.plot(trajectory['x'][j-1:j+1], trajectory['y'][j-1:j+1], 
                                color=color, linewidth=linewidth, alpha=alpha, zorder=5,
-                               label='_nolegend_')
+                               label='_nolegend_', solid_capstyle='round', solid_joinstyle='round')
             
             # Create legend elements with updated colors (same as generate_single_flowgraph)
             legend_elements = [
@@ -291,11 +313,10 @@ class FlowGraphSchool:
             ]
             
             # Add witness particles to legend
-            witness_colors = ['#FF4444']
-            for i in range(len(witness_particle_ids)):
-                color = witness_colors[i % len(witness_colors)]
+            for i, wid in enumerate(witness_particle_ids):
+                color = witness_color_by_id[wid]
                 label = f'Testigo {i+1}' if len(witness_particle_ids) > 1 else 'Testigo'
-                legend_elements.append(plt.scatter([], [], c=color, s=circle_size*1.5, label=label))
+                legend_elements.append(plt.scatter([], [], c=color, s=circle_size_witness, label=label))
             
             # Add other legend elements
             legend_elements.extend([
@@ -309,15 +330,6 @@ class FlowGraphSchool:
                       loc='center left', bbox_to_anchor=(1, 0.5),
                       title='Leyenda', fontsize=16, title_fontsize=18,
                       frameon=True, fancybox=True, shadow=True)
-            
-
-            active_pedestrians = len([i for i in range(1, N) if row.get(f'PX[{i}]') is not None])
-            
-            # Add main title and timestamp with better styling (matching generate_single_flowgraph)
-            fig.suptitle('Simulación de Movimiento de Peatones - Escenario Escuela', fontsize=20, fontweight='bold', y=0.95)
-            ax.set_title(f'Tiempo: {row["time"]:.2f} segundos | Peatones: {active_pedestrians} | '
-                        f'Grilla: {GRID_DIVISIONS}x{GRID_DIVISIONS} ({GRID_SIZE}m x {GRID_SIZE}m)', 
-                        fontsize=14, fontweight='bold', pad=20)
             
             # Add axis labels with units
             ax.set_xlabel('Posición X (metros)', fontsize=14, fontweight='bold')

@@ -27,7 +27,7 @@ use_metrics_csv = True
 run_experiments = True
 
 # Experiment parameters
-WIDTHS = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+WIDTHS = [10]
 PEDESTRIAN_DENSITY = 0.3
 VOLUMES = 50
 GRID_SIZE = 50
@@ -92,7 +92,12 @@ class LanesByWidthExperiment:
         })
         
         # Use ExperimentRunner for compilation and execution
-        ExperimentRunner.run_standard_experiment(config, output_dir, 'helbing_only_qss')
+        ExperimentRunner.run_standard_experiment(
+            config,
+            output_dir,
+            'helbing_only_qss',
+            copy_results=True,
+        )
     
     def _create_lanes_plot(self) -> None:
         """Create plot showing lanes by width with standard deviation and linear fit."""
@@ -100,32 +105,47 @@ class LanesByWidthExperiment:
         
         lanes_data = {width: [] for width in WIDTHS}
         
-        results_dirs = [d for d in os.listdir('experiments/lanes_by_width/results') 
-                       if os.path.isdir(os.path.join('experiments/lanes_by_width/results', d))]
+        results_root = Path('experiments/lanes_by_width/results')
+        width_dirs = [d for d in results_root.iterdir() if d.is_dir()]
         
-        for result_dir in results_dirs:
-            width = float(result_dir.split('_')[1])
+        for width_dir in width_dirs:
+            if not width_dir.name.startswith('width_'):
+                continue
+            try:
+                width = float(width_dir.name.split('_')[1])
+            except (IndexError, ValueError):
+                continue
             if width not in WIDTHS:
                 continue
-                
-            metrics_path = os.path.join('experiments/lanes_by_width/results', result_dir, 'latest', 'metrics.csv')
-            if os.path.exists(metrics_path) and use_metrics_csv:
-                try:
-                    metrics_df = pd.read_csv(metrics_path)
-                    if 'clustering_based_groups' in metrics_df.columns:
-                        groups_data = metrics_df['clustering_based_groups'].dropna().tolist()
-                        lanes_data[width].extend(groups_data)
-                        print(f"  Using metrics.csv for width {width}: {len(groups_data)} data points")
-                except Exception as e:
-                    print(f"Warning: Could not read metrics.csv for width {width}: {e}")
+
+            latest_dir = width_dir / 'latest'
+            if latest_dir.is_dir():
+                run_dirs = [latest_dir]
+            else:
+                run_dirs = sorted([d for d in width_dir.glob('experiment_*') if d.is_dir()])
+            
+            if use_metrics_csv:
+                for run_dir in run_dirs:
+                    metrics_path = run_dir / 'metrics.csv'
+                    if not metrics_path.exists():
+                        continue
+                    try:
+                        metrics_df = pd.read_csv(metrics_path)
+                        if 'clustering_based_groups' in metrics_df.columns:
+                            groups_data = metrics_df['clustering_based_groups'].dropna().tolist()
+                            lanes_data[width].extend(groups_data)
+                            print(f"  Using metrics.csv for width {width}: {len(groups_data)} data points")
+                    except Exception as e:
+                        print(f"Warning: Could not read metrics.csv for width {width}: {e}")
             else:
                 groups_data = []
-                for result_file in os.listdir(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest')):
-                    if result_file.endswith('.csv') and result_file != 'metrics.csv':
-                        df = pd.read_csv(os.path.join('experiments/lanes_by_width/results', result_dir, 'latest', result_file))
-                        particles = (len(df.columns) - 1) / 5
-                        groups = Clustering(df, int(particles)).calculate_groups(start_index=100, sample_rate=5)
-                        groups_data.append(groups)
+                for run_dir in run_dirs:
+                    for result_file in os.listdir(run_dir):
+                        if result_file.endswith('.csv') and result_file != 'metrics.csv':
+                            df = pd.read_csv(run_dir / result_file)
+                            particles = (len(df.columns) - 1) / 5
+                            groups = Clustering(df, int(particles)).calculate_groups(start_index=100, sample_rate=5)
+                            groups_data.append(groups)
                 lanes_data[width].extend(groups_data)
                 print(f"Using solution.csv for width {width}: {len(groups_data)} data points")
         
@@ -144,49 +164,51 @@ class LanesByWidthExperiment:
             return
         
         fig, ax = plt.subplots(figsize=(12, 8))
+        label_size = 18
+        tick_size = 16
+        legend_size = 16
         
         widths = np.array(widths)
         means = np.array(means)
         stds = np.array(stds)
         
-        ax.errorbar(widths, means, yerr=stds, fmt='o', 
-                   color='steelblue', zorder=3)
+        ax.errorbar(
+            widths,
+            means,
+            yerr=stds,
+            fmt='o',
+            color='steelblue',
+            zorder=3,
+            markersize=8,
+            elinewidth=2,
+            capsize=4,
+        )
         
         if len(widths) > 1:
             slope, intercept, r_value, p_value, std_err = stats.linregress(widths, means)
             line_x = np.array([min(widths), max(widths)])
             line_y = slope * line_x + intercept
-            ax.plot(line_x, line_y, '--', color='lightcoral', 
-                   label=f'Ajuste Lineal (R² = {r_value**2:.3f})', zorder=2)
+            ax.plot(
+                line_x,
+                line_y,
+                '--',
+                color='lightcoral',
+                label=f'Ajuste Lineal (R² = {r_value**2:.3f})',
+                zorder=2,
+                linewidth=2,
+            )
         
-        ax.set_xlabel('Ancho del Corredor (Metros)')
-        ax.set_ylabel('Número de Carriles (Promedio)')
-        ax.set_title('Formación de Carriles vs. Ancho del Corredor')
+        ax.set_xlabel('Ancho del Corredor (Metros)', fontsize=label_size)
+        ax.set_ylabel('Número de Carriles (Promedio)', fontsize=label_size)
         
         ax.grid(True, zorder=1)
-        ax.legend(loc='upper left')
+        ax.tick_params(axis='both', which='major', labelsize=tick_size)
+        ax.legend(loc='upper left', fontsize=legend_size)
         
         ax.set_xlim(min(widths) - 0.5, max(widths) + 0.5)
         y_min = max(0, min(means - stds) - 0.5)
         y_max = max(means + stds) + 0.5
         ax.set_ylim(y_min, y_max)
-        
-        param_text = (
-            f"Parámetros de Simulación:\n"
-            f"Duración: 60.0 s\n"
-            f"Densidad peatones: {PEDESTRIAN_DENSITY}\n"
-            f"Parámetros Helbing:\n"
-            f"A = 2.1m/s²\n"
-            f"B = 0.7 m\n"
-            f"r = 0.3 m\n"
-            f"λ (relaxation) = 0.5\n"
-            f"μ (velocidad) = 1.34 m/s\n"
-            f"σ (desv. vel.) = 0.26 m/s"
-        )
-        
-        ax.text(0.27, 0.90, param_text, transform=ax.transAxes, 
-                verticalalignment='top', horizontalalignment='right',
-                zorder=10)
         
         plt.tight_layout()
         plt.savefig(self.figures_dir / 'lanes_by_width.png')

@@ -4,15 +4,20 @@
     "N": {
       "name": "N",
       "type": "value",
-      "value": 300
+      "value": 200
     },
     "PEDESTRIAN_IMPLEMENTATION": {
       "name": "PEDESTRIAN_IMPLEMENTATION",
       "type": "value",
-      "value": 0
+      "value": 1
     },
     "BORDER_IMPLEMENTATION": {
       "name": "BORDER_IMPLEMENTATION",
+      "type": "value",
+      "value": 0
+    },
+    "VOLUME_NEIGHBORHOOD_TYPE": {
+      "name": "VOLUME_NEIGHBORHOOD_TYPE",
       "type": "value",
       "value": 1
     },
@@ -29,22 +34,12 @@
     "FORCE_TERMINATION_AT": {
       "name": "FORCE_TERMINATION_AT",
       "type": "value",
-      "value": 100.0
+      "value": 150.0
     },
     "GRID_SIZE": {
       "name": "GRID_SIZE",
       "type": "value",
-      "value": 50.0
-    },
-    "FROM_Y": {
-      "name": "FROM_Y",
-      "type": "value",
-      "value": 15.0
-    },
-    "TO_Y": {
-      "name": "TO_Y",
-      "type": "value",
-      "value": 35.0
+      "value": 100
     },
     "WALLS": {
       "name": "WALLS",
@@ -84,17 +79,17 @@
     "BORDER_A": {
       "name": "BORDER_A",
       "type": "value",
-      "value": 5.0
+      "value": 10
     },
     "BORDER_B": {
       "name": "BORDER_B",
       "type": "value",
-      "value": 0.7
+      "value": 1
     },
     "BORDER_R": {
       "name": "BORDER_R",
       "type": "value",
-      "value": 0.6
+      "value": 1
     },
     "SPEED_MU": {
       "name": "SPEED_MU",
@@ -106,15 +101,30 @@
       "type": "value",
       "value": 0.26
     },
-    "GROUPS_START_INDEX": {
-      "name": "GROUPS_START_INDEX",
+    "FROM_Y": {
+      "name": "FROM_Y",
       "type": "value",
-      "value": 900
+      "value": 40.0
+    },
+    "TO_Y": {
+      "name": "TO_Y",
+      "type": "value",
+      "value": 60.0
     },
     "MOTIVATION_UPDATE_DT": {
       "name": "MOTIVATION_UPDATE_DT",
       "type": "value",
       "value": 0.1
+    },
+    "GROUPS_START_INDEX": {
+      "name": "GROUPS_START_INDEX",
+      "type": "value",
+      "value": 900
+    },
+    "OBSTACLES": {
+      "name": "OBSTACLES",
+      "type": "map",
+      "map": []
     }
   }
 }

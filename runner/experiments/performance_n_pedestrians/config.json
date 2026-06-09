@@ -19,7 +19,7 @@
     "FORCE_TERMINATION_AT": {
       "name": "FORCE_TERMINATION_AT",
       "type": "value",
-      "value": 50.0
+      "value": 80.0
     },
     "GRID_SIZE": {
       "name": "GRID_SIZE",

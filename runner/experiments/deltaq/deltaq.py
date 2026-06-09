@@ -117,7 +117,7 @@ def plot_results():
     results_dirs = [d for d in os.listdir('experiments/deltaq/results') if os.path.isdir(os.path.join('experiments/deltaq/results', d))]
 
     # Inicializar estructuras de datos
-    performance_data = {deltaq: [] for deltaq in DELTAQ}
+    rtf_data = {deltaq: [] for deltaq in DELTAQ}
     groups_data = {deltaq: [] for deltaq in DELTAQ}
     time_data = {deltaq: [] for deltaq in DELTAQ}
     
@@ -132,10 +132,8 @@ def plot_results():
             df_metrics = pd.read_csv(metrics_file)
             for _, row in df_metrics.iterrows():
                 execution_time = float(row['time'])
-                # Calculate simulation speed ratio: simulated_time / execution_time
-                # Higher is better (simulation runs faster than real-time)
-                simulation_ratio = SIMULATED_TIME / execution_time
-                performance_data[deltaq].append(simulation_ratio)
+                rtf = SIMULATED_TIME / execution_time
+                rtf_data[deltaq].append(rtf)
                 groups_data[deltaq].append(int(row['clustering_based_groups']))
                 time_data[deltaq].append(execution_time)
 
@@ -152,19 +150,19 @@ def plot_results():
         # groups_data[deltaq].extend(groups_data_file)
 
     # Calcular estadísticas para cada deltaq
-    performance_stats = {}
+    rtf_stats = {}
     groups_stats = {}
     time_stats = {}
     
     for deltaq in DELTAQ:
-        if performance_data[deltaq]:
-            performance_stats[deltaq] = {
-                'mean': np.mean(performance_data[deltaq]),
-                'std': np.std(performance_data[deltaq])
+        if rtf_data[deltaq]:
+            rtf_stats[deltaq] = {
+                'mean': np.mean(rtf_data[deltaq]),
+                'std': np.std(rtf_data[deltaq])
             }
         else:
-            performance_stats[deltaq] = {'mean': 0, 'std': 0}
-            
+            rtf_stats[deltaq] = {'mean': 0, 'std': 0}
+        
         if groups_data[deltaq]:
             groups_stats[deltaq] = {
                 'mean': np.mean(groups_data[deltaq]),
@@ -180,66 +178,55 @@ def plot_results():
             }
         else:
             time_stats[deltaq] = {'mean': 0, 'std': 0}
-
+        
     # Ordenar por valores de deltaq
     sorted_deltaqs = sorted(DELTAQ)
     
     # Extraer datos para graficar
-    performance_means = [performance_stats[dq]['mean'] for dq in sorted_deltaqs]
-    performance_stds = [performance_stats[dq]['std'] for dq in sorted_deltaqs]
     groups_means = [groups_stats[dq]['mean'] for dq in sorted_deltaqs]
     groups_stds = [groups_stats[dq]['std'] for dq in sorted_deltaqs]
     time_means = [time_stats[dq]['mean'] for dq in sorted_deltaqs]
+    time_stds = [time_stats[dq]['std'] for dq in sorted_deltaqs]
 
     # Crear etiquetas con notación científica
     deltaq_labels = [f'1e{dq}' for dq in sorted_deltaqs]
     x_pos = np.arange(len(sorted_deltaqs))
-    
+
     # ========================================================================
-    # FIGURA 1: Rendimiento por dQRel
+    # FIGURA 1: Tiempo de Ejecución por dQRel
     # ========================================================================
-    fig1, ax1 = plt.subplots(figsize=(24, 14))
-    bars1 = ax1.bar(x_pos, performance_means, yerr=performance_stds, 
+
+    fig1, ax1 = plt.subplots(figsize=(18, 14))
+    bars1 = ax1.bar(x_pos, time_means, yerr=time_stds,
                     color='skyblue', width=0.6)
     ax1.set_xlabel('dQRel')
-    ax1.set_ylabel('RTF - tiempo simulado(s) / tiempo real(s)')
+    ax1.set_ylabel('Tiempo promedio de ejecución (segundos)')
     ax1.set_xticks(x_pos)
     ax1.set_xticklabels(deltaq_labels, rotation=45, ha='right')
-    
-    # Set y-axis limits to accommodate values below 1.0 (slower than real-time)
-    min_val = min(performance_means) if performance_means else 0
-    max_val = max(performance_means) if performance_means else 1
-    y_min = max(0, min_val - max(performance_stds) * 1.5)  # Allow space below for error bars
-    y_max = max_val * 1.6  # Increased space at top for labels
-    ax1.set_ylim(y_min, y_max)
-    
-    # Add horizontal line at 1.0 to show real-time threshold
-    ax1.axhline(y=1.0, color='red', linestyle='--', label='Tiempo Real (1.0x)')
+
+    # Set y-axis limits
+    max_val = max(time_means) if time_means else 1
+    max_std = max(time_stds) if time_stds else 0
+    y_max = (max_val + max_std) * 1.4
+    ax1.set_ylim(0, y_max)
+
+    # Add horizontal line at simulated time for reference
+    ax1.axhline(y=SIMULATED_TIME, color='green', linestyle='--', linewidth=2, alpha=0.5)
     legend_handles = [
-        Line2D([0], [0], color='red', linestyle='--', label='Tiempo Real (1.0x)'),
-        Line2D([], [], linestyle='None', label=f'Tiempo simulado: {SIMULATED_TIME:.0f}s'),
+        Line2D([0], [0], color='green', linestyle='--', label=f'Tiempo simulado: {SIMULATED_TIME:.0f}s'),
     ]
     ax1.legend(handles=legend_handles, loc='upper left')
     ax1.grid(True)
-    
-    # Agregar valores en las barras (rotados en vertical)
-    label_offset = max(performance_means) * 0.06 if max(performance_means) > 0 else 0.06
-    time_offset = max(performance_means) * 0.02 if max(performance_means) > 0 else 0.02
-    for i, (bar, mean, std, time_mean) in enumerate(zip(bars1, performance_means, performance_stds, time_means)):
-        height = bar.get_height()
-        if height + std > 0:
-            ax1.text(bar.get_x() + bar.get_width()/2., height + std + label_offset,
-                    f'{mean:.2f}x±{std:.2f}\n({time_mean:.1f}s)', ha='center', va='bottom',
-                    rotation=0, fontsize=14)
 
-    plt.subplots_adjust(left=0.15, bottom=0.25, top=0.95, right=0.98)
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.08, bottom=0.15, top=0.94, right=0.98)
     plt.savefig('experiments/deltaq/performance_by_deltaq.png')
     plt.close()
     
     # ========================================================================
     # FIGURA 2: Cantidad de Carriles por dQRel
     # ========================================================================
-    fig2, ax2 = plt.subplots(figsize=(24, 14))
+    fig2, ax2 = plt.subplots(figsize=(18, 14))
     bars2 = ax2.bar(x_pos, groups_means, yerr=groups_stds, 
                     color='lightgreen', width=0.6)
     ax2.set_xlabel('dQRel')
@@ -250,16 +237,8 @@ def plot_results():
         ax2.set_ylim(0, max(groups_means) * 1.4)  # Increased space at top for labels
     ax2.grid(True)
     
-    # Agregar valores en las barras (smaller font, no rotation)
-    for i, (bar, mean, std) in enumerate(zip(bars2, groups_means, groups_stds)):
-        height = bar.get_height()
-        if height + std > 0:
-            ax2.text(bar.get_x() + bar.get_width()/2., height + std + max(groups_means) * 0.03 if max(groups_means) > 0 else 0.03,
-                    f'{mean:.1f}±{std:.1f}', ha='center', va='bottom',
-                    rotation=90)
-    
     plt.tight_layout()
-    plt.subplots_adjust(left=0.12, bottom=0.15, top=0.95, right=0.98)
+    plt.subplots_adjust(left=0.08, bottom=0.15, top=0.94, right=0.98)
     plt.savefig('experiments/deltaq/lanes_by_deltaq.png')
     plt.close()
     
@@ -267,20 +246,47 @@ def plot_results():
     print("\n" + "="*80)
     print("RESUMEN DE RESULTADOS dQRel")
     print("="*80)
-    print(f"{'dQRel':<8} {'Velocidad (ratio)':<18} {'Carriles':<10}")
+    print(f"{'dQRel':<12} {'Carriles':<12} {'RTF':<15} {'Tiempo Ejec (s)':<15}")
     print("-" * 80)
     
     for dq in sorted_deltaqs:
-        perf_mean = performance_stats[dq]['mean']
-        perf_std = performance_stats[dq]['std']
         groups_mean = groups_stats[dq]['mean']
         groups_std = groups_stats[dq]['std']
+        rtf_mean = rtf_stats[dq]['mean']
+        rtf_std = rtf_stats[dq]['std']
+        time_mean = time_stats[dq]['mean']
+        time_std = time_stats[dq]['std']
         tolerance = f"1e{dq}"
-        print(f"{dq:<8} {tolerance:<12} {perf_mean:.2f}x±{perf_std:.2f}     {groups_mean:.1f}±{groups_std:.1f}")
+        print(f"{tolerance:<12} {groups_mean:.1f}±{groups_std:.1f}    {rtf_mean:.2f}±{rtf_std:.2f}    {time_mean:.2f}±{time_std:.2f}")
     
     print("="*80)
-    print(f"\nNota: Velocidad ratio = tiempo simulado ({SIMULATED_TIME}s) / tiempo de ejecución")
-    print("      Un ratio de 5.0x significa que la simulación corre 5 veces más rápido que tiempo real")
+    print(f"\nNota: RTF (Real-Time Factor) = tiempo simulado ({SIMULATED_TIME}s) / tiempo de ejecución")
+
+    # Generate LaTeX table with exact values
+    latex_dir = 'experiments/deltaq'
+    os.makedirs(latex_dir, exist_ok=True)
+    latex_path = os.path.join(latex_dir, 'deltaq_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Resultados del experimento dQRel: Carriles, RTF y tiempo de ejecución.}' + '\n')
+        f.write(r'\label{tab:deltaq}' + '\n')
+        f.write(r'\begin{tabular}{cccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'dQRel & Carriles (mean $\pm$ std) & RTF (mean $\pm$ std) & Tiempo Ejec (s) (mean $\pm$ std) \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for dq in sorted_deltaqs:
+            groups_mean = groups_stats[dq]['mean']
+            groups_std = groups_stats[dq]['std']
+            rtf_mean = rtf_stats[dq]['mean']
+            rtf_std = rtf_stats[dq]['std']
+            time_mean = time_stats[dq]['mean']
+            time_std = time_stats[dq]['std']
+            f.write(f'$10^{{{dq}}}$ & {groups_mean:.2f} $\\pm$ {groups_std:.2f} & {rtf_mean:.4f} $\\pm$ {rtf_std:.4f} & {time_mean:.2f} $\\pm$ {time_std:.2f} \\\\\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"\nLaTeX table saved to: {latex_path}")
 
 if __name__ == '__main__':
     deltaq()

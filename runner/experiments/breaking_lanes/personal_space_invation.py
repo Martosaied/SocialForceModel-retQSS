@@ -339,28 +339,22 @@ def plot_comparative_analysis(experiments_data, output_dir):
     n_runs = [experiments_data[dt]['n_runs'] for dt in cell_sizes]
     
     # Crear figura con el gráfico de invasiones totales con barras de error
-    fig, ax = plt.subplots(figsize=(24, 14))
+    fig, ax = plt.subplots(figsize=(16, 12))
     
     # Gráfico: Invasiones totales por Cell Size con barras de error
     x_pos = range(len(cell_sizes))
     bars = ax.bar(x_pos, total_invasions_mean, yerr=total_invasions_std,
-                  color='lightgreen', width=0.6)
+                  color='lightsalmon', width=0.6)
     
-    ax.set_xlabel('Cell Size')
-    ax.set_ylabel('Invasiones Totales')
+    ax.set_xlabel('Tamaño de Celda (metros)')
+    ax.set_ylabel('Colisiones Totales')
     ax.set_xticks(x_pos)
     ax.set_xticklabels([f'{dt:.3f}' for dt in cell_sizes], rotation=45, ha='right')
     ax.grid(True)
     
-    # Agregar anotaciones con mean + std
     max_invasions = max(total_invasions_mean) if len(total_invasions_mean) > 0 else 0
     if max_invasions > 0:
         ax.set_ylim(0, max_invasions * 1.4)
-    for i, (bar, mean_val, std_val) in enumerate(zip(bars, total_invasions_mean, total_invasions_std)):
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + std_val + max_invasions * 0.03 if max_invasions > 0 else 0.03,
-                f'{mean_val:.1f}±{std_val:.1f}', ha='center', va='bottom',
-                rotation=90)
     
     plt.tight_layout()
     plt.subplots_adjust(left=0.12, bottom=0.15, top=0.95, right=0.98)
@@ -368,6 +362,28 @@ def plot_comparative_analysis(experiments_data, output_dir):
     plt.close()
     
     print(f"✅ Gráfico comparativo guardado en: {output_dir}")
+
+    # Generate LaTeX table with exact values
+    latex_path = os.path.join(output_dir, 'personal_space_invasion_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Invasiones del espacio personal por tamaño de celda.}' + '\n')
+        f.write(r'\label{tab:personal_space_invasion_breaking_lanes}' + '\n')
+        f.write(r'\begin{tabular}{ccccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'Tamaño Celda (m) & Invasiones Totales (mean $\pm$ std) & Promedio/Timestep (mean $\pm$ std) & Tasa Promedio (mean $\pm$ std) & Runs \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for cs in cell_sizes:
+            agg = experiments_data[cs]['aggregated_stats']
+            f.write(f'{cs:.2f} & {agg["total_invasions_mean"]:.2f} $\\pm$ {agg["total_invasions_std"]:.2f} & ')
+            f.write(f'{agg["avg_invasions_per_timestep_mean"]:.2f} $\\pm$ {agg["avg_invasions_per_timestep_std"]:.2f} & ')
+            f.write(f'{agg["avg_invasion_rate_mean"]:.4f} $\\pm$ {agg["avg_invasion_rate_std"]:.4f} & ')
+            f.write(f'{experiments_data[cs]["n_runs"]} \\\\\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"LaTeX table saved to: {latex_path}")
 
 def main():
     parser = argparse.ArgumentParser(description='Analizar invasiones del espacio personal en simulaciones de peatones')

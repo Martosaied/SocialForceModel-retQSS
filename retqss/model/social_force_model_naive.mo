@@ -12,7 +12,7 @@ import retQSS_social_force_model_types;
 */
 
 constant Integer
-	N = 2000,
+	N = 3000,
 	GRID_DIVISIONS = 1,
 	LEFT_COUNT = N / 2;
 
@@ -189,9 +189,9 @@ algorithm
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
 
 		// Update particles position
-		for i in 1:N loop
-			_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
-		end for;
+		// for i in 1:N loop
+		// 	_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
+		// end for;
 		
 		for i in 1:N loop
 			hx := dx[i];

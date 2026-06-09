@@ -24,6 +24,11 @@ class GroupedLanesGraph:
 
             particles = int((len(df.columns) - 1) / 5)
             for index, row in df.iterrows():
+                print(f"Time: {row['time']}")
+
+                if row['time'] < 89.0 or row['time'] % 5 != 0:
+                    continue
+
                 groups = Clustering(df, int(particles)).calculate_groups_by_time(row)
                 print(f"Groups at time {row['time']}: {len(groups)}")
                 if row['time'] not in groups_per_time:
@@ -31,43 +36,27 @@ class GroupedLanesGraph:
                 else:
                     groups_per_time[row['time']].append(len(groups))
 
-                # Graphic representation of the group position
-                # Create a new figure for each frame with better proportions
-                fig, ax = plt.subplots(figsize=(16, 12))
-
-                # Set up the plot area
-                ax.set_xlim(0, 50)
-                ax.set_ylim(0, 50)
-                
                 # Get corridor parameters (assuming they exist in the data or can be inferred)
                 FROM_Y = self.parameters.get('FROM_Y', 0)
                 TO_Y = self.parameters.get('TO_Y', 50)
-                
-                # Highlight the corridor area
-                corridor_rect = plt.Rectangle(
-                    (0, 0), 
-                    50, 
-                    50, 
-                    facecolor='#808080', 
-                    alpha=0.3,
-                    edgecolor='none',
-                    label='_nolegend_'
-                )
-                corridor_rect_2 = plt.Rectangle(
-                    (0, FROM_Y), 
-                    50, 
-                    TO_Y - FROM_Y, 
-                    facecolor='#FFFFFF', 
-                    alpha=1,
-                    edgecolor='none',
-                    label='_nolegend_'
-                )
-                ax.add_patch(corridor_rect)
-                ax.add_patch(corridor_rect_2)
+
+                # Graphic representation of the group position
+                # Size the figure so its aspect matches the data extents
+                x_extent = 50
+                y_extent = TO_Y - FROM_Y
+                BASE_W = 16.0
+                fig_h = max(min(BASE_W * (y_extent / x_extent), 24.0), 2.0) if x_extent > 0 and y_extent > 0 else 12.0
+                fig, ax = plt.subplots(figsize=(BASE_W, fig_h))
+
+                # Set up the plot area — only the corridor width, drawn from 0
+                # regardless of its world-frame position
+                ax.set_xlim(0, x_extent)
+                ax.set_ylim(0, y_extent)
+                ax.set_aspect('equal')
 
                 # Add grid lines efficiently
                 GRID_SIZE = 50
-                VOLUMES_COUNT = 10
+                VOLUMES_COUNT = 1
                 CELL_SIZE = GRID_SIZE / VOLUMES_COUNT
                 
                 # Pre-calculate grid lines
@@ -91,8 +80,8 @@ class GroupedLanesGraph:
                     
                     for particle in group:
                         x = row[f'PX[{particle}]']
-                        y = row[f'PY[{particle}]']
-                        
+                        y = row[f'PY[{particle}]'] - FROM_Y
+
                         # Calculate velocities if we have a previous frame
                         vx = 0
                         vy = 0
@@ -100,32 +89,15 @@ class GroupedLanesGraph:
                             dt = row['time'] - df.iloc[index - 1]['time']
                             if dt > 0:  # Avoid division by zero
                                 prev_x = df.iloc[index - 1][f'PX[{particle}]']
-                                prev_y = df.iloc[index - 1][f'PY[{particle}]']
+                                prev_y = df.iloc[index - 1][f'PY[{particle}]'] - FROM_Y
                                 vx = (x - prev_x) / dt
                                 vy = (y - prev_y) / dt
-                        
+
                         positions_x.append(x)
                         positions_y.append(y)
                         velocities_x.append(vx)
                         velocities_y.append(vy)
-                        
-                        # Draw rectangle centered on pedestrian using Clustering measurements
-                        rect_width = MIN_X_DISTANCE
-                        rect_height = MIN_Y_DISTANCE
-                        rect_x = x - rect_width / 2
-                        rect_y = y - rect_height / 2
-                        rect = plt.Rectangle(
-                            (rect_x, rect_y),
-                            rect_width,
-                            rect_height,
-                            facecolor='none',
-                            edgecolor=color,
-                            linewidth=2,
-                            alpha=0.6,
-                            linestyle='--'
-                        )
-                        ax.add_patch(rect)
-                        
+
                         ax.scatter(x, y, color=color, s=200, alpha=0.8, edgecolors='black', linewidths=1.5)
                     
                     # Add velocity vectors with quiver if we have velocity data
@@ -145,14 +117,6 @@ class GroupedLanesGraph:
                                 np.array(normalize_velocities_y),
                                 color='gray', alpha=0.5, width=0.002, scale=20)
                 
-                # Count active pedestrians
-                active_pedestrians = len([i for i in range(1, particles + 1) if row.get(f'PX[{i}]') is not None])
-                
-                # Add main title and timestamp with better styling
-                fig.suptitle('Carriles Agrupados - Simulación de Peatones', fontsize=24, fontweight='bold', y=0.95)
-                ax.set_title(f'Tiempo: {row["time"]:.2f} segundos | Peatones: {active_pedestrians} | Grupos: {len(groups)} | Corredor: {abs(FROM_Y-TO_Y):.1f}m', 
-                            fontsize=16, fontweight='bold', pad=20)
-                
                 # Add axis labels with units
                 ax.set_xlabel('Posición X (metros)', fontsize=16, fontweight='bold')
                 ax.set_ylabel('Posición Y (metros)', fontsize=16, fontweight='bold')
@@ -163,8 +127,6 @@ class GroupedLanesGraph:
                 # Create legend elements
                 legend_elements = [
                     plt.Line2D([0], [0], color='gray', alpha=0.5, linewidth=2, label='Vectores de Velocidad'),
-                    plt.Rectangle((0, 0), 1, 1, facecolor='#FFFFFF', alpha=1, label='Corredor'),
-                    plt.Rectangle((0, 0), 1, 1, facecolor='#808080', alpha=0.3, label='Área Externa')
                 ]
                 
                 # Add legend with better styling

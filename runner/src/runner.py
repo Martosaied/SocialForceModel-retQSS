@@ -114,13 +114,13 @@ def change_sh_file(model_name: str, random_str: str):
 
 
 def run_parallel_model(
-    model_name: str, 
-    parameters: dict, 
-    iteration: int, 
-    directory: str, 
-    metrics_file: str, 
-    output_dir: str, 
-    plot: bool, 
+    model_name: str,
+    parameters: dict,
+    iteration: int,
+    directory: str,
+    metrics_file: str,
+    output_dir: str,
+    plot: bool,
     copy_results: bool,
     results: list):
     try:
@@ -160,10 +160,11 @@ def run_parallel_model(
 
 def run_iterations(num_iterations: int, model_name: str, output_dir: str = "output", parameters: dict = {}, plot: bool = True, copy_results: bool = True, max_concurrent_processes: int = None):
     """Run experiment iterations using the specified model."""
-    
+
     # Set default max concurrent processes to CPU count if not specified
-    if max_concurrent_processes is None:
-        max_concurrent_processes = multiprocessing.cpu_count()
+    max_concurrent_processes = 11
+
+    print(f"Max concurrent processes: {max_concurrent_processes}")
     
     print(f"Running {num_iterations} iterations with max {max_concurrent_processes} concurrent processes")
 
@@ -174,7 +175,25 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str = "outp
     metrics_file.flush()
     results = []
     processes = []
-    
+
+    print("Compiling model once before running iterations...")
+    compile_c_code()
+    compile_model(model_name)
+
+    tmp_dirs = []
+    for iteration in range(num_iterations):
+        random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
+        tmp_dir = f"../retqss/build/{model_name}_{random_str}"
+        print(f"Pre-copying from ../retqss/build/{model_name} to {tmp_dir}")
+        try:
+            distutils.dir_util.copy_tree(f"../retqss/build/{model_name}", tmp_dir)
+            subprocess.run(f"cp ../retqss/build/{model_name}/{model_name} {tmp_dir}", shell=True, check=True, capture_output=False)
+            change_sh_file(model_name, random_str)
+            tmp_dirs.append(tmp_dir)
+        except Exception as e:
+            print(f"Error copying ../retqss/build/{model_name} to {tmp_dir}: {e}")
+            tmp_dirs.append(None)
+
     for iteration in range(num_iterations):
         print(f"\nStarting iteration {iteration + 1}/{num_iterations}")
 
@@ -184,23 +203,17 @@ def run_iterations(num_iterations: int, model_name: str, output_dir: str = "outp
             # Clean up completed processes
             processes = [p for p in processes if p.is_alive()]
 
-        random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
-        tmp_dir = f"../retqss/build/{model_name}_{random_str}"
-        print(f"Copying from ../retqss/build/{model_name} to {tmp_dir}")
-        compile_c_code()
-        compile_model(model_name)
-        try:
-            distutils.dir_util.copy_tree(f"../retqss/build/{model_name}", tmp_dir)
-            subprocess.run( f"cp ../retqss/build/{model_name}/{model_name} {tmp_dir}", shell=True, check=True, capture_output=False)
-            change_sh_file(model_name, random_str)
+        tmp_dir = tmp_dirs[iteration]
+        if not tmp_dir:
+            continue
 
-            # Run the model in parallel
-            p = multiprocessing.Process(target=run_parallel_model, args=(model_name, parameters, iteration, tmp_dir, metrics_file, output_dir, plot, copy_results, results))
-            p.start()
-            processes.append(p)
-
-        except Exception as e:
-            print(f"Error copying ../retqss/build/{model_name} to {tmp_dir}: {e}")
+        # Run the model in parallel
+        p = multiprocessing.Process(
+            target=run_parallel_model,
+            args=(model_name, parameters, iteration, tmp_dir, metrics_file, output_dir, plot, copy_results, results)
+        )
+        p.start()
+        processes.append(p)
 
     # Wait for all remaining processes to complete
     for p in processes:

@@ -67,7 +67,7 @@ class FlowGraph:
         # Get grid parameters - use the same approach as FlowGraphInfections
         GRID_SIZE = self.parameters.get('GRID_SIZE', 50)
         # Determine VOLUMES_COUNT from GRID_DIVISIONS or default to 20
-        VOLUMES_COUNT = 10
+        VOLUMES_COUNT = 1
         CELL_SIZE = GRID_SIZE / VOLUMES_COUNT
         N = self.parameters.get('N', 300)
         
@@ -110,35 +110,18 @@ class FlowGraph:
             if index % 5 != 0:
                 continue
 
-            # Create a new figure for each frame with better proportions
-            fig, ax = plt.subplots(figsize=(16, 12))
+            # Size the figure so its aspect matches the data extents
+            x_extent = GRID_SIZE
+            y_extent = TO_Y - FROM_Y
+            BASE_W = 16.0
+            fig_h = max(min(BASE_W * (y_extent / x_extent), 24.0), 2.0) if x_extent > 0 and y_extent > 0 else 12.0
+            fig, ax = plt.subplots(figsize=(BASE_W, fig_h))
 
-            # Set up the plot area
-            ax.set_xlim(0, GRID_SIZE)
-            ax.set_ylim(0, GRID_SIZE)
-            
-            if FROM_Y is not None and TO_Y is not None:
-                # Highlight the corridor area out of FROM_Y and TO_Y
-                corridor_rect = plt.Rectangle(
-                    (0, 0), 
-                    GRID_SIZE, 
-                    GRID_SIZE, 
-                    facecolor='#808080', 
-                    alpha=0.3,
-                    edgecolor='none',
-                    label='_nolegend_'
-                )
-                corridor_rect_2 = plt.Rectangle(
-                    (0, FROM_Y), 
-                    GRID_SIZE, 
-                    TO_Y - FROM_Y, 
-                    facecolor='#FFFFFF', 
-                    alpha=1,
-                    edgecolor='none',
-                    label='_nolegend_'
-                )
-                ax.add_patch(corridor_rect)
-                ax.add_patch(corridor_rect_2)
+            # Set up the plot area — only the corridor width, drawn from 0
+            # regardless of its world-frame position
+            ax.set_xlim(0, x_extent)
+            ax.set_ylim(0, y_extent)
+            ax.set_aspect('equal')
 
             # Add grid lines efficiently - ensure they align with cell boundaries
             for x in grid_lines_x:
@@ -152,12 +135,12 @@ class FlowGraph:
                     volume_type = volume_type_map[cell_id]
                     color = volume_colors[volume_type]
                     alpha = 0.7 if volume_type == 'obstacle' else 0.5
-                    
+
                     rect = plt.Rectangle(
-                        pos, 
-                        CELL_SIZE, 
-                        CELL_SIZE, 
-                        facecolor=color, 
+                        (pos[0], pos[1] - FROM_Y),
+                        CELL_SIZE,
+                        CELL_SIZE,
+                        facecolor=color,
                         alpha=alpha,
                         edgecolor='none'
                     )
@@ -166,8 +149,8 @@ class FlowGraph:
             # Plot wall segments
             for wall in walls:
                 ax.plot(
-                    [wall['from_x'], wall['to_x']], 
-                    [wall['from_y'], wall['to_y']], 
+                    [wall['from_x'], wall['to_x']],
+                    [wall['from_y'] - FROM_Y, wall['to_y'] - FROM_Y],
                     'k-', linewidth=6, label='_nolegend_'
                 )
 
@@ -183,7 +166,7 @@ class FlowGraph:
                     continue
 
                 x = row[f'PX[{i}]']
-                y = row[f'PY[{i}]']
+                y = row[f'PY[{i}]'] - FROM_Y
                 state = row[f'PS[{i}]']
 
                 # Calculate velocities from position changes if we have a previous frame
@@ -193,7 +176,7 @@ class FlowGraph:
                     dt = row['time'] - prev_row['time']
                     if dt > 0:  # Avoid division by zero
                         prev_x = prev_row[f'PX[{i}]']
-                        prev_y = prev_row[f'PY[{i}]']
+                        prev_y = prev_row[f'PY[{i}]'] - FROM_Y
                         vx = (x - prev_x) / dt
                         vy = (y - prev_y) / dt
 
@@ -218,18 +201,13 @@ class FlowGraph:
                 plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['hallway'], alpha=0.5, label='Pasillos') if self.parameters.get('HALLWAYS', '') else None,
                 plt.Rectangle((0, 0), 1, 1, facecolor=volume_colors['classroom'], alpha=0.5, label='Aulas') if self.parameters.get('CLASSROOMS', '') else None,
             ]
-            
-            # Add area inaccesible (gray) to legend if corridor is defined
-            if FROM_Y is not None and TO_Y is not None:
-                legend_elements.append(
-                    plt.Rectangle((0, 0), 1, 1, facecolor='#808080', alpha=0.3, label='Área Inaccesible')
-                )
-            
-            # Add legend with better styling
-            plt.legend(handles=[elem for elem in legend_elements if elem is not None], 
-                      loc='center left', bbox_to_anchor=(1, 0.5),
-                      title='Leyenda', fontsize=20, title_fontsize=24,
-                      frameon=True, fancybox=True, shadow=True)
+
+            legend_handles = [elem for elem in legend_elements if elem is not None]
+            if legend_handles:
+                plt.legend(handles=legend_handles,
+                          loc='center left', bbox_to_anchor=(1, 0.5),
+                          title='Leyenda', fontsize=20, title_fontsize=24,
+                          frameon=True, fancybox=True, shadow=True)
             
             # Add velocity vectors with quiver only if we have velocity data
             if prev_row is not None and len(frame_velocities_x) > 0:
@@ -248,11 +226,6 @@ class FlowGraph:
                         np.array(normalize_velocities_y),
                         color='gray', alpha=0.5, width=0.003, scale=30)
 
-            active_pedestrians = len([i for i in range(1, N) if row.get(f'PX[{i}]') is not None])
-            
-            # Add main title with better styling
-            fig.suptitle('Corredor Bidireccional', fontsize=24, fontweight='bold', y=0.95)
-            
             # Add axis labels with units
             ax.set_xlabel('Posición X (metros)', fontsize=16, fontweight='bold')
             ax.set_ylabel('Posición Y (metros)', fontsize=16, fontweight='bold')

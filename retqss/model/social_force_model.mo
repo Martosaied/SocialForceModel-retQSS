@@ -12,8 +12,8 @@ import retQSS_social_force_model_types;
 */
 
 constant Integer
-	N = 2000,
-	GRID_DIVISIONS = 27,
+	N = 300,
+	GRID_DIVISIONS = 16,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters
@@ -199,9 +199,9 @@ algorithm
 	
 	when time > nextMotivationTick then
 		nextMotivationTick := time + MOTIVATION_UPDATE_DT;
-		for i in 1:N loop
-			_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
-		end for;
+		// for i in 1:N loop
+		// 	_ := particle_relocate(i, x[i], y[i], z[i], vx[i], vy[i], vz[i]);
+		// end for;
 		
 		for i in 1:N loop
 			hx := dx[i];

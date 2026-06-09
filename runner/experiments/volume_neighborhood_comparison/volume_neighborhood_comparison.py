@@ -208,15 +208,9 @@ def plot_results():
             stds = plot_data[metric][neighborhood_type]['stds']
             
             offset = width * (i - 0.5)
-            bars = ax.bar(x_pos + offset, means, width, yerr=stds,
-                         color=colors[neighborhood_type],
-                         label=NEIGHBORHOOD_NAMES[neighborhood_type])
-            
-            for bar, mean, std in zip(bars, means, stds):
-                if mean > 0:
-                    height = bar.get_height()
-                    ax.text(bar.get_x() + bar.get_width()/2., height + std + max(means) * 0.02,
-                           f'{mean:.2f}', ha='center', va='bottom', rotation=0)
+            ax.bar(x_pos + offset, means, width, yerr=stds,
+                   color=colors[neighborhood_type],
+                   label=NEIGHBORHOOD_NAMES[neighborhood_type])
         
         ax.set_xlabel('Cell Size (m)')
         ax.set_ylabel(label)
@@ -250,6 +244,31 @@ def plot_results():
     print("\n" + "="*80)
     print("Visualization saved: volume_neighborhood_performance_comparison.png")
     print("="*80)
+
+    # Generate LaTeX table with exact values
+    results_dir = 'experiments/volume_neighborhood_comparison'
+    latex_path = os.path.join(results_dir, 'volume_neighborhood_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Comparación Volume Neighborhood: Face Sharing vs Vertex Sharing.}' + '\n')
+        f.write(r'\label{tab:volume_neighborhood}' + '\n')
+        f.write(r'\begin{tabular}{ccccccccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'Celda (m) & Tiempo (s) FS & Tiempo (s) VS & Memoria (MB) FS & Memoria (MB) VS & Carriles FS & Carriles VS & Colisiones FS & Colisiones VS \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for i, cell_size in enumerate(cell_sizes_sorted):
+            row_parts = [f'{cell_size}']
+            for metric in metrics:
+                for nt in VOLUME_NEIGHBORHOOD_TYPES:
+                    m = plot_data[metric][nt]['means'][i]
+                    s = plot_data[metric][nt]['stds'][i]
+                    row_parts.append(f'{m:.2f} $\\pm$ {s:.2f}')
+            f.write(' & '.join(row_parts) + r' \\' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"LaTeX table saved to: {latex_path}")
 
 
 if __name__ == '__main__':

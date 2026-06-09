@@ -28,14 +28,15 @@ def load_school_configs(config_type):
 # School scenario parameters
 CLASSROOM_EDGE = 7.0  # meters per classroom edge, 49m²
 PEDESTRIANS_PER_CLASSROOM = 25
+RUN_EXPERIMENT = True
 
 # Implementation configurations to test
 IMPLEMENTATION_CONFIGS = {
-    'mmoc_border4': {
-        'PEDESTRIAN_IMPLEMENTATION': 0,
-        'BORDER_IMPLEMENTATION': 4,
-        'name': 'RETQSS'
-    },
+    # 'mmoc_border4': {
+    #     'PEDESTRIAN_IMPLEMENTATION': 0,
+    #     'BORDER_IMPLEMENTATION': 4,
+    #     'name': 'RETQSS'
+    # },
     'retqss_border3': {
         'PEDESTRIAN_IMPLEMENTATION': 1,
         'BORDER_IMPLEMENTATION': 3,
@@ -71,14 +72,19 @@ def calculate_scenario_parameters(grid_divisions, school_config):
     # Count classrooms from the CLASSROOMS matrix
     classroom_matrix = np.array(school_config['CLASSROOMS'])
     classroom_count = np.sum(classroom_matrix)
-    
+
+    # Count obstacles from the OBSTACLES matrix
+    obstacle_matrix = np.array(school_config['OBSTACLES'])
+    obstacle_count = np.sum(obstacle_matrix)
+
     # Calculate number of pedestrians
     pedestrian_count = int(classroom_count * PEDESTRIANS_PER_CLASSROOM)
-    
+
     return {
         'grid_divisions': grid_divisions,
         'grid_size': grid_size,
         'classroom_count': classroom_count,
+        'obstacle_count': obstacle_count,
         'pedestrian_count': pedestrian_count,
         'school_config': school_config
     }
@@ -101,15 +107,16 @@ def run_school_scenario_experiment():
     config = load_config('./experiments/performance_school_scenario/config.json')
     
     # Test both school configuration types
-    for config_type, config_name_spanish in SCHOOL_CONFIG_TYPES.items()[:-1]:
+    for config_type, config_name_spanish in list(SCHOOL_CONFIG_TYPES.items()):
         print(f"\n{'='*60}")
         print(f"Probando configuración escolar: {config_name_spanish}")
         print(f"{'='*60}")
         
         # Load school configurations for this type
         school_configs = load_school_configs(config_type)
-        grid_divisions_list = [int(k) for k in school_configs.keys()]
-        grid_divisions_list.sort()
+        # All top-level keys are grid sizes (e.g. "3", "15"). Do not drop the first key:
+        # a single entry would otherwise yield an empty list and run zero experiments.
+        grid_divisions_list = sorted(int(k) for k in school_configs.keys())
         
         print(f"Probando {len(grid_divisions_list)} tamaños de grilla diferentes: {grid_divisions_list}")
         print(f"Probando {len(IMPLEMENTATION_CONFIGS)} configuraciones de implementación")
@@ -189,22 +196,25 @@ def run_single_experiment(base_config, scenario_params, impl_config, config_name
     model_path = '/home/martin/Documents/UBA/Tesis/retqss/model/helbing_school_hallway.mo'
     subprocess.run(['sed', '-i', r's/\bN\s*=\s*[0-9]\+/N = ' + str(scenario_params['pedestrian_count']) + '/', model_path])
     subprocess.run(['sed', '-i', r's/\bGRID_DIVISIONS\s*=\s*[0-9]\+/GRID_DIVISIONS = ' + str(scenario_params['grid_divisions']) + '/', model_path])
-    
-    # # Compile the C++ code and model
-    compile_c_code()
-    compile_model('helbing_school_hallway')
-    
-    # Run experiment
-    run_experiment(
-        config, 
-        output_dir, 
-        'helbing_school_hallway', 
-        plot=False, 
-        copy_results=True
-    )
-    
+
+    if RUN_EXPERIMENT:
+        # Compile the C++ code and model
+        compile_c_code()
+        compile_model('helbing_school_hallway')
+        
+        # Run experiment
+        run_experiment(
+            config, 
+            output_dir, 
+            'helbing_school_hallway', 
+            plot=False, 
+            copy_results=True
+        )
+        
     # Copy results from output directory to latest directory
     copy_results_to_latest(output_dir)
+
+    print(exp_name)
     
     # Read timing results from metrics.csv
     metrics_file = os.path.join( 
@@ -236,6 +246,7 @@ def run_single_experiment(base_config, scenario_params, impl_config, config_name
         'grid_divisions': scenario_params['grid_divisions'],
         'grid_size': scenario_params['grid_size'],
         'classroom_count': scenario_params['classroom_count'],
+        'obstacle_count': scenario_params['obstacle_count'],
         'pedestrian_count': scenario_params['pedestrian_count'],
         'implementation': impl_config['name'],
         'config_name': config_name,
@@ -258,8 +269,15 @@ def plot_performance_comparison_separate(results):
     """
     Generate separate performance comparison plots for each school scenario.
     """
+    if not results:
+        print("No hay resultados para graficar; omitiendo gráficos de comparación.")
+        return
+
     df = pd.DataFrame(results)
-    
+    if df.empty or 'config_type' not in df.columns:
+        print("No hay datos válidos para gráficos de comparación.")
+        return
+
     # Create results directory if it doesn't exist
     results_dir = 'experiments/performance_school_scenario/results'
     os.makedirs(results_dir, exist_ok=True)
@@ -282,7 +300,9 @@ def plot_performance_comparison_separate(results):
 
 def generate_single_scenario_plot(config_data, config_type, config_name_spanish, results_dir):
     """
-    Generate a single comprehensive plot for one school scenario.
+    Generate two separate plots for one school scenario:
+    - Figure 1: Execution time (RTF + Absolute time)
+    - Figure 2: Memory usage
     """
     apply_publication_style()
 
@@ -292,16 +312,23 @@ def generate_single_scenario_plot(config_data, config_type, config_name_spanish,
     x_pos = np.arange(len(classroom_counts))
     bar_width = 0.7 / max(1, len(implementations))
 
+    # Build x-tick labels with classroom, obstacle, and pedestrian counts
+    x_tick_labels = []
+    for cc in classroom_counts:
+        row = config_data[config_data['classroom_count'] == cc].iloc[0]
+        obstacle_count = int(row['obstacle_count'])
+        pedestrian_count = int(row['pedestrian_count'])
+        label = f"Aulas: {cc}\nObstáculos: {obstacle_count}\nPeatones: {pedestrian_count}"
+        x_tick_labels.append(label)
+
     style_map = {
         'RETQSS': {'color': '#4ECDC4', 'edgecolor': '#00B894', 'marker': 's'},
         'RETQSS Optimizado': {'color': '#6C5CE7', 'edgecolor': '#5A4FCF', 'marker': '^'},
     }
 
-    # Create performance comparison plot (2x1 grid - only 2 graphs)
-    fig, axes = plt.subplots(2, 1, figsize=(24, 16))
-    fig.suptitle(f'Escenario Escuela - {config_name_spanish}', fontsize=30, fontweight='bold', y=0.98)
-
+    # Collect data for all implementations
     rtf_by_impl = {}
+    time_by_impl = {}
     memory_by_impl = {}
 
     for impl_name in implementations:
@@ -311,6 +338,7 @@ def generate_single_scenario_plot(config_data, config_type, config_name_spanish,
         rtf_means = []
         rtf_stds = []
         time_means = []
+        time_stds = []
         mem_means = []
         mem_stds = []
 
@@ -327,78 +355,133 @@ def generate_single_scenario_plot(config_data, config_type, config_name_spanish,
                 rtf_mean = 0
                 rtf_std = 0
                 avg_time = 0
+                std_time = 0
 
             rtf_means.append(rtf_mean)
             rtf_stds.append(rtf_std)
             time_means.append(avg_time)
+            time_stds.append(std_time if std_time is not None and not pd.isna(std_time) else 0)
 
             mem_mean = metrics['avg_memory_usage'] if metrics else None
             mem_std = metrics['std_memory_usage'] if metrics else None
             mem_means.append(mem_mean if mem_mean is not None and not pd.isna(mem_mean) else None)
             mem_stds.append(mem_std if mem_std is not None and not pd.isna(mem_std) else None)
 
-        rtf_by_impl[impl_name] = (rtf_means, rtf_stds, time_means)
+        rtf_by_impl[impl_name] = (rtf_means, rtf_stds)
+        time_by_impl[impl_name] = (time_means, time_stds)
         memory_by_impl[impl_name] = (mem_means, mem_stds)
 
-    all_rtf = [value for rtf_means, _, _ in rtf_by_impl.values() for value in rtf_means]
-    all_rtf_std = [value for _, rtf_stds, _ in rtf_by_impl.values() for value in rtf_stds]
+    # Calculate axis limits
+    all_rtf = [value for rtf_means, _ in rtf_by_impl.values() for value in rtf_means]
+    all_rtf_std = [value for _, rtf_stds in rtf_by_impl.values() for value in rtf_stds]
     max_rtf = max(all_rtf) if all_rtf else 1
     max_rtf_std = max(all_rtf_std) if all_rtf_std else 0
     min_rtf = min(all_rtf) if all_rtf else 0
 
-    # Plot 1: RTF vs Number of Classrooms
-    ax1 = axes[0]
+    all_times = [value for time_means, _ in time_by_impl.values() for value in time_means]
+    all_time_std = [value for _, time_stds in time_by_impl.values() for value in time_stds]
+    max_time = max(all_times) if all_times else 1
+    max_time_std = max(all_time_std) if all_time_std else 0
+
+    # ===== FIGURE 1: Absolute Execution Time =====
+    fig1, ax1 = plt.subplots(1, 1, figsize=(18, 14))
 
     for i, impl_name in enumerate(implementations):
-        rtf_means, rtf_stds, time_means = rtf_by_impl[impl_name]
+        time_means, time_stds = time_by_impl[impl_name]
         style = style_map.get(impl_name, {})
         bar_positions = x_pos + (i - (len(implementations) - 1) / 2) * bar_width
         bars = ax1.bar(
             bar_positions,
-            rtf_means,
-            yerr=rtf_stds,
+            time_means,
+            yerr=time_stds,
             color=style.get('color', 'skyblue'),
-            edgecolor=style.get('edgecolor', '#333333'),
+            edgecolor='black',
+            linewidth=1.5,
             width=bar_width,
             capsize=4,
             alpha=0.85,
             label=impl_name,
         )
 
-        label_offset = max_rtf * 0.06 if max_rtf > 0 else 0.06
-        for bar, mean, std, time_mean in zip(bars, rtf_means, rtf_stds, time_means):
-            if mean + std > 0:
-                ax1.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    mean + std + label_offset,
-                    f'{mean:.2f}x±{std:.2f}\n({time_mean:.1f}s)',
-                    ha='center',
-                    va='bottom',
-                    fontsize=14,
-                )
-
-    ax1.set_xlabel('Cantidad de aulas')
-    ax1.set_ylabel('RTF - tiempo simulado(s) / tiempo real(s)')
-    ax1.set_title('Rendimiento vs cantidad de aulas')
+    ax1.set_xlabel('Configuración del escenario', fontsize=35)
+    ax1.set_ylabel('Tiempo promedio de ejecución (segundos)', fontsize=35)
     ax1.set_xticks(x_pos)
-    ax1.set_xticklabels(classroom_counts, rotation=45, ha='right')
+    ax1.set_xticklabels(x_tick_labels, rotation=0, ha='center', fontsize=30)
 
-    y_min = max(0, min_rtf - max_rtf_std * 1.5)
-    y_max = max_rtf * 1.6 if max_rtf > 0 else 1
-    ax1.set_ylim(y_min, y_max)
+    y_max_time = (max_time + max_time_std) * 1.4 if max_time > 0 else 1
+    ax1.set_ylim(0, y_max_time)
 
-    ax1.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.5)
+    ax1.axhline(y=simulated_time, color='green', linestyle='--', linewidth=2, alpha=0.5)
     handles, labels = ax1.get_legend_handles_labels()
-    handles.extend([
-        Line2D([0], [0], color='red', linestyle='--', label='Tiempo Real (1.0x)'),
-        Line2D([], [], linestyle='None', label=f'Tiempo simulado: {simulated_time:.0f}s'),
-    ])
-    labels.extend(['Tiempo Real (1.0x)', f'Tiempo simulado: {simulated_time:.0f}s'])
-    ax1.legend(handles=handles, labels=labels, loc='upper left')
+    handles.append(Line2D([0], [0], color='green', linestyle='--', label=f'Tiempo simulado: {simulated_time:.0f}s'))
+    labels.append(f'Tiempo simulado: {simulated_time:.0f}s')
+    ax1.legend(handles=handles, labels=labels, loc='upper left', fontsize=30)
     ax1.grid(True)
 
-    # Plot 2: Memory usage comparison (if available)
-    ax2 = axes[1]
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.1)
+
+    filename1 = f'comparacion_rendimiento_{config_type}.png'
+    filepath1 = os.path.join(results_dir, filename1)
+    fig1.savefig(filepath1,  bbox_inches='tight')
+    plt.close(fig1)
+    print(f"  Gráfico Rendimiento guardado: {filename1}")
+
+    # ===== FIGURE 2: Memory Usage =====
+    fig2, ax2 = plt.subplots(1, 1, figsize=(24, 10))
+
+    _plot_memory_usage(ax2, implementations, classroom_counts, memory_by_impl, style_map, x_tick_labels)
+
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.1)
+
+    filename2 = f'comparacion_memoria_{config_type}.png'
+    filepath2 = os.path.join(results_dir, filename2)
+    fig2.savefig(filepath2,  bbox_inches='tight')
+    plt.close(fig2)
+    print(f"  Gráfico Memoria guardado: {filename2}")
+
+    # Generate LaTeX table with exact values
+    latex_path = os.path.join(results_dir, f'performance_school_results_{config_type}.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Resultados del escenario escolar ' + config_name_spanish + r': Tiempo de ejecución (s) y memoria (MB) por configuración.}' + '\n')
+        f.write(r'\label{tab:performance_school_' + config_type + r'}' + '\n')
+        col_spec = 'c' * (1 + len(implementations) * 2)
+        f.write(r'\begin{tabular}{l' + col_spec + r'}' + '\n')
+        f.write(r'\hline' + '\n')
+        header_parts = ['Configuración']
+        for impl in implementations:
+            header_parts.append(f'{impl} Tiempo (s)')
+            header_parts.append(f'{impl} Memoria (MB)')
+        f.write(' & '.join(header_parts) + r' \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for idx, cc in enumerate(classroom_counts):
+            row = config_data[config_data['classroom_count'] == cc].iloc[0]
+            obstacle_count = int(row['obstacle_count'])
+            pedestrian_count = int(row['pedestrian_count'])
+            config_label = f'Aulas:{cc} Obst:{obstacle_count} Ped:{pedestrian_count}'
+            row_parts = [config_label]
+            for impl_name in implementations:
+                time_means, time_stds = time_by_impl[impl_name]
+                mem_means, mem_stds = memory_by_impl[impl_name]
+                t_mean, t_std = time_means[idx], time_stds[idx]
+                m_mean = mem_means[idx]
+                m_std = mem_stds[idx] if mem_stds[idx] is not None else 0
+                m_mean_val = m_mean if m_mean is not None and not (isinstance(m_mean, float) and np.isnan(m_mean)) else 0
+                row_parts.append(f'{t_mean:.2f} $\\pm$ {t_std:.2f}')
+                row_parts.append(f'{m_mean_val:.2f} $\\pm$ {m_std:.2f}')
+            f.write(' & '.join(row_parts) + r' \\' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"  LaTeX table saved to: {latex_path}")
+
+
+def _plot_memory_usage(ax, implementations, classroom_counts, memory_by_impl, style_map, x_tick_labels):
+    """Helper function to plot memory usage on a given axis."""
+    x_pos = np.arange(len(classroom_counts))
 
     for i, impl_name in enumerate(implementations):
         memory_means, memory_stds = memory_by_impl[impl_name]
@@ -409,8 +492,8 @@ def generate_single_scenario_plot(config_data, config_type, config_name_spanish,
         y_errors = [value if value is not None else 0 for value in memory_stds]
         style = style_map.get(impl_name, {})
 
-        ax2.errorbar(
-            classroom_counts,
+        ax.errorbar(
+            x_pos,
             y_values,
             yerr=y_errors if any(y_errors) else None,
             fmt=f"{style.get('marker', 'o')}-",
@@ -426,27 +509,13 @@ def generate_single_scenario_plot(config_data, config_type, config_name_spanish,
             markeredgewidth=2,
         )
 
-    ax2.set_xlabel('Cantidad de aulas')
-    ax2.set_ylabel('Uso Promedio de Memoria (MB)')
-    ax2.set_title('Uso de Memoria vs cantidad de aulas')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    
-    # Add explanatory text about students per classroom
-    fig.text(0.5, 0.02, f'Nota: La cantidad de estudiantes es igual a {PEDESTRIANS_PER_CLASSROOM} por aula', 
-             ha='center', va='bottom', fontsize=12, style='italic',
-             bbox=dict(boxstyle='round,pad=0.5', facecolor='lightyellow', alpha=0.8, edgecolor='gray'))
-    
-    plt.tight_layout()
-    plt.subplots_adjust(bottom=0.1)  # Make room for the explanatory text
-    
-    # Save the plot
-    filename = f'comparacion_rendimiento_{config_type}.png'
-    filepath = os.path.join(results_dir, filename)
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
-    plt.close()
-    
-    print(f"  Gráfico guardado: {filename}")
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(x_tick_labels, rotation=0, ha='center', fontsize=16)
+    ax.set_xlabel('Configuración del escenario')
+    ax.set_ylabel('Uso Promedio de Memoria (MB)')
+    ax.set_title('Uso de Memoria vs configuración del escenario')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
 
 def plot_performance_comparison(results):
     """
@@ -479,8 +548,8 @@ def plot_performance_comparison(results):
                             fmt=f'{markers[j]}-', label=label, linewidth=2, markersize=6, 
                             capsize=3, color=colors[i], alpha=0.8)
     
-    plt.xlabel('Tamaño del escenario (metros)')
-    plt.ylabel('Tiempo Promedio de Ejecución (s)')
+    plt.xlabel('Tamaño del escenario (metros)', fontsize=25)
+    plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14)
     plt.title('Rendimiento vs Tamaño del escenario: Escenarios Escolares')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
@@ -500,8 +569,8 @@ def plot_performance_comparison(results):
                             fmt=f'{markers[j]}-', label=label, linewidth=2, markersize=6, 
                             capsize=3, color=colors[i], alpha=0.8)
     
-    plt.xlabel('Número de Peatones')
-    plt.ylabel('Tiempo Promedio de Ejecución (s)')
+    plt.xlabel('Número de Peatones', fontsize=25)
+    plt.ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14)
     plt.title('Rendimiento vs Número de Peatones: Escenarios Escolares')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
@@ -548,8 +617,8 @@ def plot_performance_comparison(results):
                             f'{markers[j]}-', label=label, linewidth=2, markersize=6, 
                             color=colors[i], alpha=0.8)
     
-    plt.xlabel('Tamaño del escenario (metros)')
-    plt.ylabel('Uso Promedio de Memoria (MB)')
+    plt.xlabel('Tamaño del escenario (metros)', fontsize=25)
+    plt.ylabel('Uso Promedio de Memoria (MB)', fontsize=25)
     plt.title('Uso de Memoria vs Tamaño de Grilla: Escenarios Escolares')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
@@ -609,8 +678,7 @@ def plot_performance_comparison(results):
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, 'comparacion_rendimiento_escenarios_escolares.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, 'comparacion_rendimiento_escenarios_escolares.png'),  bbox_inches='tight')
     plt.show()
 
 def save_results_to_csv(results):
@@ -747,9 +815,6 @@ def generate_single_flowgraph(config_type, config_name_spanish, scenario_params,
                 )
                 ax.add_patch(rect)
     
-    # Add main title to the figure
-    fig.suptitle(f'Escenario Escuela - {config_name_spanish}', fontsize=16, fontweight='bold', y=0.95)
-    
     # Add subtitle with details
     ax.set_title(f'Tamaño de Grilla: {grid_divisions}x{grid_divisions} ({grid_size}m x {grid_size}m) | '
                 f'Aulas: {scenario_params["classroom_count"]} | '
@@ -781,7 +846,7 @@ def generate_single_flowgraph(config_type, config_name_spanish, scenario_params,
     # Save the visualization
     filename = f'flowgraph_escenario_{config_type}.png'
     filepath = os.path.join(results_dir, filename)
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.savefig(filepath,  bbox_inches='tight')
     plt.close(fig)
     
     print(f"  Visualización guardada: {filename}")

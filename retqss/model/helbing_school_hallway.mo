@@ -13,8 +13,8 @@ import retQSS_classrooms;
 */
 
 constant Integer
-	N = 1400,
-	GRID_DIVISIONS = 15,
+	N = 500,
+	GRID_DIVISIONS = 11,
 	LEFT_COUNT = N / 2;
 
 // Initial conditions parameters

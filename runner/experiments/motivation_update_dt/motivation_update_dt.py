@@ -1,6 +1,18 @@
+import argparse
 import json
 import os
 import subprocess
+import sys
+
+# Add current directory for importing personal_space_invation
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from personal_space_invation import (
+    load_multiple_experiments,
+    load_data_from_csv,
+    save_results_to_csv,
+    plot_comparative_analysis,
+)
+
 from src.runner import run_experiment, compile_c_code, compile_model
 from src.utils import load_config, create_output_dir, copy_results_to_latest, generate_map
 from src import utils
@@ -15,7 +27,7 @@ from src.math.Clustering import Clustering
 from src.plots.DensityRowGraph import DensityRowGraph
 
 
-MOTIVATION_UPDATE_DT = [0.001,0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # Valores de motivation update dt a probar
+MOTIVATION_UPDATE_DT = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # Valores de motivation update dt a probar
 
 WIDTH = 50
 PEDESTRIAN_COUNT = int(50 * (50 * 0.4) * 0.3)
@@ -31,7 +43,7 @@ def get_simulated_time():
     return config['parameters']['FORCE_TERMINATION_AT']['value']
 
 
-def motivation_update_dt():
+def motivation_update_dt(csv_path=None):
     print(f"Ejecutando iteraciones para {PEDESTRIAN_COUNT} peatones variando Motivation Update DT y graficando carriles...\n")
     if run_simulation:
         for motivation_dt in MOTIVATION_UPDATE_DT:
@@ -39,7 +51,7 @@ def motivation_update_dt():
             run(motivation_dt)
 
     # Graficar los resultados
-    plot_results()
+    plot_results(invasion_csv_path=csv_path)
 
 def run(motivation_dt):
     """
@@ -92,7 +104,7 @@ def run(motivation_dt):
 
     print(f"\nExperimento completado. Resultados guardados en {output_dir}")
 
-def plot_results():
+def plot_results(invasion_csv_path=None):
     """
     Grafica los resultados del experimento de Motivation Update DT.
     """
@@ -192,6 +204,28 @@ def plot_results():
         print("¡No se encontraron datos para graficar!")
         return
 
+    # Run personal space invasion analysis (use CSV if passed or available for speed)
+    print("\n🔍 Ejecutando análisis de invasiones del espacio personal...")
+    exp_dir = 'experiments/motivation_update_dt'
+    csv_path = invasion_csv_path or os.path.join(exp_dir, 'personal_space_invasion_results.csv')
+    if csv_path and os.path.exists(csv_path):
+        experiments_data = load_data_from_csv(csv_path)
+    else:
+        results_dir = os.path.join(exp_dir, 'results')
+        config_path = os.path.join(exp_dir, 'config.json')
+        experiments_data = load_multiple_experiments(results_dir, config_path)
+        if experiments_data:
+            save_results_to_csv(experiments_data, exp_dir)
+    if experiments_data:
+        plot_comparative_analysis(experiments_data, exp_dir)
+        invasion_by_dt = {
+            dt: experiments_data[dt]['aggregated_stats']
+            for dt in experiments_data
+        }
+    else:
+        invasion_by_dt = {}
+        print("⚠️ No se encontraron datos de invasiones para incluir en la tabla")
+
     # Ordenar datos por motivation_dt
     sorted_indices = np.argsort(data['motivation_dts'])
     for key in data:
@@ -209,11 +243,11 @@ def plot_results():
     time_stds = data['time_std']
     
     # Gráfico 1: Grupos de carriles vs Motivation Update DT
-    fig1, ax1 = plt.subplots(figsize=(24, 14))
+    fig1, ax1 = plt.subplots(figsize=(18, 14))
     
     bars1 = ax1.bar(range(len(motivation_dts)), groups_means, yerr=groups_stds, 
                    color='lightgreen', width=0.6)
-    ax1.set_xlabel('Motivation Update DT (s)')
+    ax1.set_xlabel('Motivation Update DT (segundos)')
     ax1.set_ylabel('Número de Carriles')
     ax1.set_xticks(range(len(motivation_dts)))
     ax1.set_xticklabels([f'{dt:.3f}' for dt in motivation_dts], rotation=45, ha='right')
@@ -222,60 +256,37 @@ def plot_results():
         ax1.set_ylim(0, max_groups * 1.4)
     ax1.grid(True)
     
-    # Agregar valores en las barras
-    for i, (bar, mean, std) in enumerate(zip(bars1, groups_means, groups_stds)):
-        height = bar.get_height()
-        if height + std > 0:
-            ax1.text(bar.get_x() + bar.get_width()/2., height + std + max_groups * 0.03 if max_groups > 0 else 0.03,
-                    f'{mean:.1f}±{std:.1f}', ha='center', va='bottom',
-                    rotation=90)
-    
     plt.tight_layout()
-    plt.subplots_adjust(left=0.12, bottom=0.15, top=0.95, right=0.98)
+    plt.subplots_adjust(left=0.08, bottom=0.15, top=0.94, right=0.98)
     plt.savefig('experiments/motivation_update_dt/lane_formation_by_motivation_dt.png')
     plt.close()
     
-    # Gráfico 2: Velocidad de Simulación vs Motivation Update DT
-    fig2, ax2 = plt.subplots(figsize=(24, 14))
-    
-    bars2 = ax2.bar(range(len(motivation_dts)), speed_ratio_means, yerr=speed_ratio_stds, 
+    # Gráfico 2: Tiempo de Ejecución vs Motivation Update DT
+    fig2, ax2 = plt.subplots(figsize=(18, 14))
+
+    bars2 = ax2.bar(range(len(motivation_dts)), time_means, yerr=time_stds,
                    color='skyblue', width=0.6)
-    ax2.set_xlabel('Motivation Update DT (s)')
-    ax2.set_ylabel('RTF - tiempo simulado(s) / tiempo real(s)')
+    ax2.set_xlabel('Motivation Update DT (segundos)')
+    ax2.set_ylabel('Tiempo promedio de ejecución (segundos)')
     ax2.set_xticks(range(len(motivation_dts)))
     ax2.set_xticklabels([f'{dt:.3f}' for dt in motivation_dts], rotation=45, ha='right')
-    
-    # Set y-axis limits to accommodate values below 1.0 (slower than real-time)
-    min_val = min(speed_ratio_means) if len(speed_ratio_means) > 0 else 0
-    max_val = max(speed_ratio_means) if len(speed_ratio_means) > 0 else 1
-    max_std = max(speed_ratio_stds) if len(speed_ratio_stds) > 0 else 0
-    y_min = max(0, min_val - max_std * 1.5)  # Allow space below for error bars
-    y_max = max_val * 1.4
-    ax2.set_ylim(y_min, y_max)
-    
-    # Add horizontal line at 1.0 to show real-time threshold
-    ax2.axhline(y=1.0, color='red', linestyle='--', label='Tiempo Real (RTF=1.0)')
+
+    # Set y-axis limits
+    max_val = max(time_means) if len(time_means) > 0 else 1
+    max_std = max(time_stds) if len(time_stds) > 0 else 0
+    y_max = (max_val + max_std) * 1.4
+    ax2.set_ylim(0, y_max)
+
+    # Add horizontal line at simulated time for reference
+    ax2.axhline(y=simulated_time, color='green', linestyle='--', linewidth=2, alpha=0.5)
     legend_handles = [
-        Line2D([0], [0], color='red', linestyle='--', label='Tiempo Real (RTF=1.0)'),
-        Line2D([], [], linestyle='None', label=f'Tiempo simulado: {simulated_time:.0f}s'),
+        Line2D([0], [0], color='green', linestyle='--', label=f'Tiempo simulado: {simulated_time:.0f}s'),
     ]
     ax2.legend(handles=legend_handles, loc='upper left')
     ax2.grid(True)
-    
-    # Add labels on top of bars: RTF and execution time
-    max_speed = max(speed_ratio_means) if len(speed_ratio_means) > 0 else 0
-    for i, (bar, rtf_mean, rtf_std, time_mean) in enumerate(zip(bars2, speed_ratio_means, speed_ratio_stds, time_means)):
-        height = bar.get_height()
-        if height + rtf_std > 0:
-            # Position label above error bar
-            label_y = height + rtf_std + max_speed * 0.03 if max_speed > 0 else 0.03
-            # Format: "RTF (execution_time s)"
-            label_text = f'{rtf_mean:.2f}x±{rtf_std:.2f}\n({time_mean:.1f}s)'
-            ax2.text(bar.get_x() + bar.get_width()/2., label_y,
-                    label_text, ha='center', va='bottom')
-    
+
     plt.tight_layout()
-    plt.subplots_adjust(left=0.15, bottom=0.15, top=0.95, right=0.98)
+    plt.subplots_adjust(left=0.08, bottom=0.15, top=0.94, right=0.98)
     plt.savefig('experiments/motivation_update_dt/performance_by_motivation_dt.png')
     plt.close()
     
@@ -283,7 +294,7 @@ def plot_results():
     print("\n" + "="*100)
     print("RESUMEN DE RESULTADOS MOTIVATION UPDATE DT")
     print("="*100)
-    print(f"{'Motivation DT':<15} {'Carriles':<15} {'RTF (ratio)':<15} {'Tiempo Ejec (s)':<18}")
+    print(f"{'Motivation DT':<15} {'Carriles':<15} {'Colisiones':<18} {'RTF (ratio)':<15} {'Tiempo Ejec (s)':<18}")
     print("-" * 100)
     
     for i, dt in enumerate(motivation_dts):
@@ -293,7 +304,9 @@ def plot_results():
         speed_ratio_std = speed_ratio_stds[i]
         time_mean = time_means[i]
         time_std = time_stds[i]
-        print(f"{dt:<15.3f} {groups_mean:.1f}±{groups_std:.1f}         "
+        coll_str = (f"{invasion_by_dt[dt]['total_invasions_mean']:.1f}±{invasion_by_dt[dt]['total_invasions_std']:.1f}"
+                    if dt in invasion_by_dt else "N/A")
+        print(f"{dt:<15.3f} {groups_mean:.1f}±{groups_std:.1f}         {coll_str:<18} "
               f"{speed_ratio_mean:.2f}x±{speed_ratio_std:.2f}     {time_mean:.2f}±{time_std:.2f}")
     
     print("="*100)
@@ -301,5 +314,40 @@ def plot_results():
     print("      RTF > 1.0 significa que la simulación corre más rápido que tiempo real")
     print("      Ejemplo: RTF = 5.0x significa 5 veces más rápido que tiempo real")
 
+    # Generate LaTeX table with exact values (including collisions from personal space invasion)
+    latex_dir = 'experiments/motivation_update_dt'
+    os.makedirs(latex_dir, exist_ok=True)
+    latex_path = os.path.join(latex_dir, 'motivation_update_dt_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Resultados del experimento Motivation Update DT: Carriles, Colisiones (invasiones espacio personal), RTF y tiempo de ejecución.}' + '\n')
+        f.write(r'\label{tab:motivation_update_dt}' + '\n')
+        f.write(r'\begin{tabular}{cccccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'Motivation DT (s) & Carriles (mean $\pm$ std) & Colisiones (mean $\pm$ std) & RTF (mean $\pm$ std) & Tiempo Ejec (s) (mean $\pm$ std) \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for i, dt in enumerate(motivation_dts):
+            groups_mean = groups_means[i]
+            groups_std = groups_stds[i]
+            speed_ratio_mean = speed_ratio_means[i]
+            speed_ratio_std = speed_ratio_stds[i]
+            time_mean = time_means[i]
+            time_std = time_stds[i]
+            if dt in invasion_by_dt:
+                inv_mean = invasion_by_dt[dt]['total_invasions_mean']
+                inv_std = invasion_by_dt[dt]['total_invasions_std']
+                coll_cell = f'{inv_mean:.2f} $\\pm$ {inv_std:.2f}'
+            else:
+                coll_cell = '--'
+            f.write(f'{dt:.3f} & {groups_mean:.2f} $\\pm$ {groups_std:.2f} & {coll_cell} & {speed_ratio_mean:.4f} $\\pm$ {speed_ratio_std:.4f} & {time_mean:.2f} $\\pm$ {time_std:.2f} \\\\\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"\nLaTeX table saved to: {latex_path}")
+
 if __name__ == '__main__':
-    motivation_update_dt()
+    parser = argparse.ArgumentParser(description='Motivation Update DT experiment')
+    parser.add_argument('--csv', '-c', help='Path to personal_space_invasion_results.csv to use (skips reprocessing result files)')
+    args = parser.parse_args()
+    motivation_update_dt(csv_path=args.csv)

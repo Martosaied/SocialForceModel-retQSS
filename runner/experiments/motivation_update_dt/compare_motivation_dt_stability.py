@@ -5,11 +5,20 @@ Un modelo roto produce funciones Y(t) en zigzag, mientras que un modelo
 que funciona bien produce funciones más suaves y continuas.
 """
 
+import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import os
+
+# Add the runner directory to the Python path to allow imports from src
+script_dir = os.path.dirname(os.path.abspath(__file__))
+runner_dir = os.path.abspath(os.path.join(script_dir, '..', '..'))
+if runner_dir not in sys.path:
+    sys.path.insert(0, runner_dir)
+
+from src.experiments import apply_publication_style
 
 def load_result_file(file_path):
     """
@@ -83,6 +92,8 @@ def analyze_function_smoothness(df):
     df['dt'] = df.groupby('pedestrian_id')['time'].diff()
     df['y_velocity'] = df.groupby('pedestrian_id')['y'].diff() / df['dt']
     df['y_acceleration'] = df.groupby('pedestrian_id')['y_velocity'].diff() / df['dt']
+    df['x_velocity'] = df.groupby('pedestrian_id')['x'].diff() / df['dt']
+    df['x_acceleration'] = df.groupby('pedestrian_id')['x_velocity'].diff() / df['dt']
     
     # Análisis de suavidad por peatón
     smoothness_analysis = {}
@@ -96,41 +107,78 @@ def analyze_function_smoothness(df):
         
         # Calcular métricas de suavidad
         y_values = ped_data['y'].values
-        time_values = ped_data['time'].values
-        
-        # 1. Variación total de la función (medida de "zigzag")
-        total_variation = np.sum(np.abs(np.diff(y_values)))
-        
-        # 2. Número de cambios de signo en la velocidad (zigzag)
-        velocity_sign_changes = np.sum(np.diff(np.sign(ped_data['y_velocity'].dropna())) != 0)
-        
-        # 3. Número de cambios de signo en la aceleración (cambios de curvatura)
-        accel_sign_changes = np.sum(np.diff(np.sign(ped_data['y_acceleration'].dropna())) != 0)
-        
-        # 4. Suavidad basada en la regularidad de las derivadas
-        velocity_std = ped_data['y_velocity'].std()
-        acceleration_std = ped_data['y_acceleration'].std()
 
-        # 5. Puntuación de suavidad compuesta
+        # 1. Número de cambios de signo en la aceleración Y
+        y_accel_sign_changes = np.sum(np.diff(np.sign(ped_data['y_acceleration'].dropna())) != 0)
+
+        # 2. Número de cambios de signo en la aceleración X
+        x_accel_sign_changes = np.sum(np.diff(np.sign(ped_data['x_acceleration'].dropna())) != 0)
+
+        # 3. Suavidad basada en la regularidad de las derivadas
+        y_velocity_std = ped_data['y_velocity'].std()
+        y_acceleration_std = ped_data['y_acceleration'].std()
+        x_velocity_std = ped_data['x_velocity'].std()
+        x_acceleration_std = ped_data['x_acceleration'].std()
+
+        # 4. Puntuación de suavidad compuesta
         # Valores más altos = más suave, valores más bajos = más zigzag
         smoothness_score = calculate_smoothness_score(
-            total_variation, velocity_sign_changes, accel_sign_changes,
-            velocity_std, acceleration_std,
+            0, 0, y_accel_sign_changes,  # total_variation=0, velocity_sign_changes=0
+            y_velocity_std, y_acceleration_std,
             len(ped_data)
         )
         
         smoothness_analysis[ped_id] = {
-            'total_variation': total_variation,
-            'velocity_sign_changes': velocity_sign_changes,
-            'accel_sign_changes': accel_sign_changes,
-            'velocity_std': velocity_std,
-            'acceleration_std': acceleration_std,
+            'y_accel_sign_changes': y_accel_sign_changes,
+            'x_accel_sign_changes': x_accel_sign_changes,
+            'y_velocity_std': y_velocity_std,
+            'y_acceleration_std': y_acceleration_std,
+            'x_velocity_std': x_velocity_std,
+            'x_acceleration_std': x_acceleration_std,
             'smoothness_score': smoothness_score,
             'total_steps': len(ped_data),
             'y_range': np.max(y_values) - np.min(y_values)
         }
     
     return smoothness_analysis
+
+def find_motivation_dt_directories(results_dir):
+    """
+    Encuentra todos los directorios de motivation_dt disponibles.
+    """
+    motivation_dt_dirs = []
+    if os.path.exists(results_dir):
+        for item in os.listdir(results_dir):
+            if item.startswith('motivation_dt_') and os.path.isdir(os.path.join(results_dir, item)):
+                dt_value = item.replace('motivation_dt_', '')
+                try:
+                    dt_float = float(dt_value)
+                    motivation_dt_dirs.append((dt_float, item))
+                except ValueError:
+                    continue
+
+    # Ordenar por valor de motivation_dt
+    motivation_dt_dirs.sort(key=lambda x: x[0])
+
+    # Reamove last one motivation_dt_dir (mismo comportamiento que deltaq)
+    if motivation_dt_dirs:
+        motivation_dt_dirs.pop()
+
+    return motivation_dt_dirs
+
+def load_all_result_files(motivation_dt_dir_path):
+    """
+    Carga todos los archivos result_N.csv de un directorio motivation_dt.
+    """
+    result_files = []
+    latest_dir = os.path.join(motivation_dt_dir_path, 'latest')
+
+    if os.path.exists(latest_dir):
+        for file in os.listdir(latest_dir):
+            if file.startswith('result_') and file.endswith('.csv'):
+                result_files.append(os.path.join(latest_dir, file))
+
+    return sorted(result_files)
 
 def calculate_smoothness_score(total_variation, velocity_sign_changes, accel_sign_changes,
                              velocity_std, acceleration_std,
@@ -164,262 +212,298 @@ def calculate_smoothness_score(total_variation, velocity_sign_changes, accel_sig
 
 def load_multiple_motivation_dt_data(results_dir):
     """
-    Carga datos de múltiples experimentos de motivation_update_dt.
+    Carga datos de múltiples experimentos de motivation_update_dt, incluyendo todos los result_N.csv.
     """
     motivation_dt_data = {}
-    
-    # Buscar directorios de resultados
-    for item in os.listdir(results_dir):
-        item_path = os.path.join(results_dir, item)
-        if os.path.isdir(item_path) and item.startswith('motivation_dt_'):
-            try:
-                motivation_dt = float(item.split('motivation_dt_')[1])
-                dirs = os.listdir(item_path)
-                latest_dir = None
-                for dir in dirs:
-                    if dir.startswith('experiment_20250915_') or dir.startswith('experiment_20250916_'):
-                        latest_dir = os.path.join(item_path, dir)
-                        break
-                
-                if os.path.exists(latest_dir):
-                    result_file = os.path.join(latest_dir, 'result_1.csv')
-                    if os.path.exists(result_file):
-                        df = load_result_file(result_file)
-                        if df is not None:
-                            smoothness = analyze_function_smoothness(df)
-                            motivation_dt_data[motivation_dt] = {
-                                'data': df,
-                                'smoothness': smoothness
-                            }
-                            print(f"✅ Cargado motivation_dt={motivation_dt}: {len(smoothness)} peatones analizados")
-            except Exception as e:
-                print(f"❌ Error procesando {item}: {e}")
-                continue
-    
+
+    motivation_dt_dirs = find_motivation_dt_directories(results_dir)
+
+    print(f"🔍 Encontrados {len(motivation_dt_dirs)} experimentos de Motivation Update DT:")
+
+    for dt_value, dt_dir in motivation_dt_dirs:
+        dt_path = os.path.join(results_dir, dt_dir)
+        result_files = load_all_result_files(dt_path)
+
+        if result_files:
+            print(f"  - Cargando DT={dt_value} ({len(result_files)} archivos)...")
+
+            all_dfs = []
+            all_smoothness = {}
+            file_counter = 0
+
+            for result_file in result_files[:2]:
+                df = load_result_file(result_file)
+                if df is not None:
+                    smoothness = analyze_function_smoothness(df)
+                    all_dfs.append(df)
+
+                    # Combinar análisis de suavidad con identificador único
+                    for ped_id, data in smoothness.items():
+                        unique_ped_id = f"{file_counter}_{ped_id}"
+                        all_smoothness[unique_ped_id] = data
+
+                    file_counter += 1
+
+            if all_dfs:
+                # Combinar todos los DataFrames
+                combined_df = pd.concat(all_dfs, ignore_index=True)
+                motivation_dt_data[dt_value] = {
+                    'df': combined_df,
+                    'smoothness': all_smoothness,
+                    'file_paths': result_files,
+                    'num_files': len(result_files)
+                }
+                print(f"    ✅ Cargado exitosamente ({len(all_smoothness)} peatones analizados de {len(result_files)} archivos)")
+            else:
+                print(f"    ❌ Error al cargar datos")
+        else:
+            print(f"  - ⚠️  No se encontraron archivos result_*.csv para DT={dt_value}")
+
     return motivation_dt_data
 
-def plot_y_functions_multi(motivation_dt_data, output_dir):
+def write_analysis_to_csv(motivation_dt_data, output_file):
     """
-    Genera gráfico de las funciones Y(t) de muestra para múltiples motivation_update_dt.
+    Escribe todos los resultados de análisis de suavidad en un CSV consolidado.
     """
-    plt.figure(figsize=(14, 10))
-    plt.title('Funciones Y(t) de Muestra - Análisis de Suavidad por Motivation Update DT', fontsize=16, fontweight='bold')
-    
-    colors = plt.cm.tab10(np.linspace(0, 1, len(motivation_dt_data)))
-    
-    for i, (motivation_dt, data) in enumerate(sorted(motivation_dt_data.items())):
-        df = data['data']
-        smoothness = data['smoothness']
-        
-        if smoothness:
-            scores = [(pid, data['smoothness_score']) for pid, data in smoothness.items()]
-            scores.sort(key=lambda x: x[1], reverse=True)
-            sample_pedestrians = [pid for pid, _ in scores[:2]]  # Los más suaves
-        else:
-            sample_pedestrians = []
-        
-        # Plotear funciones Y(t)
-        for j, ped_id in enumerate(sample_pedestrians):
-            ped_data = df[df['pedestrian_id'] == ped_id].sort_values('time')
-            if len(ped_data) > 0:
-                alpha = 0.8 if j == 0 else 0.5
-                linewidth = 2 if j == 0 else 1
-                label = f'DT={motivation_dt:.3f}' if j == 0 else ""
-                plt.plot(ped_data['time'], ped_data['y'], color=colors[i], 
-                        alpha=alpha, linewidth=linewidth, label=label)
-    
-    plt.xlabel('Tiempo (s)')
-    plt.ylabel('Posición Y (m)')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'y_functions_multi_motivation_dt.png'), dpi=300, bbox_inches='tight')
-    plt.close()
+    print(f"📝 Escribiendo resultados consolidados en: {output_file}")
 
-def plot_smoothness_distribution_multi(motivation_dt_data, output_dir):
-    """
-    Genera gráfico de distribución de puntuaciones de suavidad para múltiples motivation_update_dt.
-    """
-    plt.figure(figsize=(12, 8))
-    plt.title('Distribución de Puntuaciones de Suavidad por Motivation Update DT', fontsize=14, fontweight='bold')
-    
-    colors = plt.cm.tab10(np.linspace(0, 1, len(motivation_dt_data)))
-    
-    for i, (motivation_dt, data) in enumerate(sorted(motivation_dt_data.items())):
+    all_results = []
+
+    for dt_value, data in motivation_dt_data.items():
         smoothness = data['smoothness']
-        scores = [data['smoothness_score'] for data in smoothness.values()] if smoothness else []
-        
-        if scores:
-            plt.hist(scores, bins=15, alpha=0.6, color=colors[i], 
-                    label=f'DT={motivation_dt:.3f} (n={len(scores)})', density=True)
-    
-    plt.xlabel('Puntuación de Suavidad (0=Zigzag, 1=Suave)')
-    plt.ylabel('Densidad')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'smoothness_distribution_multi_motivation_dt.png'), dpi=300, bbox_inches='tight')
-    plt.close()
+        num_files = data.get('num_files', 1)
+
+        for ped_id, analysis in smoothness.items():
+            # Extraer información del archivo si está disponible
+            file_info = ped_id.split('_', 1) if '_' in ped_id else ('0', ped_id)
+            file_num = file_info[0]
+            original_ped_id = file_info[1]
+
+            result_row = {
+                'motivation_update_dt': dt_value,
+                'file_number': int(file_num),
+                'pedestrian_id': original_ped_id,
+                'y_accel_sign_changes': analysis['y_accel_sign_changes'],
+                'x_accel_sign_changes': analysis['x_accel_sign_changes'],
+                'y_velocity_std': analysis['y_velocity_std'],
+                'y_acceleration_std': analysis['y_acceleration_std'],
+                'x_velocity_std': analysis['x_velocity_std'],
+                'x_acceleration_std': analysis['x_acceleration_std'],
+                'smoothness_score': analysis['smoothness_score'],
+                'total_steps': analysis['total_steps'],
+                'y_range': analysis['y_range'],
+                'num_files_in_motivation_dt': num_files
+            }
+            all_results.append(result_row)
+
+    # Crear DataFrame y guardar
+    results_df = pd.DataFrame(all_results)
+    results_df.to_csv(output_file, index=False)
+
+    print(f"✅ Guardados {len(all_results)} análisis de suavidad en {output_file}")
+    print(f"   - {len(motivation_dt_data)} valores de Motivation Update DT")
+    print(f"   - {len(set([r['motivation_update_dt'] for r in all_results]))} experimentos únicos")
+    print(f"   - {len(set([r['pedestrian_id'] for r in all_results]))} peatones únicos")
+
+    return results_df
+
+def load_analysis_from_csv(csv_file):
+    """
+    Carga los resultados de análisis desde un CSV consolidado.
+    """
+    print(f"📂 Cargando análisis desde: {csv_file}")
+
+    if not os.path.exists(csv_file):
+        print(f"❌ No se encontró el archivo: {csv_file}")
+        return None
+
+    df = pd.read_csv(csv_file)
+    print(f"✅ Cargados {len(df)} análisis de suavidad")
+
+    # Reorganizar datos en formato motivation_dt_data
+    motivation_dt_data = {}
+
+    for dt in df['motivation_update_dt'].unique():
+        dt_df = df[df['motivation_update_dt'] == dt]
+
+        # Reconstruir análisis de suavidad
+        smoothness = {}
+        for _, row in dt_df.iterrows():
+            ped_id = f"{row['file_number']}_{row['pedestrian_id']}"
+            smoothness[ped_id] = {
+                'y_accel_sign_changes': row['y_accel_sign_changes'],
+                'x_accel_sign_changes': row['x_accel_sign_changes'],
+                'y_velocity_std': row['y_velocity_std'],
+                'y_acceleration_std': row['y_acceleration_std'],
+                'x_velocity_std': row['x_velocity_std'],
+                'x_acceleration_std': row['x_acceleration_std'],
+                'smoothness_score': row['smoothness_score'],
+                'total_steps': row['total_steps'],
+                'y_range': row['y_range']
+            }
+
+        motivation_dt_data[dt] = {
+            'smoothness': smoothness,
+            'num_files': dt_df['num_files_in_motivation_dt'].iloc[0] if len(dt_df) > 0 else 1
+        }
+
+    print(f"✅ Reorganizados datos para {len(motivation_dt_data)} experimentos de Motivation Update DT")
+    return motivation_dt_data
 
 def plot_smoothness_components_multi(motivation_dt_data, output_dir):
     """
-    Genera gráfico de componentes de suavidad para múltiples motivation_update_dt.
+    Genera gráfico de componentes de suavidad para múltiples motivation_dt con promedio y desviación estándar.
     """
-    plt.figure(figsize=(14, 8))
-    plt.title('Componentes de Suavidad por Motivation Update DT', fontsize=14, fontweight='bold')
-    
-    # Calcular promedios de componentes para cada motivation_dt
-    motivation_dt_values = []
-    components_data = {
-        'Variación Total': [],
-        'Cambios Velocidad': [],
-        'Cambios Aceleración': [],
+    apply_publication_style()
+
+    fig = plt.figure(figsize=(16, 12))
+
+    # Calcular estadísticas de componentes para cada motivation_dt
+    dt_values = []
+    components_stats = {
+        'Cambios en el signo de la aceleración Y': {'mean': [], 'std': []},
+        'Cambios en el signo de la aceleración X': {'mean': [], 'std': []},
     }
-    
-    for motivation_dt, data in sorted(motivation_dt_data.items()):
+
+    smoothness_stats = {'mean': [], 'std': []}
+    for dt, data in motivation_dt_data.items():
         smoothness = data['smoothness']
         if smoothness:
-            motivation_dt_values.append(motivation_dt)
-            components_data['Variación Total'].append(np.mean([d['total_variation'] for d in smoothness.values()]))
-            components_data['Cambios Velocidad'].append(np.mean([d['velocity_sign_changes'] for d in smoothness.values()]))
-            components_data['Cambios Aceleración'].append(np.mean([d['accel_sign_changes'] for d in smoothness.values()]))
-        
-    if motivation_dt_values:
-        x = np.arange(len(motivation_dt_values))
-        width = 0.2
-        
-        for i, (component, values) in enumerate(components_data.items()):
-            plt.bar(x + i * width, values, width, label=component, alpha=0.8)
-        
-        plt.xlabel('Motivation Update DT')
-        plt.ylabel('Valor Promedio')
-        # Format motivation_dt values
-        motivation_dt_labels = [f'{dt:.3f}' for dt in motivation_dt_values]
-        plt.xticks(x + width, motivation_dt_labels, rotation=45)
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-    
+            dt_values.append(dt)
+
+            # Calcular estadísticas para cada componente
+            y_accel_changes = [d['y_accel_sign_changes'] for d in smoothness.values()]
+            x_accel_changes = [d['x_accel_sign_changes'] for d in smoothness.values()]
+
+            components_stats['Cambios en el signo de la aceleración Y']['mean'].append(np.mean(y_accel_changes))
+            components_stats['Cambios en el signo de la aceleración Y']['std'].append(np.std(y_accel_changes))
+
+            components_stats['Cambios en el signo de la aceleración X']['mean'].append(np.mean(x_accel_changes))
+            components_stats['Cambios en el signo de la aceleración X']['std'].append(np.std(x_accel_changes))
+
+            scores = [d['smoothness_score'] for d in smoothness.values()]
+            smoothness_stats['mean'].append(np.mean(scores))
+            smoothness_stats['std'].append(np.std(scores))
+
+    if dt_values:
+        x = np.arange(len(dt_values))
+        markers = ['o', 's']  # Different markers for clarity
+
+        # Gráfico: Líneas con marcadores y barras de error
+        for i, (component, stats) in enumerate(components_stats.items()):
+            plt.errorbar(x, stats['mean'], yerr=stats['std'],
+                        marker=markers[i],
+                        label=component)
+
+        plt.xlabel('Motivation Update DT (s)', fontsize=32)
+        plt.ylabel('Número de Cambios de Signo', fontsize=32)
+        plt.xticks(x, [f'{dt:.3f}' for dt in dt_values], rotation=45, ha='right', fontsize=25)
+        plt.yticks(fontsize=25)
+        plt.legend(loc='upper left')
+        plt.grid(True)
+
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'smoothness_components_multi_motivation_dt.png'), dpi=300, bbox_inches='tight')
+    plt.subplots_adjust(left=0.12, right=0.97, bottom=0.16, top=0.92)
+    plt.savefig(os.path.join(output_dir, 'smoothness_components_multi_motivation_dt.png'))
     plt.close()
 
-def plot_smoothness_summary_multi(motivation_dt_data, output_dir):
+    # Generate LaTeX table with exact values
+    if dt_values:
+        latex_path = os.path.join(output_dir, 'compare_motivation_dt_stability_results.tex')
+        with open(latex_path, 'w') as f:
+            f.write(r'\begin{table}[htbp]' + '\n')
+            f.write(r'\centering' + '\n')
+            f.write(r'\caption{Análisis de suavidad por Motivation Update DT: Cambios de signo en aceleración y puntuación de suavidad.}' + '\n')
+            f.write(r'\label{tab:compare_motivation_dt_stability}' + '\n')
+            f.write(r'\begin{tabular}{cccc}' + '\n')
+            f.write(r'\hline' + '\n')
+            f.write(r'Motivation DT (s) & Cambios signo acel. Y (mean $\pm$ std) & Cambios signo acel. X (mean $\pm$ std) & Suavidad (mean $\pm$ std) \\' + '\n')
+            f.write(r'\hline' + '\n')
+            for i, dt in enumerate(dt_values):
+                y_m = components_stats['Cambios en el signo de la aceleración Y']['mean'][i]
+                y_s = components_stats['Cambios en el signo de la aceleración Y']['std'][i]
+                x_m = components_stats['Cambios en el signo de la aceleración X']['mean'][i]
+                x_s = components_stats['Cambios en el signo de la aceleración X']['std'][i]
+                sm_m = smoothness_stats['mean'][i]
+                sm_s = smoothness_stats['std'][i]
+                f.write(f'{dt:.3f} & {y_m:.4f} $\\pm$ {y_s:.4f} & {x_m:.4f} $\\pm$ {x_s:.4f} & {sm_m:.4f} $\\pm$ {sm_s:.4f} \\\\\n')
+            f.write(r'\hline' + '\n')
+            f.write(r'\end{tabular}' + '\n')
+            f.write(r'\end{table}' + '\n')
+        print(f"LaTeX table saved to: {latex_path}")
+
+def process_data_and_save_csv(results_dir, output_dir):
     """
-    Genera gráfico de resumen estadístico para múltiples motivation_update_dt.
+    Procesa todos los datos y guarda los resultados en un CSV consolidado.
     """
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
-    fig.suptitle('Resumen de Análisis de Suavidad por Motivation Update DT', fontsize=16, fontweight='bold')
-    
-    # Gráfico 1: Suavidad promedio por Motivation Update DT
-    motivation_dt_values = []
-    avg_smoothness = []
-    std_smoothness = []
-    
-    for motivation_dt, data in sorted(motivation_dt_data.items()):
+    print("🔍 PROCESAMIENTO DE DATOS - ANÁLISIS DE SUAVIDAD")
+    print("="*60)
+
+    # Cargar datos de múltiples motivation_dt
+    print(f"\n📂 Cargando datos desde: {results_dir}")
+    motivation_dt_data = load_multiple_motivation_dt_data(results_dir)
+
+    if not motivation_dt_data:
+        print("❌ No se encontraron datos válidos de Motivation Update DT. Terminando.")
+        return None
+
+    print(f"\n✅ Cargados {len(motivation_dt_data)} experimentos de Motivation Update DT exitosamente")
+
+    # Escribir resultados consolidados en CSV
+    csv_file = os.path.join(output_dir, 'smoothness_analysis_consolidated.csv')
+    write_analysis_to_csv(motivation_dt_data, csv_file)
+
+    return csv_file
+
+def generate_plots_from_csv(csv_file, output_dir):
+    """
+    Genera todos los gráficos a partir del CSV consolidado.
+    """
+    print("\n📊 GENERACIÓN DE GRÁFICOS DESDE CSV CONSOLIDADO")
+    print("="*60)
+
+    # Cargar datos desde CSV
+    motivation_dt_data = load_analysis_from_csv(csv_file)
+
+    if not motivation_dt_data:
+        print("❌ No se pudieron cargar los datos desde el CSV. Terminando.")
+        return
+
+    # Generar gráficos multi-motivation_dt
+    print("\n📊 Generando gráficos de análisis de suavidad multi-Motivation DT...")
+
+    print("  - Generando gráfico de componentes de suavidad multi-Motivation DT...")
+    plot_smoothness_components_multi(motivation_dt_data, output_dir)
+
+    # Imprimir reporte resumido
+    print("\n📊 REPORTE RESUMIDO DE SUAVIDAD POR MOTIVATION UPDATE DT")
+    print("="*60)
+
+    for dt in sorted(motivation_dt_data.keys()):
+        data = motivation_dt_data[dt]
         smoothness = data['smoothness']
         if smoothness:
             scores = [d['smoothness_score'] for d in smoothness.values()]
-            motivation_dt_values.append(motivation_dt)
-            avg_smoothness.append(np.mean(scores))
-            std_smoothness.append(np.std(scores))
-    
-    if motivation_dt_values:
-        ax1.errorbar(motivation_dt_values, avg_smoothness, yerr=std_smoothness, 
-                    marker='o', capsize=5, linewidth=2)
-        ax1.set_xlabel('Motivation Update DT')
-        ax1.set_ylabel('Suavidad Promedio')
-        ax1.set_title('(a) Suavidad Promedio por Motivation Update DT')
-        ax1.grid(True, alpha=0.3)
-        
-        # Gráfico 2: Distribución de puntuaciones
-        all_scores = []
-        all_labels = []
-        
-        for motivation_dt, data in sorted(motivation_dt_data.items()):
-            smoothness = data['smoothness']
-            if smoothness:
-                scores = [d['smoothness_score'] for d in smoothness.values()]
-                all_scores.extend(scores)
-                all_labels.extend([f'DT={motivation_dt:.3f}'] * len(scores))
-        
-        if all_scores:
-            df_plot = pd.DataFrame({
-                'Motivation DT': all_labels,
-                'Smoothness Score': all_scores
-            })
-            
-            df_plot.boxplot(column='Smoothness Score', by='Motivation DT', ax=ax2)
-            ax2.set_title('(b) Distribución de Puntuaciones de Suavidad')
-            ax2.set_xlabel('Motivation Update DT')
-            ax2.set_ylabel('Puntuación de Suavidad')
-            ax2.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'smoothness_summary_multi_motivation_dt.png'), dpi=300, bbox_inches='tight')
-    plt.close()
+            avg_smooth = np.mean(scores)
+            std_smooth = np.std(scores)
+            print(f"DT={dt:.3f}: Suavidad={avg_smooth:.3f}±{std_smooth:.3f} (n={len(scores)})")
 
-def print_smoothness_report(smoothness1, smoothness2, file1_name, file2_name):
-    """
-    Imprime un reporte comparativo de suavidad.
-    """
-    print("\n" + "="*80)
-    print("REPORTE DE SUAVIDAD - COMPARACIÓN")
-    print("="*80)
-    
-    # Calcular estadísticas para cada archivo
-    stats1 = calculate_smoothness_stats(smoothness1)
-    stats2 = calculate_smoothness_stats(smoothness2)
-    
-    print(f"\n📊 ESTADÍSTICAS GENERALES")
-    print(f"{'Métrica':<25} {'Archivo 1':<15} {'Archivo 2':<15} {'Diferencia':<15}")
-    print("-" * 80)
-    
-    for metric in ['smoothness_score', 'direction_changes', 'acceleration_std', 'max_acceleration']:
-        val1 = stats1[metric]['mean']
-        val2 = stats2[metric]['mean']
-        diff = val2 - val1
-        print(f"{metric:<25} {val1:<15.4f} {val2:<15.4f} {diff:<15.4f}")
-    
-    print(f"\n📈 ANÁLISIS DE SUAVIDAD")
-    print(f"Archivo 1 ({file1_name}):")
-    print(f"  - Peatones analizados: {stats1['n_pedestrians']}")
-    print(f"  - Smoothness promedio: {stats1['smoothness_score']['mean']:.4f} ± {stats1['smoothness_score']['std']:.4f}")
-    print(f"  - Cambios de dirección promedio: {stats1['direction_changes']['mean']:.2f} ± {stats1['direction_changes']['std']:.2f}")
-    
-    print(f"\nArchivo 2 ({file2_name}):")
-    print(f"  - Peatones analizados: {stats2['n_pedestrians']}")
-    print(f"  - Smoothness promedio: {stats2['smoothness_score']['mean']:.4f} ± {stats2['smoothness_score']['std']:.4f}")
-    print(f"  - Cambios de dirección promedio: {stats2['direction_changes']['mean']:.2f} ± {stats2['direction_changes']['std']:.2f}")
-    
-    # Determinar cuál es más suave
-    if stats1['smoothness_score']['mean'] > stats2['smoothness_score']['mean']:
-        print(f"\n✅ {file1_name} produce funciones Y(t) MÁS SUAVES")
-    elif stats2['smoothness_score']['mean'] > stats1['smoothness_score']['mean']:
-        print(f"\n✅ {file2_name} produce funciones Y(t) MÁS SUAVES")
-    else:
-        print(f"\n🤝 Ambos archivos producen funciones Y(t) con suavidad similar")
-    
-    print("="*80)
+    # Encontrar el mejor y peor Motivation DT
+    best_dt = max(motivation_dt_data.keys(),
+                  key=lambda x: np.mean([d['smoothness_score'] for d in motivation_dt_data[x]['smoothness'].values()])
+                  if motivation_dt_data[x]['smoothness'] else 0)
+    worst_dt = min(motivation_dt_data.keys(),
+                   key=lambda x: np.mean([d['smoothness_score'] for d in motivation_dt_data[x]['smoothness'].values()])
+                   if motivation_dt_data[x]['smoothness'] else 1)
 
-def calculate_smoothness_stats(smoothness_data):
-    """
-    Calcula estadísticas de suavidad.
-    """
-    if not smoothness_data:
-        return {}
-    
-    stats = {}
-    for metric in ['smoothness_score', 'direction_changes', 'acceleration_std', 'max_acceleration']:
-        values = [s[metric] for s in smoothness_data.values()]
-        stats[metric] = {
-            'mean': np.mean(values),
-            'std': np.std(values),
-            'min': np.min(values),
-            'max': np.max(values)
-        }
-    
-    stats['n_pedestrians'] = len(smoothness_data)
-    return stats
+    print(f"\n🏆 MEJOR Motivation DT: {best_dt:.3f} (más suave)")
+    print(f"⚠️  PEOR Motivation DT: {worst_dt:.3f} (más zigzag)")
+
+    print(f"\n✅ Gráficos generados y guardados en: {output_dir}")
+    print("📁 Archivos generados:")
+    print("  - smoothness_analysis_consolidated.csv")
+    print("  - smoothness_components_multi_motivation_dt.png")
+    print("  - compare_motivation_dt_stability_results.tex")
 
 def main():
     parser = argparse.ArgumentParser(description='Analizar suavidad de la función Y(t) para múltiples Motivation Update DT')
@@ -429,55 +513,37 @@ def main():
     parser.add_argument('--output', '-o', 
                        default='/home/martin/Documents/UBA/Tesis/runner/experiments/motivation_update_dt', 
                        help='Directorio de salida para los resultados')
+    parser.add_argument('--csv-file', '-c',
+                       help='Archivo CSV consolidado existente (si se proporciona, solo genera gráficos)')
+    parser.add_argument('--process-only', action='store_true',
+                       help='Solo procesar datos y guardar CSV, no generar gráficos')
+    parser.add_argument('--plots-only', action='store_true',
+                       help='Solo generar gráficos desde CSV existente')
     
     args = parser.parse_args()
     
     # Crear directorio de salida
     os.makedirs(args.output, exist_ok=True)
     
-    print("🔍 ANÁLISIS DE SUAVIDAD DE LA FUNCIÓN Y(t) - MÚLTIPLES MOTIVATION UPDATE DT")
-    print("="*70)
-    
-    # Cargar datos de múltiples motivation_dt
-    print(f"\n📂 Cargando datos desde: {args.results_dir}")
-    motivation_dt_data = load_multiple_motivation_dt_data(args.results_dir)
-    
-    if not motivation_dt_data:
-        print("❌ No se encontraron datos válidos de Motivation Update DT. Terminando.")
-        return
-    
-    print(f"\n✅ Cargados {len(motivation_dt_data)} experimentos de Motivation Update DT exitosamente")
-    
-    # Generar gráficos multi-motivation_dt
-    print("\n📊 Generando gráficos de análisis de suavidad multi-Motivation DT...")
-    
-    print("  - Generando gráfico de funciones Y(t) multi-Motivation DT...")
-    plot_y_functions_multi(motivation_dt_data, args.output)
-    
-    print("  - Generando gráfico de distribución de suavidad multi-Motivation DT...")
-    plot_smoothness_distribution_multi(motivation_dt_data, args.output)
-    
-    print("  - Generando gráfico de componentes de suavidad multi-Motivation DT...")
-    plot_smoothness_components_multi(motivation_dt_data, args.output)
-    
-    print("  - Generando gráfico de resumen multi-Motivation DT...")
-    plot_smoothness_summary_multi(motivation_dt_data, args.output)
-    
-    # Imprimir reporte resumido
-    print("\n📊 REPORTE RESUMIDO DE SUAVIDAD POR MOTIVATION UPDATE DT")
-    print("="*60)
-    
-    for motivation_dt in sorted(motivation_dt_data.keys()):
-        smoothness = motivation_dt_data[motivation_dt]['smoothness']
-        stats = calculate_smoothness_stats(smoothness)
-        
-        print(f"\nMotivation DT = {motivation_dt:.3f}:")
-        print(f"  - Peatones: {stats['n_pedestrians']}")
-        print(f"  - Smoothness: {stats['smoothness_score']['mean']:.4f} ± {stats['smoothness_score']['std']:.4f}")
-        print(f"  - Cambios de dirección: {stats['direction_changes']['mean']:.2f} ± {stats['direction_changes']['std']:.2f}")
-    
-    print("\n✅ Análisis completado. Gráficos guardados en:", args.output)
-    print("="*70)
+    if args.plots_only and args.csv_file:
+        # Solo generar gráficos desde CSV existente
+        generate_plots_from_csv(args.csv_file, args.output)
+    elif args.process_only:
+        # Solo procesar datos y guardar CSV
+        csv_file = process_data_and_save_csv(args.results_dir, args.output)
+        if csv_file:
+            print(f"\n✅ Procesamiento completado. CSV guardado en: {csv_file}")
+    else:
+        # Proceso completo: procesar datos y generar gráficos
+        if args.csv_file and os.path.exists(args.csv_file):
+            # Usar CSV existente
+            print("📂 Usando CSV consolidado existente...")
+            generate_plots_from_csv(args.csv_file, args.output)
+        else:
+            # Procesar datos y generar gráficos
+            csv_file = process_data_and_save_csv(args.results_dir, args.output)
+            if csv_file:
+                generate_plots_from_csv(csv_file, args.output)
 
 if __name__ == '__main__':
     main()

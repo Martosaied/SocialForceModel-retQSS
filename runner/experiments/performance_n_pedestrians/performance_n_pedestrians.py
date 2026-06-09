@@ -12,12 +12,12 @@ from itertools import product
 from src.constants import Constants
 
 
-execute_experiment = True
+execute_experiment = False
 
 # Test configurations
-N_PEDESTRIANS = [2000] #, 10000]
+N_PEDESTRIANS = [1000, 3000, 5000] #, 10000]
 TARGET_DENSITY = 0.3  # peatones/m² - densidad constante
-CELL_SIZES = [3.0]  # metros por celda - diferentes tamaños de celda
+CELL_SIZES = [3.0, 4.0, 5.0, 7.5, 10.0]  # metros por celda - diferentes tamaños de celda
 
 
 def get_simulated_time():
@@ -145,7 +145,15 @@ def performance_n_pedestrians():
     # Phase 11: Generate breaking lanes comparison
     print("\n11. Generating breaking lanes comparison...")
     plot_enhanced_cell_size_comparison(results)
-    
+
+    # Phase 12: Generate cell size comparison with exec time
+    print("\n12. Generating cell size comparison (exec time)...")
+    plot_cell_size_comparison_exec_time(results)
+
+    # Phase 13: Generate LaTeX table (memory per pedestrian + RTF)
+    print("\n13. Generating LaTeX table (memory per pedestrian + RTF)...")
+    generate_memory_rtf_latex_table(results, optimal_configs)
+
     print("\n" + "="*60)
     print("All experiments completed successfully!")
     print("Results saved to CSV and plots generated.")
@@ -184,18 +192,22 @@ def run_experiment_with_params(n, implementation, grid_divisions, cell_size=1.0)
 
     print(f"Exp name: {exp_name}")
     
-    # Create output directory
-    output_dir = create_output_dir(
-        'experiments/performance_n_pedestrians/results', 
-        exp_name
-    )
+    # Only create a new output directory when actually running experiments.
+    # When plotting/re-reading existing results, we point to the canonical results path.
+    if execute_experiment:
+        output_dir = create_output_dir(
+            'experiments/performance_n_pedestrians/results',
+            exp_name
+        )
+    else:
+        output_dir = os.path.join('experiments/performance_n_pedestrians/results', exp_name)
 
     if execute_experiment:
         # Update config parameters
-        config['iterations'] = 1
+        config['iterations'] = 10
         config['parameters']['N']['value'] = n
         config['parameters']['PEDESTRIAN_IMPLEMENTATION']['value'] = pedestrian_implementation
-        config['parameters']['BORDER_IMPLEMENTATION']['value'] = 0
+        config['parameters']['BORDER_IMPLEMENTATION']['value'] = 1
         config['parameters']['GRID_SIZE']['value'] = actual_grid_size  # Update grid size
         config['parameters']['FROM_Y']['value'] = from_y
         config['parameters']['TO_Y']['value'] = to_y
@@ -259,6 +271,9 @@ def run_experiment_with_params(n, implementation, grid_divisions, cell_size=1.0)
                 # Higher is better (simulation runs faster than real-time)
                 speed_ratios = simulated_time / metrics_df['time']
                 
+                lanes_mean = metrics_df['clustering_based_groups'].mean() if 'clustering_based_groups' in metrics_df.columns else None
+                lanes_std = metrics_df['clustering_based_groups'].std() if 'clustering_based_groups' in metrics_df.columns else None
+
                 detailed_metrics = {
                     'total_iterations': len(metrics_df),
                     'execution_time': metrics_df['time'].mean(),  # Execution time in seconds
@@ -269,6 +284,9 @@ def run_experiment_with_params(n, implementation, grid_divisions, cell_size=1.0)
                     'std_iteration_time': speed_ratios.std(),  # Std of speed ratio
                     'avg_memory_usage': (metrics_df['memory_usage'].mean() / 1024) if 'memory_usage' in metrics_df.columns else None,  # Convert KB to MB
                     'std_memory_usage': (metrics_df['memory_usage'].std() / 1024) if 'memory_usage' in metrics_df.columns else None,  # Convert KB to MB
+                    'lanes_detected_mean': lanes_mean,
+                    'lanes_detected_std': lanes_std,
+                    'simulated_time': simulated_time,
                 }
         except (pd.errors.EmptyDataError, KeyError):
             detailed_metrics = None
@@ -302,12 +320,12 @@ def find_optimal_grid_sizes(results):
         lambda x: x['avg_iteration_time'] if x else float('inf')
     )
     
-    # Find optimal cell size for each N (minimum average time)
+    # Find optimal cell size for each N (maximum speed ratio / RTF)
     optimal_configs = {}
     for n in N_PEDESTRIANS:
         n_data = retqss_opt_data[retqss_opt_data['n_pedestrians'] == n]
         if not n_data.empty:
-            best_idx = n_data['avg_time'].idxmin()
+            best_idx = n_data['avg_time'].idxmax()
             best_config = n_data.loc[best_idx]
             optimal_configs[n] = {
                 'cell_size': best_config['cell_size'],
@@ -337,10 +355,11 @@ def plot_comprehensive_results(results, optimal_configs=None):
     qss_data = df[df['implementation'] == 'qss'].sort_values('n_pedestrians')
     retqss_data = df[df['implementation'] == 'retqss'].sort_values('n_pedestrians')
     retqss_opt_data = df[df['implementation'] == 'retqss_opt']
-    
-    # Create results directory if it doesn't exist
-    results_dir = 'experiments/performance_n_pedestrians/results'
-    os.makedirs(results_dir, exist_ok=True)
+    retqss_opt_exec_data = retqss_opt_data[retqss_opt_data['detailed_metrics'].notnull()].copy()
+    retqss_opt_exec_data['exec_time'] = retqss_opt_exec_data['detailed_metrics'].apply(
+        lambda x: x.get('execution_time') if x else None
+    )
+    retqss_opt_exec_data = retqss_opt_exec_data[retqss_opt_exec_data['exec_time'].notnull()]
     
     # Plot 1: Main comparison - All three implementations
     plt.figure(figsize=(12, 8))
@@ -391,10 +410,10 @@ def plot_comprehensive_results(results, optimal_configs=None):
     # plt.yscale('log')  # Changed to linear scale
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '01_performance_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '01_performance_comparison.png'),  bbox_inches='tight')
 
     plt.yscale('log')  # Changed to linear scale
-    plt.savefig(os.path.join(results_dir, '01_performance_comparison_log.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '01_performance_comparison_log.png'),  bbox_inches='tight')
     
     # Plot 2: QSS vs RETQSS Performance and Memory Comparison
     plt.figure(figsize=(16, 8))
@@ -441,15 +460,14 @@ def plot_comprehensive_results(results, optimal_configs=None):
                 fmt='s-', label='RETQSS', linewidth=4, markersize=10, color='orange', 
                 capsize=6, capthick=3, elinewidth=3, alpha=0.8, markeredgecolor='darkorange', markeredgewidth=2)
     
-    plt.xlabel('Número de Peatones (N)', fontsize=14)
-    plt.ylabel('Uso Promedio de Memoria (MB)', fontsize=14)
-    plt.title('Comparación de Uso de Memoria: QSS vs RETQSS', fontsize=16)
-    plt.legend(fontsize=12)
+    plt.xlabel('Número de Peatones (N)', fontsize=20)
+    plt.ylabel('Uso Promedio de Memoria (MB)', fontsize=20)
+    plt.legend(fontsize=20)
     plt.grid(True, alpha=0.3)
-    plt.tick_params(axis='both', which='major', labelsize=12)
+    plt.tick_params(axis='both', which='major', labelsize=20)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '03_qss_vs_retqss_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '03_qss_vs_retqss_comparison.png'),  bbox_inches='tight')
     plt.show()
 
 def plot_retqss_opt_cell_sizes(results):
@@ -515,7 +533,7 @@ def plot_retqss_opt_cell_sizes(results):
     plt.gca().spines['right'].set_visible(False)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '04_retqss_opt_cell_sizes_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '04_retqss_opt_cell_sizes_comparison.png'),  bbox_inches='tight')
     plt.show()
     
     # Create a second plot showing the same data but with linear scale for better visibility of trends
@@ -547,7 +565,7 @@ def plot_retqss_opt_cell_sizes(results):
     plt.gca().spines['right'].set_visible(False)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '05_retqss_opt_cell_sizes_linear.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '05_retqss_opt_cell_sizes_linear.png'),  bbox_inches='tight')
     plt.show()
 
 def plot_retqss_opt_best_cell_sizes(results):
@@ -613,7 +631,7 @@ def plot_retqss_opt_best_cell_sizes(results):
     plt.gca().spines['right'].set_visible(False)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '06_retqss_opt_best_cell_sizes.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '06_retqss_opt_best_cell_sizes.png'),  bbox_inches='tight')
     plt.show()
     
     # Create a second plot with linear scale for better trend visibility
@@ -646,7 +664,7 @@ def plot_retqss_opt_best_cell_sizes(results):
     plt.gca().spines['right'].set_visible(False)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '07_retqss_opt_best_cell_sizes_linear.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '07_retqss_opt_best_cell_sizes_linear.png'),  bbox_inches='tight')
     plt.show()
 
 def plot_performance_bar_chart(results, optimal_configs=None):
@@ -663,8 +681,13 @@ def plot_performance_bar_chart(results, optimal_configs=None):
     # Filter data by implementation
     qss_data = df[df['implementation'] == 'qss'].sort_values('n_pedestrians')
     retqss_data = df[df['implementation'] == 'retqss'].sort_values('n_pedestrians')
-    retqss_opt_data = df[df['implementation'] == 'retqss_opt']
-    
+    retqss_opt_data = df[df['implementation'] == 'retqss_opt'].copy()
+
+    # Add exec_time column for finding best configuration by execution time
+    retqss_opt_data['exec_time'] = retqss_opt_data['detailed_metrics'].apply(
+        lambda x: x.get('execution_time') if x else None
+    )
+
     # Prepare data for bar charts
     n_values = sorted(N_PEDESTRIANS)
     qss_means = []
@@ -708,29 +731,33 @@ def plot_performance_bar_chart(results, optimal_configs=None):
             retqss_exec_means.append(0)
             retqss_exec_stds.append(0)
         
-        # RETQSS Opt data (best configuration for each N)
+        # RETQSS Opt data (best configuration for each N by avg iteration time)
         if optimal_configs and n in optimal_configs:
             retqss_opt_n = retqss_opt_data[retqss_opt_data['n_pedestrians'] == n]
             retqss_opt_n = retqss_opt_n[retqss_opt_n['grid_divisions'] == optimal_configs[n]['grid_divisions']]
             if not retqss_opt_n.empty and retqss_opt_n['detailed_metrics'].iloc[0]:
                 retqss_opt_means.append(retqss_opt_n['detailed_metrics'].iloc[0]['avg_iteration_time'])
                 retqss_opt_stds.append(retqss_opt_n['detailed_metrics'].iloc[0]['std_iteration_time'])
-                retqss_opt_exec_means.append(retqss_opt_n['detailed_metrics'].iloc[0]['execution_time'])
-                retqss_opt_exec_stds.append(retqss_opt_n['detailed_metrics'].iloc[0].get('execution_time_std') or 0)
             else:
                 retqss_opt_means.append(0)
                 retqss_opt_stds.append(0)
-                retqss_opt_exec_means.append(0)
-                retqss_opt_exec_stds.append(0)
         else:
             retqss_opt_means.append(0)
             retqss_opt_stds.append(0)
+
+        # RETQSS Opt execution time (best configuration for each N by execution time)
+        retqss_opt_exec_n = retqss_opt_data[retqss_opt_data['n_pedestrians'] == n]
+        if not retqss_opt_exec_n.empty:
+            best_idx = retqss_opt_exec_n['exec_time'].idxmin()
+            best_exec = retqss_opt_exec_n.loc[best_idx]['detailed_metrics']
+            retqss_opt_exec_means.append(best_exec['execution_time'])
+            retqss_opt_exec_stds.append(best_exec.get('execution_time_std') or 0)
+        else:
             retqss_opt_exec_means.append(0)
             retqss_opt_exec_stds.append(0)
     
     # Create the bar chart
     fig, ax = plt.subplots(figsize=(16, 10))
-    fig.suptitle('Comparación de Rendimiento: QSS vs RETQSS vs RETQSS Opt', fontsize=18, fontweight='bold')
     
     # Set up bar positions
     x = np.arange(len(n_values))
@@ -749,19 +776,9 @@ def plot_performance_bar_chart(results, optimal_configs=None):
                    capsize=5, alpha=0.8, color='#6C5CE7', edgecolor='#5A4FCF', 
                    linewidth=1.5, label='RETQSS Opt')
     
-    # Add value labels on top of bars
-    for bars, means, stds in [(bars1, qss_means, qss_stds), 
-                              (bars2, retqss_means, retqss_stds), 
-                              (bars3, retqss_opt_means, retqss_opt_stds)]:
-        for bar, mean, std in zip(bars, means, stds):
-            if mean > 0:  # Only show label if there's data
-                height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2., height + std + height*0.01,
-                       f'{mean:.2f}x', ha='center', va='bottom', fontsize=9, fontweight='bold')
-    
     # Customize the plot
-    ax.set_xlabel('Número de Peatones (N)', fontsize=14)
-    ax.set_ylabel('Ratio de Velocidad (tiempo simulado / tiempo real)', fontsize=14)
+    ax.set_xlabel('Número de Peatones (N)')
+    ax.set_ylabel('Ratio de velocidad (tiempo simulado / tiempo real)')
     ax.set_title(f'Velocidad de Simulación: Densidad Constante ({TARGET_DENSITY} peatones/m²)', fontsize=16)
     ax.set_xticks(x)
     ax.set_xticklabels([str(n) for n in n_values])
@@ -774,15 +791,14 @@ def plot_performance_bar_chart(results, optimal_configs=None):
     ax.tick_params(axis='both', which='major', labelsize=12)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '02_performance_comparison_bar_chart.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '02_performance_comparison_bar_chart.png'),  bbox_inches='tight')
     plt.show()
     
     print("Performance comparison bar chart generated successfully!")
     print("Generated file: 02_performance_comparison_bar_chart.png")
 
     # Create the execution time bar chart
-    fig, ax = plt.subplots(figsize=(16, 10))
-    fig.suptitle('Comparación de Rendimiento: Tiempo de Ejecución Absoluto', fontsize=18, fontweight='bold')
+    fig, ax = plt.subplots(figsize=(18, 14))
 
     # Create bars
     bars1 = ax.bar(x - width, qss_exec_means, width, yerr=qss_exec_stds,
@@ -797,33 +813,73 @@ def plot_performance_bar_chart(results, optimal_configs=None):
                    capsize=5, alpha=0.8, color='#6C5CE7', edgecolor='#5A4FCF',
                    linewidth=1.5, label='RETQSS Opt')
 
-    # Add value labels on top of bars
-    for bars, means, stds in [(bars1, qss_exec_means, qss_exec_stds),
-                              (bars2, retqss_exec_means, retqss_exec_stds),
-                              (bars3, retqss_opt_exec_means, retqss_opt_exec_stds)]:
-        for bar, mean, std in zip(bars, means, stds):
-            if mean > 0:
-                height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2., height + std + height*0.01,
-                        f'{mean:.2f}s', ha='center', va='bottom', fontsize=9, fontweight='bold')
-
     # Customize the plot
-    ax.set_xlabel('Número de Peatones (N)', fontsize=14)
-    ax.set_ylabel('Tiempo Promedio de Ejecución (s)', fontsize=14)
-    ax.set_title(f'Tiempo de Ejecución: Densidad Constante ({TARGET_DENSITY} peatones/m²)', fontsize=16)
+    ax.set_xlabel('Número de Peatones (N)', fontsize=35)
+    ax.set_ylabel('Tiempo promedio de ejecución (segundos)', fontsize=35)
+    ax.set_ylim(0, max(qss_exec_means) + max(qss_exec_means) * 0.3)
     ax.set_xticks(x)
     ax.set_xticklabels([str(n) for n in n_values])
 
-    ax.legend(fontsize=12)
+    ax.legend(fontsize=30)
     ax.grid(True, alpha=0.3, axis='y')
-    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.tick_params(axis='both', which='major', labelsize=30)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '02_performance_comparison_bar_chart_exec_time.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '02_performance_comparison_bar_chart_exec_time.png'),  bbox_inches='tight')
     plt.show()
 
     print("Execution time bar chart generated successfully!")
     print("Generated file: 02_performance_comparison_bar_chart_exec_time.png")
+
+    # Create a second execution time bar chart without RETQSS (only QSS vs RETQSS Opt)
+    fig, ax = plt.subplots(figsize=(18, 14))
+
+    width_2 = 0.35
+    bars1 = ax.bar(x - width_2 / 2, qss_exec_means, width_2, yerr=qss_exec_stds,
+                   capsize=5, alpha=0.8, color='#FF6B6B', edgecolor='#D63031',
+                   linewidth=1.5, label='RETQSS Base')
+
+    bars2 = ax.bar(x + width_2 / 2, retqss_opt_exec_means, width_2, yerr=retqss_opt_exec_stds,
+                   capsize=5, alpha=0.8, color='#6C5CE7', edgecolor='#5A4FCF',
+                   linewidth=1.5, label='RETQSS Opt')
+
+    ax.set_xlabel('Número de Peatones (N)', fontsize=35)
+    ax.set_ylabel('Tiempo promedio de ejecución (segundos)', fontsize=35)
+    max_exec_time = max(qss_exec_means + retqss_opt_exec_means) if (qss_exec_means and retqss_opt_exec_means) else 0
+    ax.set_ylim(0, max_exec_time + max_exec_time * 0.3 if max_exec_time > 0 else 1)
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(n) for n in n_values])
+
+    ax.legend(fontsize=30)
+    ax.grid(True, alpha=0.3, axis='y')
+    ax.tick_params(axis='both', which='major', labelsize=30)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '02b_performance_comparison_bar_chart_exec_time_no_retqss.png'),  bbox_inches='tight')
+    plt.show()
+
+    print("Execution time bar chart (no RETQSS) generated successfully!")
+    print("Generated file: 02b_performance_comparison_bar_chart_exec_time_no_retqss.png")
+
+    # Generate LaTeX table with exact values
+    latex_path = os.path.join(results_dir, 'performance_n_pedestrians_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Resultados del experimento Performance N Peatones: RTF y tiempo de ejecución (s) por implementación.}' + '\n')
+        f.write(r'\label{tab:performance_n_pedestrians}' + '\n')
+        f.write(r'\begin{tabular}{ccccccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'N & QSS RTF & QSS Tiempo (s) & RETQSS RTF & RETQSS Tiempo (s) & RETQSS Opt RTF & RETQSS Opt Tiempo (s) \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for i, n in enumerate(n_values):
+            f.write(f'{n} & {qss_means[i]:.4f} $\\pm$ {qss_stds[i]:.4f} & {qss_exec_means[i]:.2f} $\\pm$ {qss_exec_stds[i]:.2f} & ')
+            f.write(f'{retqss_means[i]:.4f} $\\pm$ {retqss_stds[i]:.4f} & {retqss_exec_means[i]:.2f} $\\pm$ {retqss_exec_stds[i]:.2f} & ')
+            f.write(f'{retqss_opt_means[i]:.4f} $\\pm$ {retqss_opt_stds[i]:.4f} & {retqss_opt_exec_means[i]:.2f} $\\pm$ {retqss_opt_exec_stds[i]:.2f} \\\\\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"LaTeX table saved to: {latex_path}")
 
 def plot_enhanced_cell_size_comparison(results):
     """
@@ -908,21 +964,6 @@ def plot_enhanced_cell_size_comparison(results):
             max_std = max(stds) if len(stds) > 0 else 0
             if max_rtf > 0:
                 plt.ylim(0, max_rtf + max_std + max_rtf * 0.7)
-            label_offset = max_rtf * 0.06 if max_rtf > 0 else 0.06
-            time_offset = max_rtf * 0.02 if max_rtf > 0 else 0.02
-
-            # Add value labels on top of bars
-            for j, (bar, rtf, std, exec_time) in enumerate(zip(bars, times, stds, exec_times)):
-                height = bar.get_height()
-                if height + std > 0:
-                    plt.text(bar.get_x() + bar.get_width()/2., height + std + label_offset,
-                             f'{rtf:.2f}x±{std:.2f}', ha='center', va='bottom',
-                             fontsize=15, fontweight='bold', rotation=90)
-                    if exec_time > 0:
-                        plt.text(bar.get_x() + bar.get_width()/2., height + std + time_offset,
-                                 f'{exec_time:.1f}s', ha='center', va='bottom',
-                                 fontsize=9, rotation=90)
-            
             plt.xlabel('Tamaño de Celda (m)', fontsize=25)
             plt.ylabel('RTF', fontsize=25)
             plt.title(f'N = {n}', fontsize=25, fontweight='bold')
@@ -945,11 +986,164 @@ def plot_enhanced_cell_size_comparison(results):
             best_bar.set_linewidth(4)
             
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '08_comprehensive_cell_size_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '08_comprehensive_cell_size_comparison.png'),  bbox_inches='tight')
     plt.show()
     
     print("Comprehensive cell size comparison plot generated successfully!")
     print("Generated file: 08_comprehensive_cell_size_comparison.png")
+
+    # Generate LaTeX table for cell size comparison (RTF)
+    latex_path = os.path.join(results_dir, 'cell_size_comparison_rtf_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{RTF por tamaño de celda y número de peatones (RETQSS Opt).}' + '\n')
+        f.write(r'\label{tab:cell_size_rtf}' + '\n')
+        f.write(r'\begin{tabular}{ccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'N & Celda (m) & RTF (mean $\pm$ std) \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for n in n_values:
+            n_data = retqss_opt_data[retqss_opt_data['n_pedestrians'] == n].sort_values('cell_size')
+            for _, row in n_data.iterrows():
+                cs = row['cell_size']
+                rtf_m, rtf_s = row['avg_time'], row['std_time']
+                f.write(f'{n} & {cs} & {rtf_m:.4f} $\\pm$ {rtf_s:.4f} \\\\\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"LaTeX table saved to: {latex_path}")
+
+def plot_cell_size_comparison_exec_time(results):
+    """
+    Create a bar chart comparison for all cell sizes showing execution time on Y axis.
+    RTF is displayed as a label on each bar instead of being the Y axis variable.
+    """
+    df = pd.DataFrame(results)
+
+    # Create results directory if it doesn't exist
+    results_dir = 'experiments/performance_n_pedestrians/results'
+    os.makedirs(results_dir, exist_ok=True)
+
+    # Filter only RETQSS optimized results
+    retqss_opt_data = df[df['implementation'] == 'retqss_opt'].copy()
+
+    if retqss_opt_data.empty:
+        print("Warning: No RETQSS optimized results found for cell size comparison")
+        return
+
+    simulated_time = get_simulated_time()
+
+    # Use all cell sizes
+    all_cell_sizes = sorted(retqss_opt_data['cell_size'].unique())
+
+    # Add performance metrics from detailed_metrics
+    retqss_opt_data['avg_time'] = retqss_opt_data['detailed_metrics'].apply(
+        lambda x: x['avg_iteration_time'] if x else 0
+    )
+    retqss_opt_data['std_time'] = retqss_opt_data['detailed_metrics'].apply(
+        lambda x: x['std_iteration_time'] if x else 0
+    )
+    retqss_opt_data['execution_time_mean'] = retqss_opt_data['detailed_metrics'].apply(
+        lambda x: x.get('execution_time', 0) if x else 0
+    )
+    retqss_opt_data['execution_time_std'] = retqss_opt_data['detailed_metrics'].apply(
+        lambda x: x.get('execution_time_std', 0) or 0 if x else 0
+    )
+
+    # Create comprehensive bar chart comparison for all cell sizes
+    plt.figure(figsize=(20, 10))
+
+    # Create subplots for different N values
+    n_values = sorted(retqss_opt_data['n_pedestrians'].unique())
+    n_cols = 3
+    n_rows = (len(n_values) + n_cols - 1) // n_cols
+
+    # Define colors for all cell sizes
+    cell_size_colors = {
+        0.5: '#FF6B6B',   # Red
+        1.0: '#4ECDC4',   # Teal
+        2.0: '#45B7D1',   # Blue
+        3.0: '#96CEB4',   # Green
+        4.0: '#FFEAA7',   # Yellow
+        5.0: '#DDA0DD',   # Plum
+        7.5: '#FFB347',   # Orange
+        10.0: '#98D8C8'   # Mint
+    }
+
+    for i, n in enumerate(n_values):
+        plt.subplot(n_rows, n_cols, i + 1)
+
+        n_data = retqss_opt_data[retqss_opt_data['n_pedestrians'] == n].sort_values('cell_size')
+
+        if not n_data.empty:
+            cell_sizes = n_data['cell_size']
+            rtf_values = n_data['avg_time']
+            rtf_stds = n_data['std_time']
+            exec_times = n_data['execution_time_mean']
+            exec_stds = n_data['execution_time_std']
+
+            # Create bars with execution time on Y axis
+            colors = [cell_size_colors.get(cs, '#CCCCCC') for cs in cell_sizes]
+            bars = plt.bar(range(len(cell_sizes)), exec_times, yerr=exec_stds,
+                          color=colors, alpha=0.8, capsize=5,
+                          edgecolor='black', linewidth=1.5)
+
+            max_exec = max(exec_times) if len(exec_times) > 0 else 0
+            max_std = max(exec_stds) if len(exec_stds) > 0 else 0
+            if max_exec > 0:
+                plt.ylim(0, max_exec + max_std + max_exec * 0.7)
+
+            # Only show X axis label on middle figure (index 1)
+            if i == 1:
+                plt.xlabel('Tamaño de Celda (m)', fontsize=25)
+            # Only show Y axis label on first figure (index 0)
+            if i == 0:
+                plt.ylabel('Tiempo de Ejecución (s)', fontsize=25)
+            plt.xticks(range(len(cell_sizes)), [f'{cs}m' for cs in cell_sizes], rotation=45)
+
+            plt.grid(True, alpha=0.3, axis='y')
+            legend_handles = [
+                Line2D([], [], linestyle='None', label=f'N = {n}'),
+                Line2D([], [], linestyle='None', label=f'Tiempo simulado: {simulated_time:.0f}s'),
+            ]
+            plt.legend(handles=legend_handles, fontsize=20, loc='upper right')
+
+            # Highlight the best performing cell size (lowest execution time)
+            best_idx = exec_times.idxmin()
+            best_bar = bars[exec_times.index.get_loc(best_idx)]
+            best_bar.set_edgecolor('gold')
+            best_bar.set_linewidth(4)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '08b_cell_size_comparison_exec_time.png'),  bbox_inches='tight')
+    plt.show()
+
+    print("Cell size comparison (execution time) plot generated successfully!")
+    print("Generated file: 08b_cell_size_comparison_exec_time.png")
+
+    # Generate LaTeX table for cell size comparison (execution time)
+    latex_path = os.path.join(results_dir, 'cell_size_comparison_exec_time_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Tiempo de ejecución (s) por tamaño de celda y número de peatones (RETQSS Opt).}' + '\n')
+        f.write(r'\label{tab:cell_size_exec_time}' + '\n')
+        f.write(r'\begin{tabular}{ccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'N & Celda (m) & Tiempo Ejec (s) (mean $\pm$ std) \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for n in n_values:
+            n_data = retqss_opt_data[retqss_opt_data['n_pedestrians'] == n].sort_values('cell_size')
+            for _, row in n_data.iterrows():
+                cs = row['cell_size']
+                exec_m = row['execution_time_mean']
+                exec_s = row['execution_time_std']
+                f.write(f'{n} & {cs} & {exec_m:.2f} $\\pm$ {exec_s:.2f} \\\\\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"LaTeX table saved to: {latex_path}")
 
 def plot_qss_vs_retqss_bar_chart(results):
     """
@@ -987,8 +1181,8 @@ def plot_qss_vs_retqss_bar_chart(results):
         # QSS data
         qss_n = qss_data[qss_data['n_pedestrians'] == n]
         if not qss_n.empty and qss_n['detailed_metrics'].iloc[0]:
-            qss_means.append(qss_n['detailed_metrics'].iloc[0]['avg_iteration_time'])
-            qss_stds.append(qss_n['detailed_metrics'].iloc[0]['std_iteration_time'])
+            qss_means.append(qss_n['detailed_metrics'].iloc[0]['execution_time'])
+            qss_stds.append(qss_n['detailed_metrics'].iloc[0]['execution_time_std'])
             # Memory data (already converted to MB in metrics)
             if qss_n['detailed_metrics'].iloc[0]['avg_memory_usage']:
                 qss_memory.append(qss_n['detailed_metrics'].iloc[0]['avg_memory_usage'])
@@ -1001,12 +1195,12 @@ def plot_qss_vs_retqss_bar_chart(results):
             qss_stds.append(0)
             qss_memory.append(0)
             qss_memory_stds.append(0)
-        
+
         # RETQSS data
         retqss_n = retqss_data[retqss_data['n_pedestrians'] == n]
         if not retqss_n.empty and retqss_n['detailed_metrics'].iloc[0]:
-            retqss_means.append(retqss_n['detailed_metrics'].iloc[0]['avg_iteration_time'])
-            retqss_stds.append(retqss_n['detailed_metrics'].iloc[0]['std_iteration_time'])
+            retqss_means.append(retqss_n['detailed_metrics'].iloc[0]['execution_time'])
+            retqss_stds.append(retqss_n['detailed_metrics'].iloc[0]['execution_time_std'])
             # Memory data (already converted to MB in metrics)
             if retqss_n['detailed_metrics'].iloc[0]['avg_memory_usage']:
                 retqss_memory.append(retqss_n['detailed_metrics'].iloc[0]['avg_memory_usage'])
@@ -1020,11 +1214,8 @@ def plot_qss_vs_retqss_bar_chart(results):
             retqss_memory.append(0)
             retqss_memory_stds.append(0)
     
-    # Create the combined chart with two subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
-    fig.suptitle('Comparación QSS vs RETQSS: Rendimiento y Uso de Memoria', fontsize=18, fontweight='bold')
-    
-    # LEFT SUBPLOT: Performance comparison (bar chart)
+    # Figure 1: Performance comparison (bar chart)
+    fig_perf, ax1 = plt.subplots(figsize=(16, 10))
     x = np.arange(len(n_values))
     width = 0.35
     
@@ -1037,47 +1228,28 @@ def plot_qss_vs_retqss_bar_chart(results):
                     capsize=6, alpha=0.8, color='#4ECDC4', edgecolor='#00B894', 
                     linewidth=2, label='RETQSS', hatch='\\\\\\')
     
-    # Add value labels on performance bars
-    for bars, means, stds in [(bars1, qss_means, qss_stds), 
-                              (bars2, retqss_means, retqss_stds)]:
-        for bar, mean, std in zip(bars, means, stds):
-            if mean > 0:  # Only show label if there's data
-                height = bar.get_height()
-                ax1.text(bar.get_x() + bar.get_width()/2., height + std + height*0.02,
-                        f'{mean:.2f}x', ha='center', va='bottom', fontsize=9, fontweight='bold')
-    
     # Customize performance subplot
-    ax1.set_xlabel('Número de Peatones (N)', fontsize=14, fontweight='bold')
-    ax1.set_ylabel('Ratio de Velocidad (tiempo simulado / tiempo real)', fontsize=14, fontweight='bold')
-    ax1.set_title('Velocidad de Simulación: QSS vs RETQSS', fontsize=16, fontweight='bold')
+    ax1.set_xlabel('Número de Peatones (N)', fontsize=20)
+    ax1.set_ylabel('Tiempo Promedio de ejecución (segundos)', fontsize=20)
     ax1.set_xticks(x)
-    ax1.set_xticklabels([str(n) for n in n_values], fontsize=12)
-    
-    # Add horizontal line at 1.0 to show real-time threshold
-    ax1.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.5, label='Tiempo Real (1.0x)')
-    
-    ax1.legend(fontsize=12, loc='upper left')
+    ax1.set_xticklabels([str(n) for n in n_values])
+    ax1.set_ylim(0, max(qss_means) + max(qss_stds) + max(qss_means) * 0.7)
+
+    # Add horizontal line at simulated_time for reference
+    simulated_time = get_simulated_time()
+    ax1.axhline(y=simulated_time, color='green', linestyle='--', linewidth=2, alpha=0.5, label=f'Tiempo simulado: {simulated_time:.0f}s')
+
+    ax1.legend(loc='upper left')
     ax1.grid(True, alpha=0.3, axis='y')
-    ax1.tick_params(axis='both', which='major', labelsize=12)
     
-    # Add performance improvement annotations
-    for i, (qss_mean, retqss_mean) in enumerate(zip(qss_means, retqss_means)):
-        if qss_mean > 0 and retqss_mean > 0:
-            improvement = ((qss_mean - retqss_mean) / qss_mean) * 100
-            if improvement > 0:
-                ax1.annotate(f'+{improvement:.1f}%', 
-                            xy=(i, max(qss_mean, retqss_mean)), 
-                            xytext=(i, max(qss_mean, retqss_mean) + max(qss_stds[i], retqss_stds[i]) * 0.5),
-                            ha='center', va='bottom', fontsize=8, fontweight='bold',
-                            color='green', arrowprops=dict(arrowstyle='->', color='green', lw=1.2))
-            else:
-                ax1.annotate(f'{improvement:.1f}%', 
-                            xy=(i, max(qss_mean, retqss_mean)), 
-                            xytext=(i, max(qss_mean, retqss_mean) + max(qss_stds[i], retqss_stds[i]) * 0.5),
-                            ha='center', va='bottom', fontsize=8, fontweight='bold',
-                            color='red', arrowprops=dict(arrowstyle='->', color='red', lw=1.2))
-    
-    # RIGHT SUBPLOT: Memory usage comparison (line chart)
+    # Save performance figure
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '03a_qss_vs_retqss_performance.png'),  bbox_inches='tight')
+    plt.show()
+
+    # Figure 2: Memory usage comparison (line chart)
+    fig_mem, ax2 = plt.subplots(figsize=(16, 10))
+
     # Filter out zero values for line chart
     valid_indices = [i for i, (qss_mem, retqss_mem) in enumerate(zip(qss_memory, retqss_memory)) 
                      if qss_mem > 0 and retqss_mem > 0]
@@ -1102,27 +1274,30 @@ def plot_qss_vs_retqss_bar_chart(results):
         
         # Add value labels on memory points
         for i, (n, qss_mem, retqss_mem) in enumerate(zip(valid_n_values, valid_qss_memory, valid_retqss_memory)):
-            ax2.annotate(f'{qss_mem:.1f}MB', 
+            ax2.annotate(f'{qss_mem:.1f}MB',
                         xy=(n, qss_mem), xytext=(n, qss_mem + max(valid_qss_memory) * 0.05),
-                        ha='center', va='bottom', fontsize=8, fontweight='bold', color='#D63031')
-            ax2.annotate(f'{retqss_mem:.1f}MB', 
+                        ha='center', va='bottom', fontsize=18, fontweight='bold', color='#D63031')
+            ax2.annotate(f'{retqss_mem:.1f}MB',
                         xy=(n, retqss_mem), xytext=(n, retqss_mem - max(valid_retqss_memory) * 0.05),
-                        ha='center', va='top', fontsize=8, fontweight='bold', color='#00B894')
+                        ha='center', va='top', fontsize=18, fontweight='bold', color='#00B894')
     else:
         # If no memory data available, show empty plot with message
-        ax2.text(0.5, 0.5, 'No hay datos de memoria disponibles', 
-                ha='center', va='center', transform=ax2.transAxes, fontsize=14)
-    
-    # Customize memory subplot
-    ax2.set_xlabel('Número de Peatones (N)', fontsize=14, fontweight='bold')
-    ax2.set_ylabel('Uso Promedio de Memoria (MB)', fontsize=14, fontweight='bold')
-    ax2.set_title('Uso de Memoria: QSS vs RETQSS', fontsize=16, fontweight='bold')
-    ax2.legend(fontsize=12, loc='upper left')
+        ax2.text(0.5, 0.5, 'No hay datos de memoria disponibles',
+                ha='center', va='center', transform=ax2.transAxes)
+
+    # Customize memory plot
+    ax2.set_xlabel('Número de Peatones (N)', fontsize=20)
+    ax2.set_ylabel('Uso Promedio de Memoria (MB)', fontsize=20)
+    ax2.legend(loc='upper left')
     ax2.grid(True, alpha=0.3)
-    ax2.tick_params(axis='both', which='major', labelsize=12)
     
-    # Add some styling to both subplots
-    for ax in [ax1, ax2]:
+    # Add some styling to both figures
+    for ax in [ax1]:
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_linewidth(1.5)
+        ax.spines['bottom'].set_linewidth(1.5)
+    for ax in [ax2]:
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_linewidth(1.5)
@@ -1132,29 +1307,37 @@ def plot_qss_vs_retqss_bar_chart(results):
     qss_avg = np.mean([m for m in qss_means if m > 0])
     retqss_avg = np.mean([m for m in retqss_means if m > 0])
     overall_improvement = ((qss_avg - retqss_avg) / qss_avg) * 100 if qss_avg > 0 else 0
-    
-    perf_stats_text = f'Mejora Promedio: {overall_improvement:.1f}%\nQSS: {qss_avg:.2f}s\nRETQSS: {retqss_avg:.2f}s'
-    ax1.text(0.02, 0.98, perf_stats_text, transform=ax1.transAxes, 
-             fontsize=9, verticalalignment='top', 
-             bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.9, edgecolor='gray'))
-    
-    # Add summary statistics text box for memory
-    if valid_indices:
-        qss_avg_mem = np.mean(valid_qss_memory)
-        retqss_avg_mem = np.mean(valid_retqss_memory)
-        mem_improvement = ((qss_avg_mem - retqss_avg_mem) / qss_avg_mem) * 100 if qss_avg_mem > 0 else 0
-        
-        mem_stats_text = f'Memoria Promedio:\nQSS: {qss_avg_mem:.1f}MB\nRETQSS: {retqss_avg_mem:.1f}MB\nMejora: {mem_improvement:.1f}%'
-        ax2.text(0.02, 0.98, mem_stats_text, transform=ax2.transAxes, 
-                 fontsize=9, verticalalignment='top', 
-                 bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.9, edgecolor='gray'))
-    
+
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '03_qss_vs_retqss_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '03b_qss_vs_retqss_memory.png'),  bbox_inches='tight')
     plt.show()
     
-    print("QSS vs RETQSS comprehensive comparison generated successfully!")
-    print("Generated file: 03_qss_vs_retqss_comparison.png")
+    print("QSS vs RETQSS comparison generated successfully!")
+    print("Generated files: 03a_qss_vs_retqss_performance.png, 03b_qss_vs_retqss_memory.png")
+
+    # Generate LaTeX table for QSS vs RETQSS comparison
+    latex_path = os.path.join(results_dir, 'qss_vs_retqss_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Comparación QSS vs RETQSS: Tiempo de ejecución (s) y memoria (MB).}' + '\n')
+        f.write(r'\label{tab:qss_vs_retqss}' + '\n')
+        f.write(r'\begin{tabular}{ccccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'N & QSS Tiempo (s) & RETQSS Tiempo (s) & QSS Memoria (MB) & RETQSS Memoria (MB) \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for i, n in enumerate(n_values):
+            qss_std = qss_stds[i] if i < len(qss_stds) and qss_stds[i] is not None else 0
+            retqss_std = retqss_stds[i] if i < len(retqss_stds) and retqss_stds[i] is not None else 0
+            qss_m_std = qss_memory_stds[i] if i < len(qss_memory_stds) and qss_memory_stds[i] is not None else 0
+            retqss_m_std = retqss_memory_stds[i] if i < len(retqss_memory_stds) and retqss_memory_stds[i] is not None else 0
+            qss_m_val = qss_memory[i] if i < len(qss_memory) else 0
+            retqss_m_val = retqss_memory[i] if i < len(retqss_memory) else 0
+            f.write(f'{n} & {qss_means[i]:.2f} $\\pm$ {qss_std:.2f} & {retqss_means[i]:.2f} $\\pm$ {retqss_std:.2f} & {qss_m_val:.2f} $\\pm$ {qss_m_std:.2f} & {retqss_m_val:.2f} $\\pm$ {retqss_m_std:.2f} \\\\\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"LaTeX table saved to: {latex_path}")
 
 def plot_memory_usage_comparison(results, optimal_configs=None):
     """
@@ -1216,8 +1399,7 @@ def plot_memory_usage_comparison(results, optimal_configs=None):
             retqss_opt_memory_stds.append(0)
     
     # Create the memory usage line chart
-    fig, ax = plt.subplots(figsize=(16, 10))
-    fig.suptitle('Comparación de Uso de Memoria: QSS vs RETQSS vs RETQSS Opt', fontsize=18, fontweight='bold')
+    fig, ax = plt.subplots(figsize=(18, 14))
     
     # Filter out zero values for line chart
     valid_indices = [i for i, (qss_mem, retqss_mem, retqss_opt_mem) in enumerate(zip(qss_memory, retqss_memory, retqss_opt_memory)) 
@@ -1252,25 +1434,24 @@ def plot_memory_usage_comparison(results, optimal_configs=None):
         for i, (n, qss_mem, retqss_mem, retqss_opt_mem) in enumerate(zip(valid_n_values, valid_qss_memory, valid_retqss_memory, valid_retqss_opt_memory)):
             ax.annotate(f'{qss_mem:.1f}MB', 
                         xy=(n, qss_mem), xytext=(n, qss_mem + max(valid_qss_memory) * 0.05),
-                        ha='center', va='bottom', fontsize=8, fontweight='bold', color='#D63031')
+                        ha='center', va='bottom', fontsize=25, fontweight='bold', color='#D63031')
             ax.annotate(f'{retqss_mem:.1f}MB', 
                         xy=(n, retqss_mem), xytext=(n, retqss_mem - max(valid_retqss_memory) * 0.05),
-                        ha='center', va='top', fontsize=8, fontweight='bold', color='#00B894')
+                        ha='center', va='top', fontsize=25, fontweight='bold', color='#00B894')
             ax.annotate(f'{retqss_opt_mem:.1f}MB', 
                         xy=(n, retqss_opt_mem), xytext=(n, retqss_opt_mem + max(valid_retqss_opt_memory) * 0.05),
-                        ha='center', va='bottom', fontsize=8, fontweight='bold', color='#5A4FCF')
+                        ha='center', va='bottom', fontsize=25, fontweight='bold', color='#5A4FCF')
     else:
         # If no memory data available, show empty plot with message
         ax.text(0.5, 0.5, 'No hay datos de memoria disponibles', 
-                ha='center', va='center', transform=ax.transAxes, fontsize=14)
+                ha='center', va='center', transform=ax.transAxes, fontsize=20)
     
     # Customize the plot
-    ax.set_xlabel('Número de Peatones (N)', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Uso Promedio de Memoria (MB)', fontsize=14, fontweight='bold')
-    ax.set_title(f'Comparación de Uso de Memoria: Densidad Constante ({TARGET_DENSITY} peatones/m²)', fontsize=16)
-    ax.legend(fontsize=12, loc='upper left')
+    ax.set_xlabel('Número de Peatones (N)', fontsize=35, fontweight='bold')
+    ax.set_ylabel('Uso Promedio de Memoria (MB)', fontsize=35, fontweight='bold')
+    ax.legend(fontsize=30, loc='upper left')
     ax.grid(True, alpha=0.3)
-    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.tick_params(axis='both', which='major', labelsize=30)
     
     # Add some styling
     ax.spines['top'].set_visible(False)
@@ -1283,14 +1464,58 @@ def plot_memory_usage_comparison(results, optimal_configs=None):
         qss_avg_mem = np.mean(valid_qss_memory)
         retqss_avg_mem = np.mean(valid_retqss_memory)
         retqss_opt_avg_mem = np.mean(valid_retqss_opt_memory)
-        
-        stats_text = f'Memoria Promedio:\nQSS: {qss_avg_mem:.1f}MB\nRETQSS: {retqss_avg_mem:.1f}MB\nRETQSS Opt: {retqss_opt_avg_mem:.1f}MB'
-        ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, 
-                fontsize=10, verticalalignment='top', 
-                bbox=dict(boxstyle="round,pad=0.5", facecolor='white', alpha=0.9, edgecolor='gray'))
-    
+            
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '04_memory_usage_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '04_memory_usage_comparison.png'),  bbox_inches='tight')
+    plt.show()
+
+    # Create a second memory usage chart without RETQSS (only QSS vs RETQSS Opt)
+    fig2, ax_no_retqss = plt.subplots(figsize=(18, 14))
+
+    valid_indices_2 = [i for i, (qss_mem, retqss_opt_mem) in enumerate(zip(qss_memory, retqss_opt_memory))
+                       if qss_mem > 0 and retqss_opt_mem > 0]
+
+    if valid_indices_2:
+        valid_n_values_2 = [n_values[i] for i in valid_indices_2]
+        valid_qss_memory_2 = [qss_memory[i] for i in valid_indices_2]
+        valid_retqss_opt_memory_2 = [retqss_opt_memory[i] for i in valid_indices_2]
+        valid_qss_memory_stds_2 = [qss_memory_stds[i] for i in valid_indices_2]
+        valid_retqss_opt_memory_stds_2 = [retqss_opt_memory_stds[i] for i in valid_indices_2]
+
+        ax_no_retqss.errorbar(valid_n_values_2, valid_qss_memory_2, yerr=valid_qss_memory_stds_2,
+                              fmt='o-', label='RETQSS Base', linewidth=4, markersize=10,
+                              color='#FF6B6B', capsize=6, capthick=3, elinewidth=3,
+                              alpha=0.8, markeredgecolor='#D63031', markeredgewidth=2)
+
+        ax_no_retqss.errorbar(valid_n_values_2, valid_retqss_opt_memory_2, yerr=valid_retqss_opt_memory_stds_2,
+                              fmt='^-', label='RETQSS Opt', linewidth=4, markersize=10,
+                              color='#6C5CE7', capsize=6, capthick=3, elinewidth=3,
+                              alpha=0.8, markeredgecolor='#5A4FCF', markeredgewidth=2)
+
+        for n, qss_mem, retqss_opt_mem in zip(valid_n_values_2, valid_qss_memory_2, valid_retqss_opt_memory_2):
+            ax_no_retqss.annotate(f'{qss_mem:.1f}MB',
+                                  xy=(n, qss_mem), xytext=(n, qss_mem + max(valid_qss_memory_2) * 0.05),
+                                  ha='center', va='bottom', fontsize=25, fontweight='bold', color='#D63031')
+            ax_no_retqss.annotate(f'{retqss_opt_mem:.1f}MB',
+                                  xy=(n, retqss_opt_mem), xytext=(n, retqss_opt_mem + max(valid_retqss_opt_memory_2) * 0.05),
+                                  ha='center', va='bottom', fontsize=25, fontweight='bold', color='#5A4FCF')
+    else:
+        ax_no_retqss.text(0.5, 0.5, 'No hay datos de memoria disponibles',
+                          ha='center', va='center', transform=ax_no_retqss.transAxes, fontsize=20)
+
+    ax_no_retqss.set_xlabel('Número de Peatones (N)', fontsize=35, fontweight='bold')
+    ax_no_retqss.set_ylabel('Uso Promedio de Memoria (MB)', fontsize=35, fontweight='bold')
+    ax_no_retqss.legend(fontsize=30, loc='upper left')
+    ax_no_retqss.grid(True, alpha=0.3)
+    ax_no_retqss.tick_params(axis='both', which='major', labelsize=30)
+
+    ax_no_retqss.spines['top'].set_visible(False)
+    ax_no_retqss.spines['right'].set_visible(False)
+    ax_no_retqss.spines['left'].set_linewidth(1.5)
+    ax_no_retqss.spines['bottom'].set_linewidth(1.5)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, '04b_memory_usage_comparison_no_retqss.png'), bbox_inches='tight')
     plt.show()
     
     # Create a second plot showing memory efficiency (memory per pedestrian)
@@ -1367,11 +1592,154 @@ def plot_memory_usage_comparison(results, optimal_configs=None):
                  bbox=dict(boxstyle="round,pad=0.5", facecolor='white', alpha=0.9, edgecolor='gray'))
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, '05_memory_efficiency_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, '05_memory_efficiency_comparison.png'),  bbox_inches='tight')
     plt.show()
     
     print("Memory usage comparison plots generated successfully!")
     print("Generated files: 04_memory_usage_comparison.png, 05_memory_efficiency_comparison.png")
+
+def generate_memory_rtf_latex_table(results, optimal_configs=None):
+    """
+    Generate a LaTeX table with memory per pedestrian and RTF for each N.
+    Includes QSS, RETQSS, and RETQSS Opt (best config per N when available).
+    """
+    df = pd.DataFrame(results)
+
+    # Create results directory if it doesn't exist
+    results_dir = 'experiments/performance_n_pedestrians/results'
+    os.makedirs(results_dir, exist_ok=True)
+
+    qss_data = df[df['implementation'] == 'qss'].sort_values('n_pedestrians')
+    retqss_data = df[df['implementation'] == 'retqss'].sort_values('n_pedestrians')
+    retqss_opt_data = df[df['implementation'] == 'retqss_opt'].copy()
+
+    def extract_metrics(series, n):
+        if series is None:
+            return None, None, None, None, None, None, None
+        metrics = series['detailed_metrics']
+        if not metrics:
+            return None, None, None, None, None, None, None
+        rtf = metrics.get('avg_iteration_time')
+        rtf_std = metrics.get('std_iteration_time')
+        avg_mem = metrics.get('avg_memory_usage')
+        mem_std = metrics.get('std_memory_usage')
+        mem_per_ped = (avg_mem / n) if avg_mem is not None and n > 0 else None
+        mem_per_ped_std = (mem_std / n) if mem_std is not None and n > 0 else None
+        abs_perf = metrics.get('execution_time')
+        abs_perf_std = metrics.get('execution_time_std')
+        sim_time = metrics.get('simulated_time')
+        return mem_per_ped, mem_per_ped_std, rtf, rtf_std, abs_perf, abs_perf_std, sim_time
+
+    def format_value(value, digits):
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return "--"
+        return f"{value:.{digits}f}"
+
+    def format_mean_std(mean, std, digits):
+        if mean is None or (isinstance(mean, float) and np.isnan(mean)):
+            return "--"
+        if std is None or (isinstance(std, float) and np.isnan(std)):
+            return f"{mean:.{digits}f}"
+        return f"{mean:.{digits}f}±{std:.{digits}f}"
+
+    n_values = sorted(N_PEDESTRIANS)
+    def build_table(title, label, rows):
+        table_lines = []
+        table_lines.append("\\begin{table}[ht]")
+        table_lines.append("\\centering")
+        table_lines.append(f"\\caption{{{title}}}")
+        table_lines.append(f"\\label{{{label}}}")
+        table_lines.append("\\begin{tabular}{r r r r r}")
+        table_lines.append("\\hline")
+        table_lines.append("N & Tiempo simulado (s) & Mem/peat\\'on (MB) & RTF & Rend. abs (s) \\\\")
+        table_lines.append("\\hline")
+        table_lines.extend(rows)
+        table_lines.append("\\hline")
+        table_lines.append("\\end{tabular}")
+        table_lines.append("\\end{table}")
+        return table_lines
+
+    qss_rows = []
+    retqss_rows = []
+    retqss_opt_rows = []
+
+    for n in n_values:
+        qss_row = qss_data[qss_data['n_pedestrians'] == n]
+        retqss_row = retqss_data[retqss_data['n_pedestrians'] == n]
+
+        qss_series = qss_row.iloc[0] if not qss_row.empty else None
+        retqss_series = retqss_row.iloc[0] if not retqss_row.empty else None
+
+        qss_mem, qss_mem_std, qss_rtf, qss_rtf_std, qss_abs_perf, qss_abs_perf_std, qss_sim_time = extract_metrics(qss_series, n)
+        retqss_mem, retqss_mem_std, retqss_rtf, retqss_rtf_std, retqss_abs_perf, retqss_abs_perf_std, retqss_sim_time = extract_metrics(retqss_series, n)
+
+        # RETQSS Opt: use optimal config if provided, otherwise pick best RTF
+        retqss_opt_series = None
+        retqss_opt_n = retqss_opt_data[retqss_opt_data['n_pedestrians'] == n]
+        if not retqss_opt_n.empty:
+            if optimal_configs and n in optimal_configs:
+                retqss_opt_n = retqss_opt_n[retqss_opt_n['grid_divisions'] == optimal_configs[n]['grid_divisions']]
+                if not retqss_opt_n.empty:
+                    retqss_opt_series = retqss_opt_n.iloc[0]
+            else:
+                retqss_opt_n = retqss_opt_n[retqss_opt_n['detailed_metrics'].notnull()].copy()
+                if not retqss_opt_n.empty:
+                    retqss_opt_n['rtf'] = retqss_opt_n['detailed_metrics'].apply(
+                        lambda x: x['avg_iteration_time'] if x else 0
+                    )
+                    retqss_opt_series = retqss_opt_n.sort_values('rtf', ascending=False).iloc[0]
+
+        retqss_opt_mem, retqss_opt_mem_std, retqss_opt_rtf, retqss_opt_rtf_std, retqss_opt_abs_perf, retqss_opt_abs_perf_std, retqss_opt_sim_time = extract_metrics(retqss_opt_series, n)
+
+        qss_rows.append(" & ".join([
+            str(n),
+            format_value(qss_sim_time, 0),
+            format_mean_std(qss_mem, qss_mem_std, 6),
+            format_mean_std(qss_rtf, qss_rtf_std, 2),
+            format_mean_std(qss_abs_perf, qss_abs_perf_std, 2),
+        ]) + " \\\\")
+
+        retqss_rows.append(" & ".join([
+            str(n),
+            format_value(retqss_sim_time, 0),
+            format_mean_std(retqss_mem, retqss_mem_std, 6),
+            format_mean_std(retqss_rtf, retqss_rtf_std, 2),
+            format_mean_std(retqss_abs_perf, retqss_abs_perf_std, 2),
+        ]) + " \\\\")
+
+        retqss_opt_rows.append(" & ".join([
+            str(n),
+            format_value(retqss_opt_sim_time, 0),
+            format_mean_std(retqss_opt_mem, retqss_opt_mem_std, 6),
+            format_mean_std(retqss_opt_rtf, retqss_opt_rtf_std, 2),
+            format_mean_std(retqss_opt_abs_perf, retqss_opt_abs_perf_std, 2),
+        ]) + " \\\\")
+
+    lines = []
+    lines.extend(build_table(
+        "QSS: Memoria por peat\\'on y RTF seg\\'un n\\'umero de peatones.",
+        "tab:memoria-rtf-qss",
+        qss_rows
+    ))
+    lines.append("")
+    lines.extend(build_table(
+        "RETQSS: Memoria por peat\\'on y RTF seg\\'un n\\'umero de peatones.",
+        "tab:memoria-rtf-retqss",
+        retqss_rows
+    ))
+    lines.append("")
+    lines.extend(build_table(
+        "RETQSS Opt: Memoria por peat\\'on y RTF seg\\'un n\\'umero de peatones.",
+        "tab:memoria-rtf-retqss-opt",
+        retqss_opt_rows
+    ))
+
+    output_path = os.path.join(results_dir, '06_memory_rtf_table.tex')
+    with open(output_path, 'w') as f:
+        f.write("\n".join(lines))
+
+    print("LaTeX table generated successfully!")
+    print(f"Generated file: {output_path}")
 
 if __name__ == '__main__':
     performance_n_pedestrians()

@@ -22,7 +22,7 @@ warnings.filterwarnings('ignore')
 apply_publication_style()
 
 # Experiment parameters
-CELL_SIZES = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10, 12.5, 25, 50]
+CELL_SIZES = [3.0]
 WIDTH = 20
 GRID_SIZE = 50
 PEDESTRIAN_DENSITY = 0.3
@@ -31,7 +31,7 @@ PEDESTRIANS_IMPLEMENTATION = {
     Constants.PEDESTRIAN_NEIGHBORHOOD: "retqss_opt",
     Constants.PEDESTRIAN_MMOC: "retqss_baseline",
 }
-RUN_EXPERIMENT = False
+RUN_EXPERIMENT = True
 
 
 def get_simulated_time():
@@ -49,14 +49,14 @@ def breaking_lanes():
     print(f"  - Ancho del corredor: {WIDTH}m")
     print(f"  - Tamaños de celda: {CELL_SIZES}m\n")
     if RUN_EXPERIMENT:
-        run(50.0, Constants.PEDESTRIAN_MMOC)
+        # run(50.0, Constants.PEDESTRIAN_MMOC)
         for cell_size in CELL_SIZES:
             print(f"Ejecutando experimento para tamaño de celda {cell_size}m...")
             run(cell_size, Constants.PEDESTRIAN_NEIGHBORHOOD)
             print(f"Experimento para tamaño de celda {cell_size}m completado.\n")
 
     print("Graficando resultados...")
-    plot_results()
+    # plot_results()
 
 def run(cell_size, implementation):
     """Execute experiment for a given cell size."""
@@ -210,40 +210,30 @@ def plot_results():
     performance_colors.append(DEFAULT_COLORS['reference'])
     groups_colors.append(DEFAULT_COLORS['reference'])
 
-    fig, ax1 = plt.subplots(1, 1, figsize=(16, 12))
+    fig, ax1 = plt.subplots(1, 1, figsize=(18, 14))
     x_pos = np.arange(len(x_labels))
-    bars1 = ax1.bar(x_pos, performance_means, yerr=performance_stds, 
+    bars1 = ax1.bar(x_pos, time_means, yerr=time_stds,
                     color=performance_colors, width=0.6)
-    ax1.set_xlabel('Tamaño de Celda (m)')
-    ax1.set_ylabel('RTF - tiempo simulado(s) / tiempo real(s)')
+    ax1.set_xlabel('Tamaño de Celda (metros)')
+    ax1.set_ylabel('Tiempo promedio de ejecución (segundos)')
     ax1.set_xticks(x_pos)
     ax1.set_xticklabels(x_labels, rotation=45, ha='right')
-    
-    # Set y-axis limits to accommodate values below 1.0
-    min_val = min(performance_means) if len(performance_means) > 0 else 0
-    max_val = max(performance_means) if len(performance_means) > 0 else 1
-    max_std = max(performance_stds) if len(performance_stds) > 0 else 0
-    y_min = max(0, min_val - max_std * 1.5)
-    y_max = max_val * 1.4
-    ax1.set_ylim(y_min, y_max)
-    
-    # Add horizontal line at 1.0 to show real-time threshold
-    ax1.axhline(y=1.0, color='red', linestyle='--', label='Tiempo Real (1.0x)')
+
+    # Set y-axis limits
+    max_val = max(time_means) if len(time_means) > 0 else 1
+    max_std = max(time_stds) if len(time_stds) > 0 else 0
+    y_max = (max_val + max_std) * 1.4
+    ax1.set_ylim(0, y_max)
+
+    # Add horizontal line at simulated time for reference
+    ax1.axhline(y=simulated_time, color='green', linestyle='--', linewidth=2, alpha=0.5)
     ax1.grid(True)
-    
-    max_perf = max(performance_means) if len(performance_means) > 0 else 0
-    for i, (bar, mean, std, time_mean, time_std) in enumerate(zip(bars1, performance_means, performance_stds, time_means, time_stds)):
-        height = bar.get_height()
-        if height + std > 0:
-            ax1.text(bar.get_x() + bar.get_width()/2., height + std + max_perf * 0.03,
-                    f'{mean:.2f}x\n({time_mean:.1f}s)', ha='center', va='bottom')
-    
+
     from matplotlib.patches import Patch
     legend_elements_perf = [
         Patch(facecolor='lightcoral', label='RETQSS Base'),
         Patch(facecolor='skyblue', label='RETQSS Opt.'),
-        Line2D([0], [0], color='red', linestyle='--', label='Tiempo Real (1.0x)'),
-        Line2D([], [], linestyle='None', label=f'Tiempo simulado: {simulated_time:.0f}s'),
+        Line2D([0], [0], color='green', linestyle='--', label=f'Tiempo simulado: {simulated_time:.0f}s'),
     ]
     ax1.legend(handles=legend_elements_perf, loc='upper right')
 
@@ -260,10 +250,10 @@ def plot_results():
         else:
             groups_colors_updated.append('lightgreen')
 
-    fig, ax2 = plt.subplots(1, 1, figsize=(16, 12))
+    fig, ax2 = plt.subplots(1, 1, figsize=(18, 14))
     bars2 = ax2.bar(x_pos, groups_means, yerr=groups_stds, 
                     color=groups_colors_updated, width=0.6)
-    ax2.set_xlabel('Tamaño de Celda (m)')
+    ax2.set_xlabel('Tamaño de Celda (metros)')
     ax2.set_ylabel('Número de Carriles')
     ax2.set_xticks(x_pos)
     ax2.set_xticklabels(x_labels, rotation=45, ha='right')
@@ -271,12 +261,6 @@ def plot_results():
     if max_groups > 0:
         ax2.set_ylim(0, max_groups * 1.4)
     ax2.grid(True)
-    
-    for i, (bar, mean, std) in enumerate(zip(bars2, groups_means, groups_stds)):
-        height = bar.get_height()
-        if height + std > 0:
-            ax2.text(bar.get_x() + bar.get_width()/2., height + std + max_groups * 0.03 if max_groups > 0 else 0.03,
-                    f'{mean:.1f}', ha='center', va='bottom')
     
     legend_elements_groups = [
         Patch(facecolor='lightcoral', label='RETQSS Base'),
@@ -305,6 +289,32 @@ def plot_results():
     print("="*80)
     print(f"\nNota: Velocidad ratio = tiempo simulado ({simulated_time}s) / tiempo de ejecución")
     print("      Un ratio de 5.0x significa que la simulación corre 5 veces más rápido que tiempo real")
+
+    # Generate LaTeX table with exact values
+    latex_dir = 'experiments/breaking_lanes'
+    os.makedirs(latex_dir, exist_ok=True)
+    latex_path = os.path.join(latex_dir, 'breaking_lanes_results.tex')
+    with open(latex_path, 'w') as f:
+        f.write(r'\begin{table}[htbp]' + '\n')
+        f.write(r'\centering' + '\n')
+        f.write(r'\caption{Resultados del experimento Breaking Lanes: Velocidad y número de carriles por tamaño de celda.}' + '\n')
+        f.write(r'\label{tab:breaking_lanes}' + '\n')
+        f.write(r'\begin{tabular}{cccc}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'Tamaño Celda & Carriles (mean $\pm$ std) & RTF (mean $\pm$ std) & Tiempo de Ejecución (s) (mean $\pm$ std) \\' + '\n')
+        f.write(r'\hline' + '\n')
+        for i, label in enumerate(x_labels):
+            perf_mean = performance_means[i]
+            perf_std = performance_stds[i]
+            groups_mean = groups_means[i]
+            groups_std = groups_stds[i]
+            time_mean = time_means[i]
+            time_std = time_stds[i]
+            f.write(f'{label} & {groups_mean:.2f} $\\pm$ {groups_std:.2f} & {perf_mean:.4f} $\\pm$ {perf_std:.4f} & {time_mean:.2f} $\\pm$ {time_std:.2f} \\\\\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
+        f.write(r'\end{table}' + '\n')
+    print(f"\nLaTeX table saved to: {latex_path}")
 
 if __name__ == '__main__':
     breaking_lanes()

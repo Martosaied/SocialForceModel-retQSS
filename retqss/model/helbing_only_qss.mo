@@ -12,7 +12,7 @@ import retQSS_helbing_only_qss;
 */
 
 constant Integer
-	N = 2000;
+	N = 150;
 
 // Initial conditions parameters
 parameter Integer
@@ -188,8 +188,8 @@ algorithm
 				
 				if hx <> x[i] then
 					reinit(x[i], hx);
-					reinit(y[i], randomY);
-					dy[i] := randomY;
+					// reinit(y[i], randomY);
+					// dy[i] := randomY;
 				end if;
 				if hy <> y[i] then
 					reinit(y[i], hy);

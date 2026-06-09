@@ -112,4 +112,4 @@ class Clustering:
             particles_groups = self.join_groups(particles_groups)
             particles_groups = self.unify_groups(particles_groups)
 
-        return [group for group in particles_groups if len(group) > 0]
+        return [group for group in particles_groups if len(group) > 3]

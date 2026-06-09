@@ -354,7 +354,7 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
     """
     apply_publication_style()
     
-    fig = plt.figure(figsize=(24, 14))
+    fig = plt.figure(figsize=(16, 12))
     
     # Calcular estadísticas de componentes para cada deltaq
     deltaq_values = []
@@ -363,6 +363,7 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
         'Cambios en el signo de la aceleración X': {'mean': [], 'std': []},
     }
     
+    smoothness_stats = {'mean': [], 'std': []}
     for deltaq, data in deltaq_data.items():
         smoothness = data['smoothness']
         if smoothness:
@@ -377,6 +378,10 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
             
             components_stats['Cambios en el signo de la aceleración X']['mean'].append(np.mean(x_accel_changes))
             components_stats['Cambios en el signo de la aceleración X']['std'].append(np.std(x_accel_changes))
+            
+            scores = [d['smoothness_score'] for d in smoothness.values()]
+            smoothness_stats['mean'].append(np.mean(scores))
+            smoothness_stats['std'].append(np.std(scores))
     
     if deltaq_values:
         x = np.arange(len(deltaq_values))
@@ -388,9 +393,10 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
                         marker=markers[i],
                         label=component)
         
-        plt.xlabel('DeltaQ')
-        plt.ylabel('Número de Cambios de Signo')
-        plt.xticks(x, [f'1e{float(deltaq)}' for deltaq in deltaq_values], rotation=45, ha='right')
+        plt.xlabel('dQRel', fontsize=32)
+        plt.ylabel('Número de Cambios de Signo', fontsize=32)
+        plt.xticks(x, [f'1e{float(deltaq)}' for deltaq in deltaq_values], rotation=45, ha='right', fontsize=25)
+        plt.yticks(fontsize=25)
         plt.legend(loc='upper left')
         plt.grid(True)
     
@@ -398,6 +404,31 @@ def plot_smoothness_components_multi(deltaq_data, output_dir):
     plt.subplots_adjust(left=0.12, right=0.97, bottom=0.16, top=0.92)
     plt.savefig(os.path.join(output_dir, 'smoothness_components_multi_deltaq.png'))
     plt.close()
+
+    # Generate LaTeX table with exact values
+    if deltaq_values:
+        latex_path = os.path.join(output_dir, 'compare_model_stability_results.tex')
+        with open(latex_path, 'w') as f:
+            f.write(r'\begin{table}[htbp]' + '\n')
+            f.write(r'\centering' + '\n')
+            f.write(r'\caption{Análisis de suavidad por dQRel: Cambios de signo en aceleración y puntuación de suavidad.}' + '\n')
+            f.write(r'\label{tab:compare_model_stability}' + '\n')
+            f.write(r'\begin{tabular}{cccc}' + '\n')
+            f.write(r'\hline' + '\n')
+            f.write(r'dQRel & Cambios signo acel. Y (mean $\pm$ std) & Cambios signo acel. X (mean $\pm$ std) & Suavidad (mean $\pm$ std) \\' + '\n')
+            f.write(r'\hline' + '\n')
+            for i, dq in enumerate(deltaq_values):
+                y_m = components_stats['Cambios en el signo de la aceleración Y']['mean'][i]
+                y_s = components_stats['Cambios en el signo de la aceleración Y']['std'][i]
+                x_m = components_stats['Cambios en el signo de la aceleración X']['mean'][i]
+                x_s = components_stats['Cambios en el signo de la aceleración X']['std'][i]
+                sm_m = smoothness_stats['mean'][i]
+                sm_s = smoothness_stats['std'][i]
+                f.write(f'$10^{{{dq}}}$ & {y_m:.4f} $\\pm$ {y_s:.4f} & {x_m:.4f} $\\pm$ {x_s:.4f} & {sm_m:.4f} $\\pm$ {sm_s:.4f} \\\\\n')
+            f.write(r'\hline' + '\n')
+            f.write(r'\end{tabular}' + '\n')
+            f.write(r'\end{table}' + '\n')
+        print(f"LaTeX table saved to: {latex_path}")
 
 def print_smoothness_report(smoothness1, smoothness2, file1_name, file2_name):
     """
@@ -536,6 +567,7 @@ def generate_plots_from_csv(csv_file, output_dir):
     print("📁 Archivos generados:")
     print("  - smoothness_analysis_consolidated.csv")
     print("  - smoothness_components_multi_deltaq.png")
+    print("  - compare_model_stability_results.tex")
 
 def main():
     parser = argparse.ArgumentParser(description='Analizar suavidad de la función Y(t) para múltiples DeltaQ')

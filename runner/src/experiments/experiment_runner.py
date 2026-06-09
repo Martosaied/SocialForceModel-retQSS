@@ -19,8 +19,13 @@ class ExperimentRunner:
         if compile_model_flag:
             compile_model(model_name)
         
-        run_experiment(config, output_dir, model_name, 
-                      plot=False, copy_results=copy_results)
-        
-        copy_results_to_latest(output_dir)
+        run_experiment(
+            config,
+            output_dir,
+            model_name,
+            plot=False,
+            copy_results=copy_results,
+        )
 
+        if copy_results:
+            copy_results_to_latest(output_dir)
